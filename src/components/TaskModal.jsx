@@ -32,9 +32,13 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
   const [err, setErr] = useState({});
 
   useEffect(() => {
+    document.body.style.overflow = 'hidden';
     const onEsc = (e) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onEsc);
-    return () => document.removeEventListener('keydown', onEsc);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onEsc);
+    };
   }, [onClose]);
 
   const toggle = (arr, set, id) =>
@@ -143,7 +147,7 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
 
         <label className="fl">Date</label>
         <div style={{display:'flex',alignItems:'center',gap:6,marginTop:6,flexWrap:'wrap'}}>
-          <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:150,fontSize:13}} />
+          <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:150}} />
           <button className="btn btn-xs" onClick={()=>setDate(today())}>Today</button>
           <button className="btn btn-xs" onClick={()=>dateOffset(1)}>Tomorrow</button>
           <button className="btn btn-xs" onClick={()=>dateOffset(-1)}>Yesterday</button>
@@ -182,7 +186,7 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
           <input type="text" placeholder="Type new tag + Enter" value={newTag}
             onChange={e=>setNewTag(e.target.value)}
             onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); addTagInline(); } }}
-            style={{flex:1,fontSize:12,padding:'5px 9px'}} />
+            style={{flex:1,padding:'5px 9px'}} />
           <button className="btn btn-sm" onClick={addTagInline}>+ Tag</button>
         </div>
 
