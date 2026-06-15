@@ -20,7 +20,7 @@ export default function ClientSidebar({ clients, open, onToggle, onInsertClient 
       </div>
       {open && (
         <div className="pg-client-list">
-          {sorted.map(c => (
+          {sorted.map((c, i) => (
             <div key={c.id} className="pg-client-item" onClick={() => onInsertClient(c.id)}>
               <div className="pg-client-dot" style={{ background: c.color }} />
               <div style={{ minWidth: 0 }}>

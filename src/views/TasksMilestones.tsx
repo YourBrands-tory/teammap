@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { today, STC, STB, taskTimeStr } from '../lib/constants';
+import { useCallback, useState } from 'react';
+import { today, fmtD, STC, STB, taskTimeStr } from '../lib/constants';
 import { useStore } from '../store/useStore';
 import useTasksMilestones from '../hooks/useTasksMilestones';
 import TaskGenerator from '../components/tasks/TaskGenerator';
@@ -24,6 +24,9 @@ export default function TasksMilestones() {
     recoverTask, purgeTask,
     setDragCid, reorderC, setTaskModal, setMsModal,
   } = useTasksMilestones();
+
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
 
   const handleSaveMS = useCallback(async () => {
     if (!msModal || !msModal.name.trim()) return;
@@ -68,6 +71,20 @@ export default function TasksMilestones() {
     }
   }, [upsertClient]);
 
+  const handleMobileSelectClient = useCallback((cid: string) => {
+    setSelectedClientId(cid);
+  }, []);
+
+  const handleMobileBack = useCallback(() => {
+    setSelectedClientId(null);
+  }, []);
+
+  const handleFabAddTask = useCallback(() => {
+    if (selectedClientId) {
+      openTaskForClient(selectedClientId);
+    }
+  }, [selectedClientId, openTaskForClient]);
+
   const lt = msModal?._mode === 'edit' && msModal._id
     ? S.tasks.filter((t: any) => t.milestoneId === msModal._id && !t.deleted)
     : [];
@@ -82,17 +99,30 @@ export default function TasksMilestones() {
 
   return (
     <div className="view active" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {tabs.map(t => (
-        <div key={t.key} style={{
-          display: 'inline-block', padding: '7px 18px', fontSize: 12, fontWeight: 700,
-          textTransform: 'uppercase', letterSpacing: '.5px', cursor: 'pointer',
-          borderBottom: ctab === t.key ? '2px solid var(--accent)' : '2px solid transparent',
-          color: ctab === t.key ? 'var(--accent)' : 'var(--t3)',
-          transition: '.15s', background: ctab === t.key ? 'var(--al)' : 'transparent',
-        }} onClick={() => setCtab(t.key)}>
-          {t.label}
-        </div>
-      ))}
+      {/* Desktop tabs */}
+      <div className="tm-desk-tabs">
+        {tabs.map(t => (
+          <div key={t.key} style={{
+            display: 'inline-block', padding: '7px 18px', fontSize: 12, fontWeight: 700,
+            textTransform: 'uppercase', letterSpacing: '.5px', cursor: 'pointer',
+            borderBottom: ctab === t.key ? '2px solid var(--accent)' : '2px solid transparent',
+            color: ctab === t.key ? 'var(--accent)' : 'var(--t3)',
+            transition: '.15s', background: ctab === t.key ? 'var(--al)' : 'transparent',
+          }} onClick={() => { setCtab(t.key); setSelectedClientId(null); }}>
+            {t.label}
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile tab bar */}
+      <div className="tm-mob-tabs">
+        {tabs.map(t => (
+          <button key={t.key} className={`tm-mob-tab${ctab === t.key ? ' active' : ''}`}
+            onClick={() => { setCtab(t.key); setSelectedClientId(null); }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       <div id="tcontent" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {ctab === 'tg' && (
@@ -112,6 +142,10 @@ export default function TasksMilestones() {
             onDragOver={e => e.preventDefault()}
             onDrop={reorderC}
             onAddClient={handleAddClient}
+            selectedClientId={selectedClientId}
+            onSelectClient={handleMobileSelectClient}
+            onBackToClients={handleMobileBack}
+            onShowFilter={() => setShowFilterSheet(true)}
           />
         )}
         {ctab === 'ms' && (
@@ -132,6 +166,41 @@ export default function TasksMilestones() {
           />
         )}
       </div>
+
+      {/* Mobile FAB */}
+      {ctab === 'tg' && (
+        <button className="tm-fab" onClick={handleFabAddTask}>+</button>
+      )}
+
+      {/* Mobile filter bottom sheet */}
+      {showFilterSheet && (
+        <div className="tm-sheet-overlay" onClick={() => setShowFilterSheet(false)}>
+          <div className="tm-sheet" onClick={e => e.stopPropagation()}>
+            <div className="tm-sheet-head">
+              <span style={{ fontWeight: 700, fontSize: 15 }}>Filter by date</span>
+              <button className="tm-sheet-close" onClick={() => setShowFilterSheet(false)}>✕</button>
+            </div>
+            <div className="tm-sheet-body">
+              <div className="tm-sheet-section">
+                <label className="tm-sheet-label">Date</label>
+                <div className="tm-sheet-date-row">
+                  <button className="btn btn-sm" style={{ padding: '3px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => shiftGenDate(-1)}>←</button>
+                  <input type="date" value={dashDate} onChange={e => setDashDate(e.target.value)}
+                    style={{ flex: 1, fontSize: 14, padding: '8px 10px' }} />
+                  <button className="btn btn-sm" style={{ padding: '3px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => shiftGenDate(1)}>→</button>
+                </div>
+              </div>
+              <div className="tm-sheet-section">
+                <button className="btn btn-sm" onClick={() => { setDashDate(today()); setShowFilterSheet(false); }}
+                  style={{ width: '100%', fontWeight: 700 }}>Today</button>
+              </div>
+              <div className="tm-sheet-section">
+                <span style={{ fontSize: 12, color: 'var(--t3)' }}>{fmtD(dashDate)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {taskModal && (
         <TaskModal
@@ -197,3 +266,4 @@ export default function TasksMilestones() {
     </div>
   );
 }
+

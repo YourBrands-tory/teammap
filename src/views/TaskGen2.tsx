@@ -33,6 +33,7 @@ export default function TaskGen2() {
 
   const [saveViewModal, setSaveViewModal] = useState(false);
   const [saveViewName, setSaveViewName] = useState('');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const hasAllFilters = tg2AllMulti.freqs.length || tg2AllMulti.clients.length ||
     tg2AllMulti.members.length || tg2AllMulti.moods.length;
@@ -95,9 +96,53 @@ export default function TaskGen2() {
     }
   };
 
+  const sidebarContent = (tab: string) => {
+    if (tab === 'templates') {
+      return (
+        <ProjectSidebar
+          clients={sortedClients}
+          templates={S.templates || []}
+          selectedId={tg2SelProject}
+          dragId={dragId}
+          onSelect={(id) => { setTg2SelProject(id); setMobileSidebarOpen(false); }}
+          onDragStart={(id) => setDragId(id)}
+          onDragEnd={() => setDragId(null)}
+          onDragOver={(e) => e.preventDefault()}
+          onDragLeave={(e) => { (e.target as HTMLElement).classList.remove('drag-over'); }}
+          onDrop={(targetId) => { reorderProjects(targetId); }}
+          onAddProject={() => {
+            const c = window.confirm('Add project from Builder view');
+            if (c) { /* Placeholder */ }
+          }}
+        />
+      );
+    }
+    if (tab === 'ms') {
+      return (
+        <ProjectSidebar
+          clients={sortedClients}
+          templates={[]}
+          selectedId={tg2SelProject}
+          dragId={null}
+          onSelect={(id) => setTg2SelProject(id)}
+          onDragStart={() => {}}
+          onDragEnd={() => {}}
+          onDragOver={(e) => e.preventDefault()}
+          onDragLeave={() => {}}
+          onDrop={() => {}}
+          onAddProject={() => {}}
+        />
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="tg2-app">
       <div className="tg2-subnav">
+        <button className="tg2-mobile-sidebar-btn" onClick={() => setMobileSidebarOpen(o => !o)} aria-label="Toggle sidebar">
+          &#9776;
+        </button>
         <div className={`tg2-tab${tg2Tab === 'templates' ? ' active' : ''}`} onClick={() => switchTab('templates')}>
           &#128196; Project Templates
         </div>
@@ -113,22 +158,7 @@ export default function TaskGen2() {
         {/* ── PROJECT TEMPLATES ── */}
         {tg2Tab === 'templates' && (
           <>
-            <ProjectSidebar
-              clients={sortedClients}
-              templates={S.templates || []}
-              selectedId={tg2SelProject}
-              dragId={dragId}
-              onSelect={(id) => { setTg2SelProject(id); }}
-              onDragStart={(id) => setDragId(id)}
-              onDragEnd={() => setDragId(null)}
-              onDragOver={(e) => e.preventDefault()}
-              onDragLeave={(e) => { (e.target as HTMLElement).classList.remove('drag-over'); }}
-              onDrop={(targetId) => { reorderProjects(targetId); }}
-              onAddProject={() => {
-                const c = window.confirm('Add project from Builder view');
-                if (c) { /* Placeholder — in legacy it opens add client modal which is in Builder */ }
-              }}
-            />
+            <div className="tg2-left">{sidebarContent('templates')}</div>
             <div className="tg2-right">
               {proj ? (
                 <>
@@ -257,19 +287,7 @@ export default function TaskGen2() {
         {/* ── MILESTONE LINKS ── */}
         {tg2Tab === 'ms' && (
           <>
-            <ProjectSidebar
-              clients={sortedClients}
-              templates={[]}
-              selectedId={tg2SelProject}
-              dragId={null}
-              onSelect={(id) => setTg2SelProject(id)}
-              onDragStart={() => {}}
-              onDragEnd={() => {}}
-              onDragOver={(e) => e.preventDefault()}
-              onDragLeave={() => {}}
-              onDrop={() => {}}
-              onAddProject={() => {}}
-            />
+            <div className="tg2-left">{sidebarContent('ms')}</div>
             <MilestoneLinks
               S={S}
               milestones={milestones}
@@ -290,6 +308,15 @@ export default function TaskGen2() {
           </>
         )}
       </div>
+
+      {/* Mobile sidebar drawer */}
+      {mobileSidebarOpen && (
+        <div className="tg2-mobile-drawer" onClick={() => setMobileSidebarOpen(false)}>
+          <div className="tg2-mobile-drawer-content" onClick={e => e.stopPropagation()}>
+            {sidebarContent(tg2Tab)}
+          </div>
+        </div>
+      )}
 
       {/* ── Template form modal ── */}
       {tmplForm && (
@@ -434,9 +461,6 @@ export default function TaskGen2() {
                       : [...(msModal.assignedTo || []), m.id];
                     setMsModal({ ...msModal, assignedTo: next });
                   }}>
-                  <span style={{ width: 16, height: 16, borderRadius: '50%', background: m.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>
-                    {(m.name || '').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
-                  </span>
                   {m.name}
                 </div>
               );

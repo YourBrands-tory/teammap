@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import useBuilder from '../hooks/useBuilder';
 import MemberList from '../components/builder/MemberList';
 import ClientList from '../components/builder/ClientList';
@@ -13,25 +14,57 @@ export default function Builder() {
     removeLink, removeRole, openModal, closeModal,
   } = useBuilder();
 
+  const [collapsed, setCollapsed] = useState({ members: false, clients: false });
+
   return (
     <div className="view active" style={{ display: 'flex', flexDirection: 'column' }}>
       <div className="builder">
-        <MemberList
-          S={S}
-          selectedMemberId={selectedMemberId}
-          onSelect={selectMember}
-          onDragStart={setDragMid}
-          onDragEnd={() => setDragMid(null)}
-          onAdd={() => openModal('member')} />
+        <div className={`panel panel-mobile ${collapsed.members ? 'collapsed' : ''}`}>
+          <div className="ph panel-mobile-head" onClick={() => setCollapsed(c => ({ ...c, members: !c.members }))}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div>
+                <h3>Team Members</h3>
+                <p>Drag to assign or click to select</p>
+              </div>
+              <button className="panel-collapse-btn" onClick={(e) => { e.stopPropagation(); setCollapsed(c => ({ ...c, members: !c.members })); }}>
+                {collapsed.members ? '+' : '−'}
+              </button>
+            </div>
+          </div>
+          {!collapsed.members && (
+            <MemberList
+              S={S}
+              selectedMemberId={selectedMemberId}
+              onSelect={selectMember}
+              onDragStart={setDragMid}
+              onDragEnd={() => setDragMid(null)}
+              onAdd={() => openModal('member')} />
+          )}
+        </div>
 
-        <ClientList
-          S={S}
-          selectedMemberId={selectedMemberId}
-          onDrop={handleDrop}
-          onToggleLink={(clientId) => {
-            if (selectedMemberId) toggleLink(selectedMemberId, clientId);
-          }}
-          onAdd={() => openModal('client')} />
+        <div className={`panel panel-mobile ${collapsed.clients ? 'collapsed' : ''}`}>
+          <div className="ph panel-mobile-head" onClick={() => setCollapsed(c => ({ ...c, clients: !c.clients }))}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div>
+                <h3>Clients & Projects</h3>
+                <p>Drop member here to assign</p>
+              </div>
+              <button className="panel-collapse-btn" onClick={(e) => { e.stopPropagation(); setCollapsed(c => ({ ...c, clients: !c.clients })); }}>
+                {collapsed.clients ? '+' : '−'}
+              </button>
+            </div>
+          </div>
+          {!collapsed.clients && (
+            <ClientList
+              S={S}
+              selectedMemberId={selectedMemberId}
+              onDrop={handleDrop}
+              onToggleLink={(clientId) => {
+                if (selectedMemberId) toggleLink(selectedMemberId, clientId);
+              }}
+              onAdd={() => openModal('client')} />
+          )}
+        </div>
 
         <AssignmentCanvas
           S={S}

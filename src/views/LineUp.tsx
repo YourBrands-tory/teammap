@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { DndContext, DragOverlay, pointerWithin } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import useLineUp from '../hooks/useLineUp';
@@ -14,6 +15,8 @@ export default function LineUp() {
     setStatus, hideTask, restoreTask,
     handleDragEnd, setActiveId, setTaskModal, setPanelWidth,
   } = useLineUp();
+
+  const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);
 
   const activeTask = activeId ? S.tasks.find((t: any) => t.id === activeId) : null;
 
@@ -63,6 +66,24 @@ export default function LineUp() {
           S={S} date={date} panelWidth={panelWidth}
           onResize={setPanelWidth} onRestore={restoreTask} />
       </div>
+
+      <button className="lu-mobile-hidden-toggle" onClick={() => setMobileHiddenOpen(o => !o)}>
+        &#128065; Hidden ({((S.lineUpHidden || {})[date] || []).length})
+      </button>
+
+      {mobileHiddenOpen && (
+        <div className="lu-mobile-drawer" onClick={() => setMobileHiddenOpen(false)}>
+          <div className="lu-mobile-drawer-content" onClick={e => e.stopPropagation()}>
+            <div className="lu-mobile-drawer-head">
+              <span>&#128065; Hidden</span>
+              <button className="btn btn-sm" onClick={() => setMobileHiddenOpen(false)}>Close</button>
+            </div>
+            <HiddenPanel
+              S={S} date={date} panelWidth={300}
+              onResize={() => {}} onRestore={(id) => { restoreTask(id); setMobileHiddenOpen(false); }} />
+          </div>
+        </div>
+      )}
 
       {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} />}
     </div>

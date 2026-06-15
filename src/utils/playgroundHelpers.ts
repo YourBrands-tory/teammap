@@ -1,5 +1,5 @@
-export const PG_ROWS = 20;
 export const PG_COLS = 10;
+export const ROW_HEIGHT = 56;
 
 export interface CellData {
   taskId: string;
