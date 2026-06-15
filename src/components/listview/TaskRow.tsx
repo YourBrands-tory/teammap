@@ -1,0 +1,82 @@
+import { fmtD, taskTimeStr, STC, STB } from '../../lib/constants';
+import { sel } from '../../store/useStore';
+
+interface Props {
+  task: any;
+  S: any;
+  onOpen: (task: any) => void;
+  onDelete: (taskId: string) => void;
+}
+
+export default function TaskRow({ task, S, onOpen, onDelete }: Props) {
+  const mood = sel.gmood(S, task.mood);
+  const client = sel.gc(S, task.clientId);
+  const assignees = (task.assignedTo || [])
+    .map((id: string) => { const m = sel.gm(S, id); return m ? m.name : ''; })
+    .filter(Boolean);
+  const taskTags = (task.tags || [])
+    .map((tid: string) => { const tg = sel.gtag(S, tid); return tg ? tg.label : ''; })
+    .filter(Boolean);
+  const ms = task.milestoneId ? S.milestones.find((m: any) => m.id === task.milestoneId) : null;
+  const timeStr = taskTimeStr(task);
+
+  return (
+    <tr onClick={() => onOpen(task)}>
+      <td style={{ color: 'var(--t2)', whiteSpace: 'nowrap' }}>{fmtD(task.date)}</td>
+      <td className="wrap">
+        <span style={{ fontWeight: 600 }}>{task.isMilestone ? '\u{1F3A6} ' : ''}{task.name}</span>
+      </td>
+      <td>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+          background: mood.bg, color: mood.color,
+        }}>
+          {mood.icon} {mood.label}
+        </span>
+      </td>
+      <td>
+        <span style={{
+          padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+          background: STB[task.status], color: STC[task.status],
+        }}>
+          {task.status}
+        </span>
+      </td>
+      <td style={{ fontWeight: 500 }}>
+        {client
+          ? <span style={{ color: client.color, fontWeight: 600 }}>{client.name}</span>
+          : <span style={{ color: 'var(--t3)' }}>&mdash;</span>}
+      </td>
+      <td>
+        {assignees.length
+          ? assignees.map((n: string, i: number) => (
+              <span key={i} style={{
+                display: 'inline-block', padding: '1px 6px', borderRadius: 10,
+                fontSize: 11, background: 'var(--s2)', marginRight: 3, fontWeight: 500,
+              }}>{n}</span>
+            ))
+          : <span style={{ color: 'var(--t3)' }}>&mdash;</span>}
+      </td>
+      <td style={{ fontWeight: 600, color: 'var(--t2)' }}>
+        {timeStr || <span style={{ color: 'var(--t3)' }}>&mdash;</span>}
+      </td>
+      <td>
+        {taskTags.length
+          ? taskTags.map((l: string, i: number) => (
+              <span key={i} style={{
+                display: 'inline-block', padding: '1px 6px', borderRadius: 10,
+                fontSize: 11, background: 'var(--s3)', marginRight: 2,
+              }}>{l}</span>
+            ))
+          : <span style={{ color: 'var(--t3)' }}>&mdash;</span>}
+      </td>
+      <td style={{ fontSize: 11, color: 'var(--t2)' }}>
+        {ms ? ms.name : <span style={{ color: 'var(--t3)' }}>&mdash;</span>}
+      </td>
+      <td onClick={(e) => e.stopPropagation()}>
+        <button className="btn btn-xs btn-d" onClick={() => onDelete(task.id)}>&#128465;</button>
+      </td>
+    </tr>
+  );
+}
