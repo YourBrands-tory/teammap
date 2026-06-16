@@ -37,6 +37,11 @@ export default function PreferencesPanel({ maxCap, weekends, onUpdateSettings, o
     loadAll(true);
   };
 
+  const handleLogout = async () => {
+    if (!confirm('Log out?')) return;
+    await useStore.getState().signOut();
+  };
+
   return (
     <div className="st-panel">
       <div className="st-panel-head"><h3>Preferences &amp; Data</h3></div>
@@ -59,6 +64,9 @@ export default function PreferencesPanel({ maxCap, weekends, onUpdateSettings, o
             <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFile} />
           </label>
           <button className="btn btn-sm btn-d" onClick={handleReset}>↻ Reset</button>
+        </div>
+        <div style={{ padding: '8px 12px 12px', borderTop: '1px solid var(--border)' }}>
+          <button className="btn btn-sm" style={{ color:'var(--warn)' }} onClick={handleLogout}>🚪 Log out</button>
         </div>
         {msg && <div style={{
           padding: '0 12px 12px', fontSize: 12, fontWeight: 600,

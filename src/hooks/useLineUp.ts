@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { today } from '../lib/constants';
 import { getFilteredAndSortedTasks, dayProgress } from '../utils/lineUpHelpers';
@@ -9,6 +9,8 @@ type Filters = { member: string; client: string; mood: string };
 
 export default function useLineUp() {
   const S = useStore(s => s.S);
+  const role = useStore(s => s.role);
+  const memberId = useStore(s => s.memberId);
   const upsertTask = useStore(s => s.upsertTask);
   const setStateKey = useStore(s => s.setStateKey);
 
@@ -27,8 +29,13 @@ export default function useLineUp() {
 
   const goToday = useCallback(() => setDate(today()), []);
 
-  const tasks = getFilteredAndSortedTasks(S, date, filters, sortMode);
-  const allOnDate = S.tasks.filter((t: any) => t.date === date && !t.deleted);
+  const memberScopedTasks = useMemo(() => {
+    if (role !== 'member' || !memberId) return S.tasks;
+    return S.tasks.filter((t: any) => t.assignedTo && t.assignedTo.includes(memberId));
+  }, [S.tasks, role, memberId]);
+
+  const tasks = getFilteredAndSortedTasks({ ...S, tasks: memberScopedTasks }, date, filters, sortMode);
+  const allOnDate = memberScopedTasks.filter((t: any) => t.date === date && !t.deleted);
   const prog = dayProgress(allOnDate);
 
   const totalMins = allOnDate.reduce((a: number, t: any) => a + ((t.estH || 0) * 60 + (t.estM || 0)), 0);
@@ -52,6 +59,7 @@ export default function useLineUp() {
   }, [S.lineUpHidden, date, setStateKey]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
+    if (role === 'member') { setActiveId(null); return; }
     const { active, over } = event;
     if (!active || !over || active.id === over.id) { setActiveId(null); return; }
     const ids = tasks.map(t => t.id);
@@ -62,7 +70,7 @@ export default function useLineUp() {
     ids.splice(newIdx, 0, active.id as string);
     setStateKey('lineUpOrder', { ...S.lineUpOrder, [date]: ids });
     setActiveId(null);
-  }, [tasks, S.lineUpOrder, date, setStateKey]);
+  }, [tasks, S.lineUpOrder, date, setStateKey, role]);
 
   const setFilter = useCallback((key: keyof Filters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -70,7 +78,7 @@ export default function useLineUp() {
 
   return {
     S, date, sortMode, filters, tasks, allOnDate, prog, totalMins,
-    panelWidth, activeId, taskModal,
+    panelWidth, activeId, taskModal, role, memberId,
     setDate, shift, goToday, setSortMode, setFilter,
     setStatus, hideTask, restoreTask,
     handleDragEnd, setActiveId, setTaskModal, setPanelWidth,

@@ -22,12 +22,13 @@ function clearDraft() {
   try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
 }
 
-export default function TaskModal({ task = {}, onClose, onSave }) {
+export default function TaskModal({ task = {}, onClose, onSave, role, memberId }) {
   const S = useStore(s => s.S);
   const upsertTask = useStore(s => s.upsertTask);
   const upsertTag = useStore(s => s.upsertTag);
   const upsertMilestone = useStore(s => s.upsertMilestone);
   const softDeleteTask = useStore(s => s.softDeleteTask);
+  const isMember = role === 'member' && !!memberId;
 
   const isEdit = !!task.id;
   const draftId = task.id || '__new__';
@@ -55,6 +56,8 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
   const [newLinkLabel, setNewLinkLabel] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [tDetailTab, setTDetailTab] = useState('sub');
+  const [saveError, setSaveError] = useState(null);
+  const [saving, setSaving] = useState(false);
   const notesRef = useRef(null);
 
   const resizeNotes = () => {
@@ -123,12 +126,20 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
   const toggleSubtask = (i) => {
     const next = subtasks.map((s, idx) => idx === i ? { ...s, done: !s.done } : s);
     setSubtasks(next);
-    const allDone = next.length && next.every(s => s.done);
-    if (allDone && status !== 'Complete') {
-      if (confirm('All subtasks are checked off. Mark this task as Complete?')) {
-        setStatus('Complete');
-      }
+    const newStatus = next.length && next.every(s => s.done) ? 'Complete' : status;
+    if (task.id) {
+      upsertTask({
+        id: task.id, createdAt: task.createdAt,
+        name: name.trim(), clientId: clientId || null, date: date || today(),
+        mood, assignedTo: [...assigned], tags: [...tags],
+        estH: parseInt(estH) || 0, estM: parseInt(estM) || 0, notes: notes.trim(),
+        subtasks: next,
+        links: links.map(l => ({ ...l })),
+        status: newStatus,
+        isMilestone: isMs, milestoneId,
+      }).catch(err => console.error('[TaskModal.toggleSubtask] upsertTask failed:', err));
     }
+    if (newStatus !== status) setStatus(newStatus);
   };
 
   const editSubtaskText = (i, text) => {
@@ -156,6 +167,7 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
   };
 
   const save = async () => {
+    setSaveError(null);
     const e = {};
     if (!name.trim()) e.name = true;
     if (!mood) e.mood = true;
@@ -171,7 +183,7 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
       milestoneId = nm.id;
     }
 
-    const saved = await upsertTask({
+    const payload = {
       ...(isEdit ? { id: task.id, createdAt: task.createdAt } : {}),
       name: name.trim(), clientId: clientId || null, date: date || today(),
       mood, status, assignedTo: [...assigned], tags: [...tags],
@@ -179,10 +191,21 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
       subtasks: subtasks.map(s => ({ ...s })),
       links: links.map(l => ({ ...l })),
       isMilestone: isMs, milestoneId,
-    });
-    clearDraft();
-    if (onSave) onSave(saved);
-    onClose();
+    };
+    console.log('[TaskModal.save] saving', { id: payload.id, subtasks: payload.subtasks?.length, links: payload.links?.length });
+    setSaving(true);
+    try {
+      const saved = await upsertTask(payload);
+      clearDraft();
+      if (onSave) onSave(saved);
+      onClose();
+    } catch (err) {
+      const msg = err?.message || err?.error?.message || String(err);
+      console.error('[TaskModal.save] FAILED:', msg);
+      setSaveError(msg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const del = async () => {
@@ -196,11 +219,13 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
     <div className="mbg" onMouseDown={(e)=>e.target.classList.contains('mbg')&&handleClose()}>
       <div className="modal modal-lg" onMouseDown={e=>e.stopPropagation()}>
         <h2 style={{marginBottom:12}}>{isEdit ? 'Edit task' : 'New task'}</h2>
-        <div style={{fontSize:11,color:'var(--warn)',marginBottom:10}}>* Task name, assigned to &amp; mood are required</div>
+        {isMember && <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>Viewing task — you can update subtasks and status</div>}
+        {!isMember && <div style={{fontSize:11,color:'var(--warn)',marginBottom:10}}>* Task name, assigned to &amp; mood are required</div>}
 
         <label className="fl" style={{marginTop:0}}>Task name *</label>
         <input type="text" placeholder="What needs to be done?" value={name}
-          className={err.name?'req':''} onChange={e=>setName(e.target.value)} />
+          className={err.name?'req':''} onChange={e=>setName(e.target.value)}
+          readOnly={isMember} style={isMember?{background:'var(--s2)',color:'var(--t2)',cursor:'default'}:{}} />
 
         <label className="fl">Mood *</label>
         <div className="mood-pick-row" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
@@ -208,8 +233,8 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
             const on = mood === m.id;
             return (
               <div key={m.id} className={`mood-opt-btn${on?' on':''}`}
-                style={on?{background:m.bg,color:m.color,borderColor:m.color,borderWidth:2}:{}}
-                onClick={()=>setMood(m.id)}>
+                style={{...(on?{background:m.bg,color:m.color,borderColor:m.color,borderWidth:2}:{}), ...(isMember?{opacity:0.6,cursor:'default'}:{})}}
+                onClick={()=>{if(!isMember) setMood(m.id);}}>
                 {m.icon} {m.label}{m.max?<span style={{fontSize:9,opacity:.6}}> max{m.max}</span>:null}
               </div>
             );
@@ -220,7 +245,8 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
         <div className="ttag-row" style={err.assigned?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
           {S.members.map(m => (
             <div key={m.id} className={`ttagopt${assigned.includes(m.id)?' on':''}`}
-              onClick={()=>toggle(assigned,setAssigned,m.id)}>
+              style={isMember?{cursor:'default',opacity:0.7}:{}}
+              onClick={()=>{if(!isMember) toggle(assigned,setAssigned,m.id);}}>
               <Avatar name={m.name} color={m.color} size={16} /> {m.name}
             </div>
           ))}
@@ -231,9 +257,9 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
           {sel.scl(S).map(c => {
             const on = clientId === c.id;
             return (
-              <div key={c.id} onClick={()=>setClientId(on?'':c.id)}
+              <div key={c.id} onClick={()=>{if(!isMember) setClientId(on?'':c.id);}}
                 className={`ttagopt${on?' on':''}`}
-                style={on?{borderColor:c.color,background:c.color+'18',color:c.color}:{}}>
+                style={{...(on?{borderColor:c.color,background:c.color+'18',color:c.color}:{}), ...(isMember?{cursor:'default',opacity:0.7}:{})}}>
                 {c.name}
               </div>
             );
@@ -242,20 +268,23 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
 
         <label className="fl">Date</label>
         <div style={{display:'flex',alignItems:'center',gap:6,marginTop:6,flexWrap:'wrap'}}>
-          <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:150}} />
-          <button className="btn btn-xs" onClick={()=>setDate(today())}>Today</button>
-          <button className="btn btn-xs" onClick={()=>dateOffset(1)}>Tomorrow</button>
-          <button className="btn btn-xs" onClick={()=>dateOffset(-1)}>Yesterday</button>
+          <input type="date" value={date} onChange={e=>{if(!isMember) setDate(e.target.value);}} style={{width:150}} readOnly={isMember} />
+          {!isMember && <button className="btn btn-xs" onClick={()=>setDate(today())}>Today</button>}
+          {!isMember && <button className="btn btn-xs" onClick={()=>setDate(today())}>Tomorrow</button>}
+          {!isMember && <button className="btn btn-xs" onClick={()=>dateOffset(-1)}>Yesterday</button>}
         </div>
 
         <div style={{display:'flex',gap:16,alignItems:'flex-start',marginTop:6}}>
           <div style={{flex:1,minWidth:0}}>
             <label className="fl" style={{marginTop:0}}>Status</label>
-            <select value={status} onChange={e=>setStatus(e.target.value)} style={{width:'100%',maxWidth:200}}>
+            <select value={status} onChange={e=>{
+              setStatus(e.target.value);
+              if (task.id) upsertTask({ ...task, status: e.target.value }).catch(err => console.error('[TaskModal] status upsertTask failed:', err));
+            }} style={{width:'100%',maxWidth:200}}>
               {STATS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          <div style={{flexShrink:0}}>
+          {!isMember && <div style={{flexShrink:0}}>
             <label className="fl" style={{marginTop:0}}>Est. time</label>
             <div style={{display:'flex',gap:6,alignItems:'center',marginTop:6}}>
               <input type="number" min="0" max="99" placeholder="0" value={estH}
@@ -263,28 +292,30 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
               <input type="number" min="0" max="59" placeholder="0" value={estM}
                 onChange={e=>setEstM(e.target.value)} style={{width:58}} /> <span style={{fontSize:12,color:'var(--t2)'}}>m</span>
             </div>
-          </div>
+          </div>}
         </div>
 
         <label className="fl">Notes</label>
         <textarea ref={notesRef} placeholder="Notes…" value={notes}
           onChange={e=>setNotes(e.target.value)} onInput={resizeNotes}
-          style={{minHeight:60,marginTop:6,overflow:'hidden',resize:'none'}} />
+          readOnly={isMember}
+          style={{minHeight:60,marginTop:6,overflow:'hidden',resize:'none',...(isMember?{background:'var(--s2)',color:'var(--t2)',cursor:'default'}:{})}} />
 
         <label className="fl">Tags</label>
         <div className="tag-chip-pick">
           {(S.tags||[]).map(tg => (
             <div key={tg.id} className={`tcp${tags.includes(tg.id)?' on':''}`}
-              onClick={()=>toggle(tags,setTags,tg.id)}>{tg.label}</div>
+              onClick={()=>{if(!isMember) toggle(tags,setTags,tg.id);}}
+              style={isMember?{cursor:'default',opacity:0.7}:{}}>{tg.label}</div>
           ))}
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}>
+        {!isMember && <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}>
           <input type="text" placeholder="Type new tag + Enter" value={newTag}
             onChange={e=>setNewTag(e.target.value)}
             onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); addTagInline(); } }}
             style={{flex:1,padding:'5px 9px'}} />
           <button className="btn btn-sm" onClick={addTagInline}>+ Tag</button>
-        </div>
+        </div>}
 
         {/* ── Subtasks & Links tabs ── */}
         <div className="tdetail-tabs">
@@ -314,23 +345,23 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
                 <div className={`subtask-check${s.done?' checked':''}`} onClick={()=>toggleSubtask(i)}>
                   {s.done ? '✓' : ''}
                 </div>
-                <span className="subtask-text" contentEditable
-                  suppressContentEditableWarning
-                  onBlur={(e)=>editSubtaskText(i, e.currentTarget.textContent)}
-                  onKeyDown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}>
+                <span className="subtask-text"
+                  {...(isMember ? {} : { contentEditable: true, suppressContentEditableWarning: true })}
+                  {...(isMember ? {} : { onBlur: (e) => editSubtaskText(i, e.currentTarget.textContent) })}
+                  {...(isMember ? {} : { onKeyDown: (e) => { if(e.key==='Enter'){ e.preventDefault(); e.currentTarget.blur(); } } })}>
                   {s.text}
                 </span>
-                <button className="subtask-del" onClick={()=>delSubtask(i)}>✕</button>
+                {!isMember && <button className="subtask-del" onClick={()=>delSubtask(i)}>✕</button>}
               </div>
             ))}
           </div>
-          <div className="subtask-add-row">
+          {!isMember && <div className="subtask-add-row">
             <input type="text" placeholder="Add a subtask + Enter" value={newSubtask}
               onChange={e=>setNewSubtask(e.target.value)}
               onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addSubtaskInline();}}}
               style={{flex:1,fontSize:13}} />
             <button className="btn btn-sm" onClick={addSubtaskInline}>+ Add</button>
-          </div>
+          </div>}
         </div>
 
         {/* ── Links tab content ── */}
@@ -343,12 +374,12 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
                 <div key={i} className="link-row">
                   <span style={{flexShrink:0}}>🔗</span>
                   <a href={safeUrl} target="_blank" rel="noopener noreferrer">{l.label || l.url}</a>
-                  <button className="link-del" onClick={()=>delLink(i)}>✕</button>
+                  {!isMember && <button className="link-del" onClick={()=>delLink(i)}>✕</button>}
                 </div>
               );
             })}
           </div>
-          <div className="link-add-row">
+          {!isMember && <div className="link-add-row">
             <input type="text" placeholder="Label (optional)" value={newLinkLabel}
               onChange={e=>setNewLinkLabel(e.target.value)} style={{width:140,fontSize:12}} />
             <input type="text" placeholder="https://…" value={newLinkUrl}
@@ -356,14 +387,14 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
               onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addLinkInline();}}}
               style={{flex:1,fontSize:12}} />
             <button className="btn btn-sm" onClick={addLinkInline}>+ Add</button>
-          </div>
+          </div>}
         </div>
 
-        <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8}}>
+        {!isMember && <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8}}>
           <input type="checkbox" id="tms" checked={isMs} onChange={e=>setIsMs(e.target.checked)} />
           <label htmlFor="tms" style={{fontSize:13,fontWeight:600,cursor:'pointer'}}>Milestone task</label>
-        </div>
-        {(isMs || msId) && (
+        </div>}
+        {!isMember && (isMs || msId) && (
           <div>
             <label className="fl">Link to milestone</label>
             <select value={msId} onChange={e=>setMsId(e.target.value)}>
@@ -373,10 +404,13 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
           </div>
         )}
 
+        {saveError && <div style={{marginTop:10,padding:'8px 12px',background:'#d32f2f22',border:'1px solid #d32f2f',borderRadius:6,color:'#d32f2f',fontSize:13,fontWeight:600}}>
+          Save failed: {saveError}
+        </div>}
         <div className="ma">
-          {isEdit && <button className="btn btn-d" onClick={del}>🗑 Delete</button>}
-          <button className="btn btn-g" onClick={handleClose}>Cancel</button>
-          <button className="btn btn-p" onClick={save}>Save task</button>
+          {isEdit && !isMember && <button className="btn btn-d" onClick={del}>🗑 Delete</button>}
+          <button className="btn btn-g" onClick={handleClose}>Close</button>
+          {!isMember && <button className="btn btn-p" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save task'}</button>}
         </div>
       </div>
     </div>

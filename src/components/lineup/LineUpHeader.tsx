@@ -16,6 +16,7 @@ interface Props {
   sortMode: SortMode;
   S: S;
   filters: Filters;
+  role?: string;
   onShift: (dir: number, val?: string) => void;
   onGoToday: () => void;
   onSetSortMode: (m: SortMode) => void;
@@ -23,7 +24,7 @@ interface Props {
   onNewTask: () => void;
 }
 
-export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filters,
+export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filters, role,
   onShift, onGoToday, onSetSortMode, onSetFilter, onNewTask }: Props) {
   const totalStr = totalMins
     ? `${Math.floor(totalMins / 60)}h${totalMins % 60 ? ' ' + totalMins % 60 + 'm' : ''}`
@@ -82,7 +83,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
         {S.moods.map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
       </select>
 
-      <button className="btn btn-sm btn-p" onClick={onNewTask}>+ New task</button>
+      {role !== 'member' && <button className="btn btn-sm btn-p" onClick={onNewTask}>+ New task</button>}
     </div>
   );
 }

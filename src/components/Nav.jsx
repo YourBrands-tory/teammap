@@ -2,10 +2,12 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { NAV_ICONS } from '../lib/constants';
 
-export default function Nav({ current, onSwitch }) {
+const MEMBER_NAV = ['lu', 'pg'];
+
+export default function Nav({ current, onSwitch, role }) {
   const S = useStore(s => s.S);
   const saveFlash = useStore(s => s.saveFlash);
-  const order = S.navOrder || [];
+  const order = role === 'member' ? MEMBER_NAV : (S.navOrder || []);
   const labels = S.navLabels || {};
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -32,6 +34,12 @@ export default function Nav({ current, onSwitch }) {
     onSwitch(v);
     closeMenu();
   }, [onSwitch, closeMenu]);
+
+  const handleLogout = async () => {
+    closeMenu();
+    if (!confirm('Log out?')) return;
+    await useStore.getState().signOut();
+  };
 
   return (
     <div className="nav">
@@ -62,6 +70,11 @@ export default function Nav({ current, onSwitch }) {
               <span>{labels[v]||v}</span>
             </div>
           ))}
+          <div style={{borderTop:'1px solid var(--border)',margin:'8px 0'}} />
+          <div className="nav-mobile-item" onClick={handleLogout} style={{color:'var(--warn)'}}>
+            <span style={{fontSize:16,width:24,textAlign:'center'}}>🚪</span>
+            <span>Log out</span>
+          </div>
         </div>
       )}
     </div>

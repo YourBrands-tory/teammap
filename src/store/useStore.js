@@ -19,19 +19,27 @@ import {
 */
 
 // ── row <-> in-memory mappers ────────────────────────────────────────────────
-const taskFromRow = (r) => ({
-  id:r.id, name:r.name, clientId:r.client_id, date:r.date, mood:r.mood,
-  status:r.status, assignedTo:r.assigned_to||[], tags:r.tags||[],
-  estH:r.est_h||0, estM:r.est_m||0, notes:r.notes||'',
-  subtasks:r.subtasks||[], links:r.links||[],
-  isMilestone:!!r.is_milestone, milestoneId:r.milestone_id||null,
-  deleted:!!r.deleted, createdAt:Number(r.created_at)||Date.now(), updatedAt:Number(r.updated_at)||Date.now(),
-});
+const taskFromRow = (r) => {
+  const t = {
+    id:r.id, name:r.name, clientId:r.client_id, date:r.date, mood:r.mood,
+    status:r.status, assignedTo:r.assigned_to||[], tags:r.tags||[],
+    estH:r.est_h||0, estM:r.est_m||0, notes:r.notes||'',
+    subtasks:r.subtasks||[], links:r.links||[],
+    createdBy:r.created_by||null,
+    isMilestone:!!r.is_milestone, milestoneId:r.milestone_id||null,
+    deleted:!!r.deleted, createdAt:Number(r.created_at)||Date.now(), updatedAt:Number(r.updated_at)||Date.now(),
+  };
+  if (t.subtasks?.length || t.links?.length) {
+    console.log('[taskFromRow] loaded', t.id, { subtasks: t.subtasks.length, links: t.links.length });
+  }
+  return t;
+};
 const taskToRow = (t) => ({
   id:t.id, name:t.name, client_id:t.clientId||null, date:t.date, mood:t.mood,
   status:t.status, assigned_to:t.assignedTo||[], tags:t.tags||[],
   est_h:t.estH||0, est_m:t.estM||0, notes:t.notes||'',
   subtasks:t.subtasks||[], links:t.links||[],
+  created_by:t.createdBy||null,
   is_milestone:!!t.isMilestone, milestone_id:t.milestoneId||null,
   deleted:!!t.deleted, created_at:t.createdAt||Date.now(), updated_at:t.updatedAt||Date.now(),
 });
@@ -61,33 +69,62 @@ const EMPTY_S = {
 export const useStore = create((set, get) => ({
   // session / auth
   session: null,
-  role: null,        // 'admin' | 'member'
+  role: null,        // 'manager' | 'member'
   memberId: null,    // for member views: which member this user maps to
   loading: true,
+  profileError: null, // set when logged in but no profile row exists
   saveFlash: 0,      // bump to flash the "saved" badge
+  _rtChannel: null,  // realtime channel ref
 
   // the S object
   S: JSON.parse(JSON.stringify(EMPTY_S)),
 
-  setSession: (session) => set({ session }),
+  setSession: (session) => set({ session, ...(session ? {} : { profileError: null }) }),
+
+  signOut: async () => {
+    const ch = get()._rtChannel;
+    if (ch) { supabase.removeChannel(ch); }
+    await supabase.auth.signOut();
+    set({
+      session: null, role: null, memberId: null,
+      S: JSON.parse(JSON.stringify(EMPTY_S)),
+      loading: false, _rtChannel: null, profileError: null,
+    });
+  },
 
   // ── boot: pull profile + all data ─────────────────────────────────────────
   loadAll: async (force) => {
     const cur = get().S;
     if (!force && cur?.tasks?.length) return; // already loaded, skip unless forced
-    set({ loading: true });
+    set({ loading: true, profileError: null });
     const { data: sess } = await supabase.auth.getSession();
     const session = sess?.session || null;
     if (!session) { set({ session:null, loading:false }); return; }
 
     // profile -> role + member mapping
-    let role='admin', memberId=null;
+    let role=null, memberId=null;
     try {
       const { data: prof } = await supabase.from('profiles')
         .select('role, member_id').eq('id', session.user.id).maybeSingle();
-      if (prof) { role = prof.role || 'admin'; memberId = prof.member_id || null; }
-    } catch (e) { console.error('profile load', e); }
+      if (!prof) {
+        set({
+          session, role: null, memberId: null, loading: false,
+          profileError: 'Your account is missing role configuration. Please contact an administrator.',
+        });
+        return;
+      }
+      role = prof.role || 'member';
+      memberId = prof.member_id || null;
+    } catch (e) {
+      console.error('profile load', e);
+      set({
+        session, loading: false,
+        profileError: 'Failed to load your profile. Please try again.',
+      });
+      return;
+    }
 
+    console.log('[loadAll] fetching data…');
     const [members, clients, links, tasks, milestones, tags, st] = await Promise.all([
       supabase.from('members').select('*'),
       supabase.from('clients').select('*'),
@@ -98,6 +135,14 @@ export const useStore = create((set, get) => ({
       supabase.from('app_state').select('*'),
     ]);
 
+    console.log('[loadAll] tasks raw from DB:', tasks.data?.length, 'rows');
+    if (tasks.data?.length) {
+      const sample = tasks.data[0];
+      console.log('[loadAll] sample task columns:', Object.keys(sample));
+      console.log('[loadAll] sample subtasks:', sample.subtasks);
+      console.log('[loadAll] sample links:', sample.links);
+    }
+
     const S = JSON.parse(JSON.stringify(EMPTY_S));
     S.members    = (members.data||[]).map(memberFromRow);
     S.clients    = (clients.data||[]).map(clientFromRow);
@@ -106,11 +151,42 @@ export const useStore = create((set, get) => ({
     S.milestones = (milestones.data||[]).map(msFromRow);
     S.tags       = (tags.data||[]).map(tagFromRow);
     (st.data||[]).forEach(r => { if (STATE_KEYS.includes(r.key)) S[r.key] = r.value; });
+
+    const subtaskCount = S.tasks.reduce((a, t) => a + (t.subtasks?.length || 0), 0);
+    const linkCount = S.tasks.reduce((a, t) => a + (t.links?.length || 0), 0);
+    const tasksWithSubtasks = S.tasks.filter(t => t.subtasks?.length > 0).length;
+    const tasksWithLinks = S.tasks.filter(t => t.links?.length > 0).length;
+    console.log('[loadAll] done', { tasks: S.tasks.length, tasksWithSubtasks, tasksWithLinks, subtasks: subtaskCount, links: linkCount });
     if (!S.moods || !S.moods.length) S.moods = JSON.parse(JSON.stringify(DMOODS));
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members[0]?.id || null };
     if (S.settings.spMember == null) S.settings.spMember = S.members[0]?.id || null;
 
     set({ S, session, role, memberId, loading:false });
+    get()._subscribeRealtime();
+  },
+
+  _subscribeRealtime: () => {
+    const existing = get()._rtChannel;
+    if (existing) { supabase.removeChannel(existing); }
+    const channel = supabase.channel('tasks-realtime')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        (payload) => {
+          const { new: row, eventType } = payload;
+          get()._patchS((S) => {
+            if (eventType === 'DELETE') {
+              S.tasks = S.tasks.filter(t => t.id !== row.id);
+            } else if (row) {
+              const task = taskFromRow(row);
+              const i = S.tasks.findIndex(t => t.id === task.id);
+              if (i >= 0) { S.tasks[i] = task; }
+              else { S.tasks.push(task); }
+            }
+          });
+        }
+      )
+      .subscribe();
+    set({ _rtChannel: channel });
   },
 
   flashSaved: () => set((s)=>({ saveFlash: s.saveFlash+1 })),
@@ -132,16 +208,47 @@ export const useStore = create((set, get) => ({
   // ── TASKS ─────────────────────────────────────────────────────────────────
   upsertTask: async (task) => {
     const now = Date.now();
+    const { session } = get();
+    const existing = get().S.tasks.find(x => x.id === task.id);
     const t = { estH:0, estM:0, tags:[], assignedTo:[], notes:'', status:'Not Started',
-      subtasks:[], links:[], isMilestone:false, milestoneId:null, deleted:false, ...task };
-    if (!t.id) { t.id = uid(); t.createdAt = now; }
+      subtasks:[], links:[], isMilestone:false, milestoneId:null, deleted:false,
+      ...(existing || {}), ...task };
+    const isNew = !t.id;
+    if (isNew) { t.id = uid(); t.createdAt = now; t.createdBy = session?.user?.id || null; }
     t.updatedAt = now;
     get()._patchS((S) => {
-      const i = S.tasks.findIndex(x=>x.id===t.id);
-      S.tasks = i>=0 ? S.tasks.map(x=>x.id===t.id?t:x) : [...S.tasks, t];
+      const i = S.tasks.findIndex(x => x.id === t.id);
+      S.tasks = i >= 0 ? S.tasks.map(x => x.id === t.id ? t : x) : [...S.tasks, t];
     });
-    const { error } = await supabase.from('tasks').upsert(taskToRow(t));
-    if (error) console.error('upsertTask', error);
+    const row = taskToRow(t);
+    console.log('[upsertTask] task.subtasks:', JSON.stringify(task.subtasks));
+    console.log('[upsertTask] task.links:', JSON.stringify(task.links));
+    console.log('[upsertTask] t.subtasks:', JSON.stringify(t.subtasks));
+    console.log('[upsertTask] row.subtasks:', JSON.stringify(row.subtasks));
+    console.log('[upsertTask] row keys:', Object.keys(row));
+    let error = null, result = null;
+    try {
+      if (isNew) {
+        console.log('[upsertTask] INSERT row:', JSON.stringify(row));
+        result = await supabase.from('tasks').insert(row);
+      } else {
+        const { id: rowId, created_at, created_by, ...data } = row;
+        console.log('[upsertTask] UPDATE data keys:', Object.keys(data));
+        console.log('[upsertTask] UPDATE data.subtasks:', JSON.stringify(data.subtasks));
+        console.log('[upsertTask] UPDATE data.links:', JSON.stringify(data.links));
+        result = await supabase.from('tasks').update(data).eq('id', rowId);
+      }
+    } catch (e) {
+      console.error('[upsertTask] exception:', e);
+      error = e;
+    }
+    if (result && result.error) error = result.error;
+    console.log('[upsertTask] Supabase response:', result);
+    if (error) {
+      console.error('[upsertTask] error:', error);
+      throw error;
+    }
+    console.log('[upsertTask] saved OK', row.id);
     return t;
   },
   setTaskStatus: async (taskId, status) => {
@@ -150,9 +257,10 @@ export const useStore = create((set, get) => ({
       S.tasks = S.tasks.map(t => t.id===taskId ? (updated={...t,status,updatedAt:Date.now()}) : t);
     });
     if (updated) {
+      console.log('[setTaskStatus] updating', { id: taskId, status, hadSubtasks: (updated.subtasks?.length||0) > 0, hadLinks: (updated.links?.length||0) > 0 });
       const { error } = await supabase.from('tasks')
         .update({ status, updated_at: updated.updatedAt }).eq('id', taskId);
-      if (error) console.error('setTaskStatus', error);
+      if (error) console.error('[setTaskStatus] error', error);
     }
   },
   softDeleteTask: async (taskId) => {

@@ -8,7 +8,7 @@
 -- ── profiles: maps an auth user to a role + (optionally) a team member ──────
 create table if not exists profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
-  role        text not null default 'member',   -- 'admin' | 'member'
+  role        text not null default 'member',   -- 'admin' | 'manager' | 'member'
   member_id   text,                              -- links a login to a members.id
   created_at  timestamptz default now()
 );
@@ -51,6 +51,7 @@ create table if not exists tasks (
   notes         text default '',
   subtasks      jsonb default '[]'::jsonb,
   links         jsonb default '[]'::jsonb,
+  created_by    text,                           -- auth.uid() of the manager who created it
   is_milestone  boolean default false,
   milestone_id  text,
   deleted       boolean default false,
@@ -85,10 +86,15 @@ create table if not exists app_state (
   value  jsonb
 );
 
--- ── helper: is the current user an admin? ───────────────────────────────────
+-- ── helpers: role checks ────────────────────────────────────────────────────
 create or replace function is_admin() returns boolean
 language sql security definer stable as $$
   select exists(select 1 from profiles where id = auth.uid() and role = 'admin');
+$$;
+
+create or replace function is_manager() returns boolean
+language sql security definer stable as $$
+  select exists(select 1 from profiles where id = auth.uid() and role = 'manager');
 $$;
 
 -- ── RLS ─────────────────────────────────────────────────────────────────────
@@ -107,27 +113,35 @@ create policy profiles_read on profiles for select
   using (id = auth.uid() or is_admin());
 
 -- Everything below: any authenticated user can READ.
--- Admins can WRITE everything. Members can update their OWN tasks (status etc.).
--- Tighten later as you build the member view.
+-- Admins can WRITE everything. Managers can write business tables (tasks, clients, etc.)
+-- but NOT manage users (profiles, members). Members can update their own tasks (status etc.).
 
 do $$
 declare t text;
 begin
+  alter table tasks add column if not exists created_by text;
   foreach t in array array['members','clients','links','milestones','tags','app_state']
   loop
     execute format('drop policy if exists %1$s_read on %1$s;', t);
     execute format('create policy %1$s_read on %1$s for select using (auth.role() = ''authenticated'');', t);
     execute format('drop policy if exists %1$s_write on %1$s;', t);
-    execute format('create policy %1$s_write on %1$s for all using (is_admin()) with check (is_admin());', t);
+    execute format('create policy %1$s_write on %1$s for all using (is_admin() or is_manager()) with check (is_admin() or is_manager());', t);
   end loop;
 end $$;
 
--- tasks: read for all authenticated; admin full write; members update own tasks.
+-- tasks: read for all authenticated; admin/manager full write; members read assigned, update own.
 drop policy if exists tasks_read on tasks;
-create policy tasks_read on tasks for select using (auth.role() = 'authenticated');
+create policy tasks_read on tasks for select using (
+  is_admin() or is_manager() or exists (
+    select 1 from profiles p
+    where p.id = auth.uid()
+      and p.member_id is not null
+      and tasks.assigned_to ? p.member_id
+  )
+);
 
 drop policy if exists tasks_admin_write on tasks;
-create policy tasks_admin_write on tasks for all using (is_admin()) with check (is_admin());
+create policy tasks_admin_write on tasks for all using (is_admin() or is_manager()) with check (is_admin() or is_manager());
 
 drop policy if exists tasks_member_update on tasks;
 create policy tasks_member_update on tasks for update
@@ -136,9 +150,21 @@ create policy tasks_member_update on tasks for update
       select 1 from profiles p
       where p.id = auth.uid()
         and p.member_id is not null
-        and tasks.assigned_to ? p.member_id      -- member is assigned to this task
+        and tasks.assigned_to ? p.member_id
     )
   );
+
+-- profiles: only admins can manage all profiles; users can read their own.
+drop policy if exists profiles_write on profiles;
+create policy profiles_write on profiles for all
+  using (is_admin())
+  with check (is_admin());
+
+-- members: only admins can write (managers read-only).
+drop policy if exists members_write on members;
+create policy members_write on members for all
+  using (is_admin())
+  with check (is_admin());
 
 -- ── make yourself admin after creating your auth user ───────────────────────
 -- 1) Authentication → Users → Add user (email + password) — that's your admin login.
