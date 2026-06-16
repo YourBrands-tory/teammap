@@ -1,22 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import usePlayground from '../hooks/usePlayground';
 import PlaygroundToolbar from '../components/playground/PlaygroundToolbar';
 import SpreadsheetGrid from '../components/playground/SpreadsheetGrid';
 import ClientSidebar from '../components/playground/ClientSidebar';
 import TaskModal from '../components/TaskModal';
 import Modal from '../components/Modal';
-
-function useIsMobile(): boolean {
-  const [mobile, setMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
-    setMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
-  return mobile;
-}
 
 export default function Playground() {
   const {
@@ -26,20 +14,6 @@ export default function Playground() {
     convertToTask, handleTaskSaved, openTask, unlinkCell, setRenameModal,
     quickCreateTask, updateCellTaskName,
   } = usePlayground();
-
-  const isMobile = useIsMobile();
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (S.clients.length > 0 && !selectedClientId) {
-      setSelectedClientId(S.clients[0].id);
-    }
-    if (selectedClientId && !S.clients.find((c: any) => c.id === selectedClientId)) {
-      setSelectedClientId(S.clients[0]?.id || null);
-    }
-  }, [S.clients, selectedClientId]);
-
-  const sortedClients = [...S.clients].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
 
   const handleInsertClient = useCallback((clientId: string) => {
     const c = S.clients.find((x: any) => x.id === clientId);
@@ -58,15 +32,6 @@ export default function Playground() {
         onRename={() => renameTab(activeTab)}
         onClear={() => clearTab(activeTab)}
       />
-      {isMobile && (
-        <div className="pg-mob-select">
-          <select value={selectedClientId || ''} onChange={e => setSelectedClientId(e.target.value || null)}>
-            {sortedClients.map((c: any) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
       <div className="pg-layout">
         <div className="pg-scroll-wrap">
           <ClientSidebar
@@ -80,7 +45,6 @@ export default function Playground() {
               tab={tab}
               tasks={S.tasks}
               clients={S.clients}
-              selectedClientId={isMobile ? selectedClientId : undefined}
               onConvertToTask={convertToTask}
               onOpenTask={openTask}
               onUnlink={unlinkCell}

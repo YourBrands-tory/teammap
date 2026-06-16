@@ -10,25 +10,32 @@ export default function Nav({ current, onSwitch }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
   useEffect(() => {
     if (!menuOpen) return;
     const handler = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target) && !e.target.closest('.nav-hamburger')) {
+        closeMenu();
       }
     };
+    const onEsc = (e) => e.key === 'Escape' && closeMenu();
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [menuOpen]);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [menuOpen, closeMenu]);
 
   const handleSwitch = useCallback((v) => {
     onSwitch(v);
-    setMenuOpen(false);
-  }, [onSwitch]);
+    closeMenu();
+  }, [onSwitch, closeMenu]);
 
   return (
     <div className="nav">
-      <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
+      <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} onTouchStart={() => setMenuOpen(o => !o)} aria-label="Menu">
         <span className={`nav-hamburger-line${menuOpen ? ' open' : ''}`} />
       </button>
       <div className="nav-brand">Team<span>Map</span></div>
@@ -45,6 +52,10 @@ export default function Nav({ current, onSwitch }) {
       </div>
       {menuOpen && (
         <div className="nav-mobile-menu" ref={menuRef}>
+          <div className="nav-mobile-close-row">
+            <span className="nav-mobile-title">Menu</span>
+            <button className="nav-mobile-x" onClick={closeMenu} onTouchStart={closeMenu} aria-label="Close menu">✕</button>
+          </div>
           {order.map(v => (
             <div key={v} className={`nav-mobile-item${current===v?' active':''}`} onClick={() => handleSwitch(v)}>
               <span style={{fontSize:16,width:24,textAlign:'center'}}>{NAV_ICONS[v]||' '}</span>

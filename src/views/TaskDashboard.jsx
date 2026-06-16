@@ -323,6 +323,26 @@ const TeamCol = memo(function TeamCol({ member, date, S, drawerOpen, toggleDrawe
   );
 });
 
+/* ── CIRCULAR SUBTASK PROGRESS ── */
+function CircProg({ done, total }) {
+  const pct = total > 0 ? (done / total) * 100 : 0;
+  const r = 13;
+  const circ = 2 * Math.PI * r;
+  const off = circ - (pct / 100) * circ;
+  return (
+    <span className="card-circ-prog" title={`${done} of ${total} subtasks completed`}
+      role="progressbar" aria-valuenow={done} aria-valuemin={0} aria-valuemax={total}>
+      <svg width="30" height="30" viewBox="0 0 30 30">
+        <circle cx="15" cy="15" r={r} fill="none" stroke="var(--s2)" strokeWidth="3.5" />
+        <circle cx="15" cy="15" r={r} fill="none" stroke="var(--accent)" strokeWidth="3.5"
+          strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"
+          transform="rotate(-90 15 15)" style={{transition:'stroke-dashoffset .3s'}} />
+      </svg>
+      <span className="card-circ-text">{done}/{total}</span>
+    </span>
+  );
+}
+
 /* ── DESKTOP TASK CARD ── */
 const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
   const mood = sel.gmood(S, task.mood);
@@ -331,6 +351,12 @@ const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
   const client = sel.gc(S, task.clientId);
   const timeStr = taskTimeStr(task);
   const extra = isHero?' hero':isImp?' imp-card':isTop?' top':isLight?' light':'';
+  const [linkPop, setLinkPop] = useState(false);
+  const hasNotes = task.notes?.trim().length > 0;
+  const hasLinks = task.links?.length > 0;
+  const hasSubtasks = task.subtasks?.length > 0;
+  const subTotal = task.subtasks?.length || 0;
+  const subDone = task.subtasks?.filter(s => s.done).length || 0;
 
   return (
     <div className={`tcard${extra}`} onClick={()=>onOpenTask(task)}>
@@ -355,6 +381,31 @@ const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
           {task.assignedTo.filter(id=>id!==member.id).map(id => { const m = sel.gm(S, id); return m ? (
             <span key={id} style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--s2)',
               border:'1px solid var(--border)',fontWeight:600,color:'var(--t2)'}}>{m.name}</span>) : null; })}
+        </div>
+      )}
+      {(hasNotes || hasLinks || hasSubtasks) && (
+        <div className="card-icon-row">
+          {hasNotes && (
+            <span className="card-icon-pill notes-pill" aria-label="Has notes">
+              📝<span className="card-pill-tip">{task.notes}</span>
+            </span>
+          )}
+          {hasLinks && (
+            <span className="card-icon-pill link-pill" aria-label={`${task.links.length} link(s)`}
+              onClick={e=>{e.stopPropagation();setLinkPop(p=>!p);}}>
+              🔗 {task.links.length}
+              {linkPop && (
+                <span className="card-link-pop" onClick={e=>e.stopPropagation()}>
+                  {task.links.map((ln,i) => (
+                    <span key={i} className="card-link-item" onClick={()=>window.open(ln.url,'_blank','noopener,noreferrer')}>
+                      {ln.label||ln.url}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </span>
+          )}
+          {hasSubtasks && <CircProg done={subDone} total={subTotal} />}
         </div>
       )}
     </div>
@@ -480,6 +531,12 @@ const MobileTaskCard = memo(function MobileTaskCard({ task, member, S, expanded,
   const mood = sel.gmood(S, task.mood);
   const client = sel.gc(S, task.clientId);
   const timeStr = taskTimeStr(task);
+  const [linkPop, setLinkPop] = useState(false);
+  const hasNotes = task.notes?.trim().length > 0;
+  const hasLinks = task.links?.length > 0;
+  const hasSubtasks = task.subtasks?.length > 0;
+  const subTotal = task.subtasks?.length || 0;
+  const subDone = task.subtasks?.filter(s => s.done).length || 0;
 
   return (
     <div className="td-mob-card" onClick={() => onOpenTask(task)}>
@@ -512,6 +569,31 @@ const MobileTaskCard = memo(function MobileTaskCard({ task, member, S, expanded,
                 <span key={id} style={{padding:'2px 7px',borderRadius:4,background:'var(--s2)',border:'1px solid var(--border)',fontWeight:600}}>{m.name}</span>) : null; })}
             </div>
           )}
+        </div>
+      )}
+      {(hasNotes || hasLinks || hasSubtasks) && (
+        <div className="card-icon-row mob">
+          {hasNotes && (
+            <span className="card-icon-pill notes-pill" aria-label="Has notes">
+              📝<span className="card-pill-tip">{task.notes}</span>
+            </span>
+          )}
+          {hasLinks && (
+            <span className="card-icon-pill link-pill" aria-label={`${task.links.length} link(s)`}
+              onClick={e=>{e.stopPropagation();setLinkPop(p=>!p);}}>
+              🔗 {task.links.length}
+              {linkPop && (
+                <span className="card-link-pop" onClick={e=>e.stopPropagation()}>
+                  {task.links.map((ln,i) => (
+                    <span key={i} className="card-link-item" onClick={()=>window.open(ln.url,'_blank','noopener,noreferrer')}>
+                      {ln.label||ln.url}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </span>
+          )}
+          {hasSubtasks && <CircProg done={subDone} total={subTotal} />}
         </div>
       )}
     </div>

@@ -9,7 +9,6 @@ interface Props {
   tab: TabData;
   tasks: Task[];
   clients: Client[];
-  selectedClientId?: string | null;
   onConvertToTask: (r: number, c: number) => void;
   onOpenTask: (taskId: string) => void;
   onUnlink: (r: number, c: number) => void;
@@ -18,7 +17,7 @@ interface Props {
 }
 
 export default function SpreadsheetGrid({
-  tab, tasks, clients, selectedClientId,
+  tab, tasks, clients,
   onConvertToTask, onOpenTask, onUnlink,
   onUpdateTaskName, onQuickCreate,
 }: Props) {
@@ -33,15 +32,9 @@ export default function SpreadsheetGrid({
 
   const sortedClients = [...clients].sort((a, b) => (a.order || 0) - (b.order || 0));
 
-  let rowIndices: number[];
-  if (selectedClientId) {
-    const idx = sortedClients.findIndex(c => c.id === selectedClientId);
-    rowIndices = idx >= 0 ? [idx] : [0];
-  } else {
-    rowIndices = sortedClients.length > 0
-      ? sortedClients.map((_, i) => i)
-      : [0];
-  }
+  const rowIndices = sortedClients.length > 0
+    ? sortedClients.map((_, i) => i)
+    : [0];
 
   const totalRows = rowIndices.length;
 
