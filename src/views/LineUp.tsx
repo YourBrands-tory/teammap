@@ -10,7 +10,7 @@ import TaskModal from '../components/TaskModal';
 export default function LineUp() {
   const {
     S, date, sortMode, filters, tasks, allOnDate, prog, totalMins,
-    panelWidth, activeId, taskModal, role, memberId,
+    panelWidth, activeId, taskModal,
     setDate, shift, goToday, setSortMode, setFilter,
     setStatus, hideTask, restoreTask,
     handleDragEnd, setActiveId, setTaskModal, setPanelWidth,
@@ -32,7 +32,6 @@ export default function LineUp() {
         S={S} filters={filters}
         onShift={handleShift} onGoToday={goToday}
         onSetSortMode={setSortMode} onSetFilter={setFilter}
-        role={role}
         onNewTask={() => setTaskModal({ date })} />
 
       <div className="lu-body">
@@ -51,7 +50,6 @@ export default function LineUp() {
               <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                 {tasks.map(t => (
                   <LineUpCard key={t.id} task={t} S={S}
-                    role={role} memberId={memberId}
                     onOpen={setTaskModal}
                     onStatusChange={setStatus}
                     onHide={hideTask} />
@@ -87,7 +85,7 @@ export default function LineUp() {
         </div>
       )}
 
-      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} role={role} memberId={memberId} />}
+      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} />}
     </div>
   );
 }

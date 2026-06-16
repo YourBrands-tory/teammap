@@ -20,7 +20,7 @@ export const DMOODS = [
   { id:'share', label:'Share', icon:'🔗', color:'#2196c4', bg:'#e3f2fd', desc:'To share/handoff', max:null, hidden:false, cardSize:'narrow' },
 ];
 
-export const NAV_ICONS = { tkd:'📊', tg2:'💡', lu:'📋', lv:'☷', tk:'☰', td:'▣', bl:'◯', pg:'◢', st:'⚙' };
+export const NAV_ICONS = { tkd:'📊', tg2:'💡', lu:'📋', lv:'☷', tk:'☰', td:'▣', bl:'◯', pg:'◢', kb:'📌', st:'⚙' };
 
 export const DEFAULT_NAV_ORDER = ['tkd','tg2','lu','lv','tk','td','bl','pg','st'];
 export const DEFAULT_NAV_LABELS = {

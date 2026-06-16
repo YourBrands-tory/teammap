@@ -1,24 +1,10 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { useUIStore } from './useUIStore';
 import {
   DMOODS, DEFAULT_NAV_ORDER, DEFAULT_NAV_LABELS, uid,
 } from '../lib/constants';
 
-/*
-  This store is the React equivalent of the old global `S` object.
-  - It holds the SAME shape the old render functions expected
-    (members, clients, links, tasks, milestones, moods, tags, settings, ...).
-  - Components read from it; "render functions" become components that map over the same fields.
-  - Every mutation updates local state immediately (optimistic) AND writes the
-    changed row(s) to Supabase. This replaces the old localStorage `save()`.
-
-  Heavy/queryable data lives in real tables (members, clients, links, tasks,
-  milestones, tags). Config singletons (settings, moods, navOrder/navLabels,
-  freqTags, templates, playground, tg2Views, lineUpOrder, lineUpHidden) live in
-  one key/value table `app_state` as jsonb — keeps the schema small.
-*/
-
-// ── row <-> in-memory mappers ────────────────────────────────────────────────
 const taskFromRow = (r) => {
   const t = {
     id:r.id, name:r.name, clientId:r.client_id, date:r.date, mood:r.mood,
@@ -54,7 +40,6 @@ const msToRow       = (m) => ({ id:m.id, name:m.name, description:m.description|
 const tagFromRow    = (r) => ({ id:r.id, label:r.label, color:r.color });
 const tagToRow      = (t) => ({ id:t.id, label:t.label, color:t.color });
 
-// keys stored in app_state
 const STATE_KEYS = ['settings','moods','navOrder','navLabels','freqTags','templates','playground','tg2Views','lineUpOrder','lineUpHidden'];
 
 const EMPTY_S = {
@@ -66,72 +51,95 @@ const EMPTY_S = {
   tg2Views:[], lineUpOrder:{}, lineUpHidden:{},
 };
 
-export const useStore = create((set, get) => ({
-  // session / auth
-  session: null,
-  role: null,        // 'manager' | 'member'
-  memberId: null,    // for member views: which member this user maps to
-  loading: true,
-  profileError: null, // set when logged in but no profile row exists
-  saveFlash: 0,      // bump to flash the "saved" badge
-  _rtChannel: null,  // realtime channel ref
+const SESSION_KEY = 'teammap_session';
 
-  // the S object
+export const useStore = create((set, get) => ({
+  session: null,
+  role: null,
+  loading: true,
+  saveFlash: 0,
+  _rtChannel: null,
+
   S: JSON.parse(JSON.stringify(EMPTY_S)),
 
-  setSession: (session) => set({ session, ...(session ? {} : { profileError: null }) }),
+  // ── Custom login: query members table directly — NO Supabase Auth ─────────
+  login: async (selectedRole, email, password) => {
+    const roleFilter = selectedRole === 'manager' ? ['admin','manager'] : ['member'];
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, name, role, color')
+      .eq('email', email)
+      .eq('password', password)
+      .in('role', roleFilter)
+      .maybeSingle();
 
-  signOut: async () => {
+    if (error) return { error: 'Database error. Please try again.' };
+    if (!data) return { error: selectedRole === 'manager'
+      ? 'No manager found with that email and password.'
+      : 'No member found with that email and password.' };
+
+    const session = { memberId: data.id, role: data.role, name: data.name, color: data.color };
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    } catch (e) { /* sessionStorage may be full or unavailable */ }
+
+    set({ session, role: data.role, loading: true });
+    await get().loadAll();
+    return {};
+  },
+
+  // ── Restore session from sessionStorage on page load ──────────────────────
+  restoreSession: async () => {
+    let session = null;
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (raw) session = JSON.parse(raw);
+    } catch (e) { /* ignore */ }
+
+    if (session?.memberId) {
+      set({ session, role: session.role, loading: true });
+      await get().loadAll();
+    } else {
+      set({ loading: false });
+    }
+  },
+
+  setSession: (session) => set({ session }),
+
+  signOut: () => {
+    useUIStore.getState().clearUIState();
     const ch = get()._rtChannel;
     if (ch) { supabase.removeChannel(ch); }
-    await supabase.auth.signOut();
+    try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
     set({
-      session: null, role: null, memberId: null,
+      session: null, role: null,
       S: JSON.parse(JSON.stringify(EMPTY_S)),
-      loading: false, _rtChannel: null, profileError: null,
+      loading: false, _rtChannel: null,
     });
   },
 
-  // ── boot: pull profile + all data ─────────────────────────────────────────
+  // ── boot: pull all data (no Supabase Auth dependency) ──────────────────────
   loadAll: async (force) => {
     const cur = get().S;
-    if (!force && cur?.tasks?.length) return; // already loaded, skip unless forced
-    set({ loading: true, profileError: null });
-    const { data: sess } = await supabase.auth.getSession();
-    const session = sess?.session || null;
-    if (!session) { set({ session:null, loading:false }); return; }
+    if (!force && cur?.tasks?.length) return;
+    set({ loading: true });
 
-    // profile -> role + member mapping
-    let role=null, memberId=null;
-    try {
-      const { data: prof } = await supabase.from('profiles')
-        .select('role, member_id').eq('id', session.user.id).maybeSingle();
-      if (!prof) {
-        set({
-          session, role: null, memberId: null, loading: false,
-          profileError: 'Your account is missing role configuration. Please contact an administrator.',
-        });
-        return;
-      }
-      role = prof.role || 'member';
-      memberId = prof.member_id || null;
-    } catch (e) {
-      console.error('profile load', e);
-      set({
-        session, loading: false,
-        profileError: 'Failed to load your profile. Please try again.',
-      });
-      return;
-    }
+    if (!get().session) { set({ loading:false }); return; }
 
     console.log('[loadAll] fetching data…');
-    const [members, clients, links, tasks, milestones, tags, st] = await Promise.all([
+    const [members, clients] = await Promise.all([
       supabase.from('members').select('*'),
       supabase.from('clients').select('*'),
+    ]);
+    const [links, tags] = await Promise.all([
       supabase.from('links').select('*'),
+      supabase.from('tags').select('*'),
+    ]);
+    const [tasks, milestones] = await Promise.all([
       supabase.from('tasks').select('*'),
       supabase.from('milestones').select('*'),
-      supabase.from('tags').select('*'),
+    ]);
+    const [st] = await Promise.all([
       supabase.from('app_state').select('*'),
     ]);
 
@@ -161,7 +169,7 @@ export const useStore = create((set, get) => ({
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members[0]?.id || null };
     if (S.settings.spMember == null) S.settings.spMember = S.members[0]?.id || null;
 
-    set({ S, session, role, memberId, loading:false });
+    set({ S, loading:false });
     get()._subscribeRealtime();
   },
 
@@ -191,7 +199,6 @@ export const useStore = create((set, get) => ({
 
   flashSaved: () => set((s)=>({ saveFlash: s.saveFlash+1 })),
 
-  // ── generic helpers ───────────────────────────────────────────────────────
   _patchS: (mutator) => {
     const S = get().S;
     const next = { ...S };
@@ -208,13 +215,13 @@ export const useStore = create((set, get) => ({
   // ── TASKS ─────────────────────────────────────────────────────────────────
   upsertTask: async (task) => {
     const now = Date.now();
-    const { session } = get();
+    const session = get().session;
     const existing = get().S.tasks.find(x => x.id === task.id);
     const t = { estH:0, estM:0, tags:[], assignedTo:[], notes:'', status:'Not Started',
       subtasks:[], links:[], isMilestone:false, milestoneId:null, deleted:false,
       ...(existing || {}), ...task };
     const isNew = !t.id;
-    if (isNew) { t.id = uid(); t.createdAt = now; t.createdBy = session?.user?.id || null; }
+    if (isNew) { t.id = uid(); t.createdAt = now; t.createdBy = session?.memberId || null; }
     t.updatedAt = now;
     get()._patchS((S) => {
       const i = S.tasks.findIndex(x => x.id === t.id);
@@ -304,7 +311,7 @@ export const useStore = create((set, get) => ({
     await supabase.from('clients').delete().eq('id', id);
   },
 
-  // ── LINKS (roles stored as jsonb on the link) ─────────────────────────────
+  // ── LINKS ─────────────────────────────────────────────────────────────────
   upsertLink: async (l) => {
     if (!l.id) l={ roles:[], ...l, id:uid() };
     get()._patchS((S)=>{ const i=S.links.findIndex(x=>x.id===l.id);
@@ -357,7 +364,7 @@ export const useStore = create((set, get) => ({
   },
   setStateKey: async (key, value) => { get()._patchS((S)=>{ S[key]=value; }); await get()._persistState(key); },
 
-  // ── JSON import / export (your admin onboarding workflow) ─────────────────
+  // ── JSON import / export ──────────────────────────────────────────────────
   exportJSON: () => {
     const S = get().S;
     const blob = new Blob([JSON.stringify(S, null, 2)], { type:'application/json' });
@@ -367,14 +374,12 @@ export const useStore = create((set, get) => ({
     a.click();
   },
   importJSON: async (raw) => {
-    // raw = parsed legacy backup object (same shape as old S)
     const S = JSON.parse(JSON.stringify(EMPTY_S));
     Object.assign(S, raw);
     if (!S.moods || !S.moods.length) S.moods = JSON.parse(JSON.stringify(DMOODS));
     if (!S.tags) S.tags = [];
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members?.[0]?.id||null };
 
-    // Bulk write everything to Supabase. upsert = safe to re-run.
     const chunks = [
       supabase.from('members').upsert((S.members||[]).map(memberToRow)),
       supabase.from('clients').upsert((S.clients||[]).map(clientToRow)),
@@ -393,7 +398,6 @@ export const useStore = create((set, get) => ({
   },
 }));
 
-// convenience selectors (the old gm/gc/gmood/gtag etc.)
 export const sel = {
   gm:  (S,id)=>S.members.find(m=>m.id===id),
   gc:  (S,id)=>S.clients.find(c=>c.id===id),

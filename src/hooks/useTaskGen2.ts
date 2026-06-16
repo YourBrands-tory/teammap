@@ -1,5 +1,6 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useStore, sel } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import { uid, today } from '../lib/constants';
 import type { TG2AllMulti, Template } from '../utils/taskGen2Helpers';
 import {
@@ -13,16 +14,22 @@ export default function useTaskGen2() {
   const upsertTask = useStore(s => s.upsertTask);
   const upsertMilestone = useStore(s => s.upsertMilestone);
   const upsertClient = useStore(s => s.upsertClient);
+  const uiViewState = useUIStore(s => s.viewStates.tg2 || {});
+  const setViewState = useUIStore(s => s.setViewState);
 
-  const [tg2Tab, setTg2Tab] = useState('templates');
-  const [tg2SelProject, setTg2SelProject] = useState<string | null>(null);
-  const [projSortModes, setProjSortModes] = useState<Record<string, string>>({});
-  const [tg2AllMulti, setTg2AllMulti] = useState<TG2AllMulti>({ freqs: [], clients: [], members: [], moods: [] });
-  const [tg2AllSort, setTg2AllSort] = useState('freq');
-  const [tg2ActiveView, setTg2ActiveView] = useState<number | null>(null);
+  const [tg2Tab, setTg2Tab] = useState(uiViewState.tg2Tab || 'templates');
+  const [tg2SelProject, setTg2SelProject] = useState<string | null>(uiViewState.tg2SelProject ?? null);
+  const [projSortModes, setProjSortModes] = useState<Record<string, string>>(uiViewState.projSortModes || {});
+  const [tg2AllMulti, setTg2AllMulti] = useState<TG2AllMulti>(uiViewState.tg2AllMulti || { freqs: [], clients: [], members: [], moods: [] });
+  const [tg2AllSort, setTg2AllSort] = useState(uiViewState.tg2AllSort || 'freq');
+  const [tg2ActiveView, setTg2ActiveView] = useState<number | null>(uiViewState.tg2ActiveView ?? null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<any>(null);
   const [createConfirm, setCreateConfirm] = useState<string | null>(null);
+
+  useEffect(() => {
+    setViewState('tg2', { tg2Tab, tg2SelProject, projSortModes, tg2AllMulti, tg2AllSort, tg2ActiveView });
+  }, [tg2Tab, tg2SelProject, projSortModes, tg2AllMulti, tg2AllSort, tg2ActiveView, setViewState]);
 
   const freqTags: any[] = useMemo(() =>
     (S.freqTags || []).sort((a: any, b: any) => (a.order || 0) - (b.order || 0)),

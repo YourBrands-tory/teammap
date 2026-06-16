@@ -1,17 +1,19 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
+import { supabase } from '../lib/supabase';
 import { uid, today } from '../lib/constants';
-import type { TabData, PlaygroundData, CellData } from '../utils/playgroundHelpers';
+import type { TabData, PlaygroundData } from '../utils/playgroundHelpers';
 
-export default function usePlayground() {
+export default function useMemberPlayground() {
   const S = useStore(s => s.S);
-  const setStateKey = useStore(s => s.setStateKey);
+  const memberId = useStore(s => s.S.settings.spMember);
   const upsertTask = useStore(s => s.upsertTask);
   const uiViewState = useUIStore(s => s.viewStates.pg || {});
   const setViewState = useUIStore(s => s.setViewState);
 
-  const pg: PlaygroundData = S.playground || { tabs: [{ id: uid(), name: 'Sheet 1', data: {} }] };
+  const [tabs, setTabs] = useState<TabData[]>([{ id: uid(), name: 'Sheet 1', data: {} }]);
+  const [loaded, setLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState(uiViewState.activeTab ?? 0);
   const [sidebarOpen, setSidebarOpen] = useState(uiViewState.sidebarOpen ?? true);
   const [taskModal, setTaskModal] = useState<any>(null);
@@ -22,12 +24,35 @@ export default function usePlayground() {
     setViewState('pg', { activeTab, sidebarOpen });
   }, [activeTab, sidebarOpen, setViewState]);
 
-  const tabs = pg.tabs;
-  const tab = tabs[activeTab] || tabs[0];
+  // Load member sheets from Supabase
+  useEffect(() => {
+    if (!memberId || loaded) return;
+    (async () => {
+      const { data, error } = await supabase
+        .from('member_sheets')
+        .select('data')
+        .eq('member_id', memberId)
+        .maybeSingle();
+      if (!error && data?.data?.tabs) {
+        setTabs(data.data.tabs);
+      }
+      setLoaded(true);
+    })();
+  }, [memberId, loaded]);
 
+  // Persist to Supabase on change
   const persist = useCallback((updatedTabs: TabData[]) => {
-    setStateKey('playground', { tabs: updatedTabs });
-  }, [setStateKey]);
+    setTabs(updatedTabs);
+    if (!memberId) return;
+    supabase.from('member_sheets').upsert(
+      { member_id: memberId, data: { tabs: updatedTabs }, updated_at: new Date().toISOString() },
+      { onConflict: 'member_id' }
+    ).then(({ error }) => {
+      if (error) console.error('[useMemberPlayground] persist error:', error);
+    });
+  }, [memberId]);
+
+  const tab = tabs[activeTab] || tabs[0];
 
   const addTab = useCallback(() => {
     const updated = [...tabs, { id: uid(), name: `Sheet ${tabs.length + 1}`, data: {} }];
@@ -39,7 +64,7 @@ export default function usePlayground() {
     if (tabs.length === 1) { alert('Cannot delete the last sheet.'); return; }
     if (!confirm('Delete this sheet?')) return;
     const updated = tabs.filter((_, idx) => idx !== i);
-    setActiveTab(prev => Math.min(prev, updated.length - 1));
+    setActiveTab((prev: number) => Math.min(prev, updated.length - 1));
     persist(updated);
   }, [tabs, persist]);
 
@@ -98,6 +123,7 @@ export default function usePlayground() {
     const firstMood = S.moods[0]?.id || '';
     const saved = await upsertTask({
       name: name.trim(), date: today(), mood: firstMood, status: 'Not Started',
+      assignedTo: memberId ? [memberId] : [],
       subtasks: [], links: [],
     });
     const key = `${row},${col}`;
@@ -107,7 +133,7 @@ export default function usePlayground() {
     });
     await persist(updated);
     return saved;
-  }, [S.moods, tabs, activeTab, upsertTask, persist]);
+  }, [S.moods, tabs, activeTab, memberId, upsertTask, persist]);
 
   const updateCellTaskName = useCallback(async (taskId: string, name: string) => {
     const existing = S.tasks.find((t: any) => t.id === taskId);

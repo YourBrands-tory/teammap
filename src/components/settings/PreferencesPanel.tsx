@@ -10,7 +10,6 @@ interface Props {
 }
 
 export default function PreferencesPanel({ maxCap, weekends, onUpdateSettings, onExport, onImport }: Props) {
-  const role = useStore(s => s.role);
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);

@@ -1,15 +1,22 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import type { LVFilters, LVSort } from '../utils/listViewHelpers';
 import { filterAndSortTasks, toggleSort, DEFAULT_FILTERS, DEFAULT_SORT } from '../utils/listViewHelpers';
 
 export default function useListView() {
   const S = useStore(s => s.S);
   const softDeleteTask = useStore(s => s.softDeleteTask);
+  const uiViewState = useUIStore(s => s.viewStates.lv || {});
+  const setViewState = useUIStore(s => s.setViewState);
 
-  const [lvSort, setLvSort] = useState<LVSort>(DEFAULT_SORT);
-  const [lvFilters, setLvFilters] = useState<LVFilters>(DEFAULT_FILTERS);
+  const [lvSort, setLvSort] = useState<LVSort>(uiViewState.lvSort || DEFAULT_SORT);
+  const [lvFilters, setLvFilters] = useState<LVFilters>(uiViewState.lvFilters || DEFAULT_FILTERS);
   const [taskModal, setTaskModal] = useState<any>(null);
+
+  useEffect(() => {
+    setViewState('lv', { lvSort, lvFilters });
+  }, [lvSort, lvFilters, setViewState]);
 
   const lookup = useMemo(() => ({
     members: S.members,

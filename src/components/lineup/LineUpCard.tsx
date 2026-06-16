@@ -19,15 +19,13 @@ interface S { members: Member[]; clients: Client[]; moods: Mood[]; }
 interface Props {
   task: Task;
   S: S;
-  role?: string;
-  memberId?: string | null;
   onOpen: (t: any) => void;
   onStatusChange: (id: string, s: string) => void;
   onHide: (id: string) => void;
   isOverlay?: boolean;
 }
 
-export default function LineUpCard({ task, S, role, memberId, onOpen, onStatusChange, onHide, isOverlay }: Props) {
+export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, isOverlay }: Props) {
   const [linkPop, setLinkPop] = useState(false);
   const cardSize = getCardSize(task.mood, S.moods);
   const isNarrow = cardSize === 'narrow';
@@ -57,14 +55,12 @@ export default function LineUpCard({ task, S, role, memberId, onOpen, onStatusCh
     };
   }
 
-  const isMember = role === 'member';
-
   return (
     <div ref={sortable.ref} style={sortable.style}
       className={`lu-card size-${cardSize}`}
       onClick={() => onOpen(task)}>
       <div className="lu-mood-bar" style={{ background: moodColor }} />
-      {!isOverlay && !isMember && (
+      {!isOverlay && (
         <span className="lu-drag-handle" {...sortable.handleProps} onClick={e => e.stopPropagation()}>
           &#8942;
         </span>
@@ -131,8 +127,8 @@ export default function LineUpCard({ task, S, role, memberId, onOpen, onStatusCh
         )}
       </div>
       <div className="lu-actions">
-        {!isNarrow && !isMember && <button className="lu-open-btn" onClick={e => { e.stopPropagation(); onOpen(task); }}>Open</button>}
-        {!isMember && <button className="lu-hide-btn" onClick={e => { e.stopPropagation(); onHide(task.id); }} title="Hide">&#10005;</button>}
+        {!isNarrow && <button className="lu-open-btn" onClick={e => { e.stopPropagation(); onOpen(task); }}>Open</button>}
+        <button className="lu-hide-btn" onClick={e => { e.stopPropagation(); onHide(task.id); }} title="Hide">&#10005;</button>
       </div>
     </div>
   );

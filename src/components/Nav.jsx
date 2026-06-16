@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import { NAV_ICONS } from '../lib/constants';
 
-const MEMBER_NAV = ['lu', 'pg'];
-
-export default function Nav({ current, onSwitch, role }) {
+export default function Nav({ current, onSwitch }) {
   const S = useStore(s => s.S);
   const saveFlash = useStore(s => s.saveFlash);
-  const order = role === 'member' ? MEMBER_NAV : (S.navOrder || []);
+  const order = S.navOrder || [];
   const labels = S.navLabels || {};
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -38,6 +37,7 @@ export default function Nav({ current, onSwitch, role }) {
   const handleLogout = async () => {
     closeMenu();
     if (!confirm('Log out?')) return;
+    useUIStore.getState().clearUIState();
     await useStore.getState().signOut();
   };
 

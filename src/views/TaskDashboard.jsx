@@ -1,5 +1,6 @@
-import { useState, useCallback, memo } from 'react';
+import { useState, useCallback, useEffect, memo } from 'react';
 import { useStore, sel } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import { today, fmtD, taskTimeStr, STC, STB } from '../lib/constants';
 import Avatar from '../components/Avatar';
 import TaskModal from '../components/TaskModal';
@@ -12,15 +13,21 @@ const hm = (m) => m ? `${Math.floor(m/60)}h${m%60?' '+m%60+'m':''}` : null;
 export default function TaskDashboard() {
   const S = useStore(s => s.S);
   const updateSettings = useStore(s => s.updateSettings);
-  const [dashDate, setDashDate] = useState(today());
+  const uiViewState = useUIStore(s => s.viewStates.tkd || {});
+  const setViewState = useUIStore(s => s.setViewState);
+  const [dashDate, setDashDate] = useState(uiViewState.dashDate || today());
   const [modal, setModal] = useState(null);
   const [stPop, setStPop] = useState(null);
-  const [drawers, setDrawers] = useState({});
+  const [drawers, setDrawers] = useState(uiViewState.drawers || {});
 
   // Mobile state
   const [mobileMemberIdx, setMobileMemberIdx] = useState(0);
   const [mobileSheet, setMobileSheet] = useState(null);
-  const [expandedCards, setExpandedCards] = useState({});
+  const [expandedCards, setExpandedCards] = useState(uiViewState.expandedCards || {});
+
+  useEffect(() => {
+    setViewState('tkd', { dashDate, drawers, expandedCards });
+  }, [dashDate, drawers, expandedCards, setViewState]);
 
   const openTask = useCallback((t) => setModal(t), []);
   const openStatus = useCallback((s) => setStPop(s), []);

@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useStore, sel } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import { today, uid, COLORS } from '../lib/constants';
 
 export default function useTasksMilestones() {
@@ -11,12 +12,18 @@ export default function useTasksMilestones() {
   const recoverTaskStore = useStore(s => s.recoverTask);
   const purgeTaskStore = useStore(s => s.purgeTask);
   const delMilestoneStore = useStore(s => s.delMilestone);
+  const uiViewState = useUIStore(s => s.viewStates.tk || {});
+  const setViewState = useUIStore(s => s.setViewState);
 
-  const [ctab, setCtab] = useState<'tg' | 'ms' | 'trash'>('tg');
-  const [dashDate, setDashDate] = useState(today());
+  const [ctab, setCtab] = useState<'tg' | 'ms' | 'trash'>((uiViewState.ctab as 'tg' | 'ms' | 'trash') || 'tg');
+  const [dashDate, setDashDate] = useState(uiViewState.dashDate || today());
   const [taskModal, setTaskModal] = useState<any>(null);
   const [msModal, setMsModal] = useState<any>(null);
   const [dragCid, setDragCid] = useState<string | null>(null);
+
+  useEffect(() => {
+    setViewState('tk', { ctab, dashDate });
+  }, [ctab, dashDate, setViewState]);
 
   const shiftGenDate = useCallback((days: number) => {
     const d = new Date(dashDate + 'T12:00:00');

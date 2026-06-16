@@ -17,7 +17,6 @@ import FrequencyModal from '../components/modals/FrequencyModal';
 
 export default function Settings() {
   const S = useStore(s => s.S);
-  const role = useStore(s => s.role);
   const upsertMember = useStore(s => s.upsertMember);
   const upsertClient = useStore(s => s.upsertClient);
   const setMoods = useStore(s => s.setMoods);
@@ -78,18 +77,16 @@ export default function Settings() {
         Settings
       </div>
       <div className="st-grid">
-        {role === 'admin' && (
-          <MembersPanel
-            members={S.members}
-            stDrag={stDrag}
-            onDragStart={handleStDragStart}
-            onDragEnd={() => {}}
-            onDrop={handleStDrop}
-            onEdit={(m) => setMemberModal(m)}
-            onDelete={delMember}
-            onAdd={() => setMemberModal({ _new: true })}
-          />
-        )}
+        <MembersPanel
+          members={S.members}
+          stDrag={stDrag}
+          onDragStart={handleStDragStart}
+          onDragEnd={() => {}}
+          onDrop={handleStDrop}
+          onEdit={(m) => setMemberModal(m)}
+          onDelete={delMember}
+          onAdd={() => setMemberModal({ _new: true })}
+        />
 
         <ClientsPanel
           clients={sel.scl(S)}
