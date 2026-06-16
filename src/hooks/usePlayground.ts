@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import { uid, today } from '../lib/constants';
-import type { TabData, PlaygroundData } from '../utils/playgroundHelpers';
+import type { TabData, PlaygroundData, CellData } from '../utils/playgroundHelpers';
 
 export default function usePlayground() {
   const S = useStore(s => s.S);
   const setStateKey = useStore(s => s.setStateKey);
+  const upsertTask = useStore(s => s.upsertTask);
 
   const pg: PlaygroundData = S.playground || { tabs: [{ id: uid(), name: 'Sheet 1', data: {} }] };
   const [activeTab, setActiveTab] = useState(0);
@@ -86,10 +87,33 @@ export default function usePlayground() {
     persist(updated);
   }, [tabs, activeTab, persist]);
 
+  const quickCreateTask = useCallback(async (row: number, col: number, name: string) => {
+    const firstMood = S.moods[0]?.id || '';
+    const saved = await upsertTask({
+      name: name.trim(), date: today(), mood: firstMood, status: 'Not Started',
+      subtasks: [], links: [],
+    });
+    const key = `${row},${col}`;
+    const updated: TabData[] = tabs.map((t, i) => {
+      if (i !== activeTab) return t;
+      return { ...t, data: { ...t.data, [key]: { taskId: saved.id } } };
+    });
+    await persist(updated);
+    return saved;
+  }, [S.moods, tabs, activeTab, upsertTask, persist]);
+
+  const updateCellTaskName = useCallback(async (taskId: string, name: string) => {
+    const existing = S.tasks.find((t: any) => t.id === taskId);
+    if (existing) {
+      await upsertTask({ ...existing, subtasks: existing.subtasks || [], links: existing.links || [], name: name.trim() });
+    }
+  }, [S.tasks, upsertTask]);
+
   return {
     S, tabs, tab, activeTab, sidebarOpen, taskModal, renameModal, pendingCell,
     setActiveTab, setSidebarOpen, setTaskModal, setPendingCell,
     addTab, deleteTab, renameTab, saveRename, clearTab,
     convertToTask, handleTaskSaved, openTask, unlinkCell, setRenameModal,
+    upsertTask, quickCreateTask, updateCellTaskName,
   };
 }

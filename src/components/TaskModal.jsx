@@ -1,13 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { STATS, COLORS, today, uid } from '../lib/constants';
 import { useStore, sel } from '../store/useStore';
 import Avatar from './Avatar';
 
-/*
-  Port of openTaskModal + saveTask.
-  Pass `task` (a partial task, e.g. { mood, assignedTo, date }) for "new", or a
-  full task with `id` for "edit". `onClose` closes the modal.
-*/
+const DRAFT_KEY = 'tm_task_draft';
+
+function loadDraft(taskId) {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    return d._taskId === taskId ? d : null;
+  } catch { return null; }
+}
+
+function saveDraft(data) {
+  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify(data)); } catch {}
+}
+
+function clearDraft() {
+  try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
+}
+
 export default function TaskModal({ task = {}, onClose, onSave }) {
   const S = useStore(s => s.S);
   const upsertTask = useStore(s => s.upsertTask);
@@ -16,30 +30,67 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
   const softDeleteTask = useStore(s => s.softDeleteTask);
 
   const isEdit = !!task.id;
-  const [name, setName] = useState(task.name || '');
-  const [mood, setMood] = useState(task.mood || '');
-  const [assigned, setAssigned] = useState(task.assignedTo ? [...task.assignedTo] : []);
-  const [clientId, setClientId] = useState(task.clientId || '');
-  const [date, setDate] = useState(task.date || today());
-  const [status, setStatus] = useState(task.status || 'Not Started');
-  const [estH, setEstH] = useState(task.estH || '');
-  const [estM, setEstM] = useState(task.estM || '');
-  const [notes, setNotes] = useState(task.notes || '');
-  const [tags, setTags] = useState(task.tags ? [...task.tags] : []);
+  const draftId = task.id || '__new__';
+  const draft = useRef(loadDraft(draftId));
+
+  const initVal = (field, fallback) => draft.current?.[field] ?? fallback;
+
+  const [name, setName] = useState(initVal('name', task.name || ''));
+  const [mood, setMood] = useState(initVal('mood', task.mood || ''));
+  const [assigned, setAssigned] = useState(initVal('assigned', task.assignedTo ? [...task.assignedTo] : []));
+  const [clientId, setClientId] = useState(initVal('clientId', task.clientId || ''));
+  const [date, setDate] = useState(initVal('date', task.date || today()));
+  const [status, setStatus] = useState(initVal('status', task.status || 'Not Started'));
+  const [estH, setEstH] = useState(initVal('estH', task.estH || ''));
+  const [estM, setEstM] = useState(initVal('estM', task.estM || ''));
+  const [notes, setNotes] = useState(initVal('notes', task.notes || ''));
+  const [tags, setTags] = useState(initVal('tags', task.tags ? [...task.tags] : []));
   const [newTag, setNewTag] = useState('');
-  const [isMs, setIsMs] = useState(!!task.isMilestone);
-  const [msId, setMsId] = useState(task.milestoneId || '');
+  const [isMs, setIsMs] = useState(initVal('isMs', !!task.isMilestone));
+  const [msId, setMsId] = useState(initVal('msId', task.milestoneId || ''));
   const [err, setErr] = useState({});
+  const [subtasks, setSubtasks] = useState(initVal('subtasks', task.subtasks ? task.subtasks.map(s => ({ ...s })) : []));
+  const [links, setLinks] = useState(initVal('links', task.links ? task.links.map(l => ({ ...l })) : []));
+  const [newSubtask, setNewSubtask] = useState('');
+  const [newLinkLabel, setNewLinkLabel] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [tDetailTab, setTDetailTab] = useState('sub');
+  const notesRef = useRef(null);
+
+  const resizeNotes = () => {
+    const el = notesRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+  };
+
+  const handleClose = useCallback(() => {
+    clearDraft();
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    const onEsc = (e) => e.key === 'Escape' && onClose();
+    const onEsc = (e) => e.key === 'Escape' && handleClose();
     document.addEventListener('keydown', onEsc);
     return () => {
       document.body.style.overflow = '';
       document.removeEventListener('keydown', onEsc);
     };
-  }, [onClose]);
+  }, [handleClose]);
+
+  useEffect(() => { resizeNotes(); }, [notes]);
+
+  // auto-save draft on every meaningful change
+  useEffect(() => {
+    saveDraft({
+      _taskId: draftId,
+      name, mood, assigned, clientId, date, status,
+      estH, estM, notes, tags, isMs, msId, subtasks, links,
+      newTag, newSubtask, newLinkLabel, newLinkUrl, tDetailTab,
+    });
+  }, [name, mood, assigned, clientId, date, status, estH, estM, notes, tags, isMs, msId, subtasks, links, newTag, newSubtask, newLinkLabel, newLinkUrl, tDetailTab, draftId]);
 
   const toggle = (arr, set, id) =>
     set(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
@@ -60,6 +111,48 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
     }
     if (!tags.includes(existing.id)) setTags([...tags, existing.id]);
     setNewTag('');
+  };
+
+  const addSubtaskInline = () => {
+    const text = newSubtask.trim();
+    if (!text) return;
+    setSubtasks([...subtasks, { text, done: false }]);
+    setNewSubtask('');
+  };
+
+  const toggleSubtask = (i) => {
+    const next = subtasks.map((s, idx) => idx === i ? { ...s, done: !s.done } : s);
+    setSubtasks(next);
+    const allDone = next.length && next.every(s => s.done);
+    if (allDone && status !== 'Complete') {
+      if (confirm('All subtasks are checked off. Mark this task as Complete?')) {
+        setStatus('Complete');
+      }
+    }
+  };
+
+  const editSubtaskText = (i, text) => {
+    text = text.trim();
+    if (text) {
+      setSubtasks(subtasks.map((s, idx) => idx === i ? { ...s, text } : s));
+    }
+  };
+
+  const delSubtask = (i) => {
+    setSubtasks(subtasks.filter((_, idx) => idx !== i));
+  };
+
+  const addLinkInline = () => {
+    const url = newLinkUrl.trim();
+    if (!url) return;
+    const label = newLinkLabel.trim();
+    setLinks([...links, { label, url }]);
+    setNewLinkLabel('');
+    setNewLinkUrl('');
+  };
+
+  const delLink = (i) => {
+    setLinks(links.filter((_, idx) => idx !== i));
   };
 
   const save = async () => {
@@ -83,8 +176,11 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
       name: name.trim(), clientId: clientId || null, date: date || today(),
       mood, status, assignedTo: [...assigned], tags: [...tags],
       estH: parseInt(estH) || 0, estM: parseInt(estM) || 0, notes: notes.trim(),
+      subtasks: subtasks.map(s => ({ ...s })),
+      links: links.map(l => ({ ...l })),
       isMilestone: isMs, milestoneId,
     });
+    clearDraft();
     if (onSave) onSave(saved);
     onClose();
   };
@@ -92,18 +188,19 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
   const del = async () => {
     if (!confirm('Delete this task? It moves to Deleted Tasks where you can recover it.')) return;
     await softDeleteTask(task.id);
+    clearDraft();
     onClose();
   };
 
   return (
-    <div className="mbg" onMouseDown={(e)=>e.target.classList.contains('mbg')&&onClose()}>
+    <div className="mbg" onMouseDown={(e)=>e.target.classList.contains('mbg')&&handleClose()}>
       <div className="modal modal-lg" onMouseDown={e=>e.stopPropagation()}>
         <h2 style={{marginBottom:12}}>{isEdit ? 'Edit task' : 'New task'}</h2>
         <div style={{fontSize:11,color:'var(--warn)',marginBottom:10}}>* Task name, assigned to &amp; mood are required</div>
 
         <label className="fl" style={{marginTop:0}}>Task name *</label>
         <input type="text" placeholder="What needs to be done?" value={name}
-          className={err.name?'req':''} onChange={e=>setName(e.target.value)} autoFocus />
+          className={err.name?'req':''} onChange={e=>setName(e.target.value)} />
 
         <label className="fl">Mood *</label>
         <div className="mood-pick-row" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
@@ -130,15 +227,13 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
         </div>
 
         <label className="fl">Client / Project</label>
-        <div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4,marginTop:6}}>
+        <div className="ttag-row">
           {sel.scl(S).map(c => {
             const on = clientId === c.id;
             return (
               <div key={c.id} onClick={()=>setClientId(on?'':c.id)}
-                style={{flexShrink:0,padding:'4px 11px',borderRadius:20,
-                  border:`1.5px solid ${on?c.color:'var(--border)'}`,
-                  background:on?c.color+'18':'var(--s2)', color:on?c.color:'var(--t2)',
-                  fontSize:12,fontWeight:on?700:500,cursor:'pointer',whiteSpace:'nowrap'}}>
+                className={`ttagopt${on?' on':''}`}
+                style={on?{borderColor:c.color,background:c.color+'18',color:c.color}:{}}>
                 {c.name}
               </div>
             );
@@ -153,13 +248,14 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
           <button className="btn btn-xs" onClick={()=>dateOffset(-1)}>Yesterday</button>
         </div>
 
-        <label className="fl">Status</label>
-        <select value={status} onChange={e=>setStatus(e.target.value)} style={{width:180,marginTop:6}}>
-          {STATS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-
-        <div style={{display:'flex',gap:12,marginTop:14,alignItems:'flex-start'}}>
-          <div style={{flex:'0 0 160px'}}>
+        <div style={{display:'flex',gap:16,alignItems:'flex-start',marginTop:6}}>
+          <div style={{flex:1,minWidth:0}}>
+            <label className="fl" style={{marginTop:0}}>Status</label>
+            <select value={status} onChange={e=>setStatus(e.target.value)} style={{width:'100%',maxWidth:200}}>
+              {STATS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div style={{flexShrink:0}}>
             <label className="fl" style={{marginTop:0}}>Est. time</label>
             <div style={{display:'flex',gap:6,alignItems:'center',marginTop:6}}>
               <input type="number" min="0" max="99" placeholder="0" value={estH}
@@ -168,12 +264,12 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
                 onChange={e=>setEstM(e.target.value)} style={{width:58}} /> <span style={{fontSize:12,color:'var(--t2)'}}>m</span>
             </div>
           </div>
-          <div style={{flex:1}}>
-            <label className="fl" style={{marginTop:0}}>Notes</label>
-            <textarea placeholder="Notes…" value={notes} onChange={e=>setNotes(e.target.value)}
-              style={{minHeight:52,marginTop:6}} />
-          </div>
         </div>
+
+        <label className="fl">Notes</label>
+        <textarea ref={notesRef} placeholder="Notes…" value={notes}
+          onChange={e=>setNotes(e.target.value)} onInput={resizeNotes}
+          style={{minHeight:60,marginTop:6,overflow:'hidden',resize:'none'}} />
 
         <label className="fl">Tags</label>
         <div className="tag-chip-pick">
@@ -188,6 +284,79 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
             onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); addTagInline(); } }}
             style={{flex:1,padding:'5px 9px'}} />
           <button className="btn btn-sm" onClick={addTagInline}>+ Tag</button>
+        </div>
+
+        {/* ── Subtasks & Links tabs ── */}
+        <div className="tdetail-tabs">
+          <div className={`tdetail-tab${tDetailTab==='sub'?' active':''}`} onClick={()=>setTDetailTab('sub')}>
+            ☑ Subtasks {subtasks.length ? `(${subtasks.filter(s=>s.done).length}/${subtasks.length})` : ''}
+          </div>
+          <div className={`tdetail-tab${tDetailTab==='links'?' active':''}`} onClick={()=>setTDetailTab('links')}>
+            🔗 Links {links.length ? `(${links.length})` : ''}
+          </div>
+        </div>
+
+        {/* ── Subtasks tab content ── */}
+        <div className={`tdetail-tab-content${tDetailTab==='sub'?' active':''}`}>
+          {subtasks.length > 0 && (
+            <div className="subtask-progress-mini">
+              <div className="subtask-bar-track">
+                <div className="subtask-bar-fill" style={{width:`${Math.round(subtasks.filter(s=>s.done).length/subtasks.length*100)}%`}} />
+              </div>
+              <span style={{fontSize:11,color:'var(--t2)',fontWeight:700,whiteSpace:'nowrap'}}>
+                {subtasks.filter(s=>s.done).length}/{subtasks.length}
+              </span>
+            </div>
+          )}
+          <div>
+            {subtasks.map((s, i) => (
+              <div key={i} className={`subtask-row${s.done?' done':''}`}>
+                <div className={`subtask-check${s.done?' checked':''}`} onClick={()=>toggleSubtask(i)}>
+                  {s.done ? '✓' : ''}
+                </div>
+                <span className="subtask-text" contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e)=>editSubtaskText(i, e.currentTarget.textContent)}
+                  onKeyDown={(e)=>{if(e.key==='Enter'){e.preventDefault();e.currentTarget.blur();}}}>
+                  {s.text}
+                </span>
+                <button className="subtask-del" onClick={()=>delSubtask(i)}>✕</button>
+              </div>
+            ))}
+          </div>
+          <div className="subtask-add-row">
+            <input type="text" placeholder="Add a subtask + Enter" value={newSubtask}
+              onChange={e=>setNewSubtask(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addSubtaskInline();}}}
+              style={{flex:1,fontSize:13}} />
+            <button className="btn btn-sm" onClick={addSubtaskInline}>+ Add</button>
+          </div>
+        </div>
+
+        {/* ── Links tab content ── */}
+        <div className={`tdetail-tab-content${tDetailTab==='links'?' active':''}`}>
+          <div>
+            {links.map((l, i) => {
+              let safeUrl = l.url;
+              if (!/^https?:\/\//i.test(safeUrl)) safeUrl = 'https://' + safeUrl;
+              return (
+                <div key={i} className="link-row">
+                  <span style={{flexShrink:0}}>🔗</span>
+                  <a href={safeUrl} target="_blank" rel="noopener noreferrer">{l.label || l.url}</a>
+                  <button className="link-del" onClick={()=>delLink(i)}>✕</button>
+                </div>
+              );
+            })}
+          </div>
+          <div className="link-add-row">
+            <input type="text" placeholder="Label (optional)" value={newLinkLabel}
+              onChange={e=>setNewLinkLabel(e.target.value)} style={{width:140,fontSize:12}} />
+            <input type="text" placeholder="https://…" value={newLinkUrl}
+              onChange={e=>setNewLinkUrl(e.target.value)}
+              onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addLinkInline();}}}
+              style={{flex:1,fontSize:12}} />
+            <button className="btn btn-sm" onClick={addLinkInline}>+ Add</button>
+          </div>
         </div>
 
         <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8}}>
@@ -206,7 +375,7 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
 
         <div className="ma">
           {isEdit && <button className="btn btn-d" onClick={del}>🗑 Delete</button>}
-          <button className="btn btn-g" onClick={onClose}>Cancel</button>
+          <button className="btn btn-g" onClick={handleClose}>Cancel</button>
           <button className="btn btn-p" onClick={save}>Save task</button>
         </div>
       </div>

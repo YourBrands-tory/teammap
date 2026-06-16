@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
@@ -8,14 +8,22 @@ export default function AuthGate({ children }) {
   const [pw, setPw] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const loaded = useRef(false);
 
   useEffect(() => {
-    loadAll();
+    if (!loaded.current) {
+      loaded.current = true;
+      loadAll();
+    }
     const { data: sub } = supabase.auth.onAuthStateChange((_e, sess) => {
       setSession(sess);
-      if (sess) loadAll();
     });
-    return () => sub.subscription.unsubscribe();
+    const onVis = () => {}; // no-op guard (prevents accidental refetch)
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      sub.subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', onVis);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { today, fmtD, taskTimeStr, STC, STB } from '../lib/constants';
 import Avatar from '../components/Avatar';
@@ -21,6 +21,11 @@ export default function TaskDashboard() {
   const [mobileMemberIdx, setMobileMemberIdx] = useState(0);
   const [mobileSheet, setMobileSheet] = useState(null);
   const [expandedCards, setExpandedCards] = useState({});
+
+  const openTask = useCallback((t) => setModal(t), []);
+  const openStatus = useCallback((s) => setStPop(s), []);
+  const closeModal = useCallback(() => setModal(null), []);
+  const closeStatus = useCallback(() => setStPop(null), []);
 
   const shift = (days) => {
     const d = new Date(dashDate+'T12:00:00'); d.setDate(d.getDate()+days);
@@ -80,7 +85,7 @@ export default function TaskDashboard() {
             {S.members.map(m => (
               <TeamCol key={m.id} member={m} date={dashDate} S={S}
                 drawerOpen={!!drawers[m.id]} toggleDrawer={()=>setDrawers(d=>({...d,[m.id]:!d[m.id]}))}
-                onOpenTask={setModal} onStatus={setStPop} />
+                onOpenTask={openTask} onStatus={openStatus} />
             ))}
           </div>
         </div>
@@ -89,7 +94,7 @@ export default function TaskDashboard() {
             <h4>{spM ? spM.name : 'Quick View'}</h4>
             <div style={{fontSize:10,color:'var(--t3)'}}>{fmtD(dashDate)}</div>
           </div>
-          <div className="spb"><SidePanel member={spM} date={dashDate} S={S} onOpenTask={setModal} /></div>
+          <div className="spb"><SidePanel member={spM} date={dashDate} S={S} onOpenTask={openTask} /></div>
         </div>
       </div>
 
@@ -131,14 +136,14 @@ export default function TaskDashboard() {
               member={mobileMember} date={dashDate} S={S}
               expandedCards={expandedCards}
               onToggleExpand={(id) => setExpandedCards(c => ({...c, [id]: !c[id]}))}
-              onOpenTask={setModal} onStatus={setStPop}
+              onOpenTask={openTask} onStatus={openStatus}
             />
           )}
         </div>
       </div>
 
       {/* ── MOBILE FAB ── */}
-      <button className="td-fab" onClick={()=>setModal({ date:dashDate })}>+</button>
+      <button className="td-fab" onClick={()=>openTask({ date:dashDate })}>+</button>
 
       {/* ── MOBILE BOTTOM SHEET ── */}
       {mobileSheet && (
@@ -187,7 +192,7 @@ export default function TaskDashboard() {
 
                   {/* Side panel content */}
                   <div className="td-mob-sheet-section" style={{flex:1,overflowY:'auto'}}>
-                    <SidePanel member={spM} date={dashDate} S={S} onOpenTask={(t) => { setModal(t); setMobileSheet(null); }} />
+                    <SidePanel member={spM} date={dashDate} S={S} onOpenTask={(t) => { openTask(t); setMobileSheet(null); }} />
                   </div>
                 </>
               )}
@@ -204,14 +209,14 @@ export default function TaskDashboard() {
         </button>
       </div>
 
-      {modal && <TaskModal task={modal} onClose={()=>setModal(null)} />}
-      {stPop && <StatusPopup taskId={stPop.taskId} anchorRect={stPop.rect} onClose={()=>setStPop(null)} />}
+      {modal && <TaskModal task={modal} onClose={closeModal} />}
+      {stPop && <StatusPopup taskId={stPop.taskId} anchorRect={stPop.rect} onClose={closeStatus} />}
     </div>
   );
 }
 
-/* ── DESKTOP TEAM COL (unchanged) ── */
-function TeamCol({ member, date, S, drawerOpen, toggleDrawer, onOpenTask, onStatus }) {
+/* ── DESKTOP TEAM COL ── */
+const TeamCol = memo(function TeamCol({ member, date, S, drawerOpen, toggleDrawer, onOpenTask, onStatus }) {
   const allTasks = sel.tasksForMD(S, member.id, date);
   const visible = allTasks.filter(t=>t.status!=='Complete');
   const doneCount = allTasks.filter(t=>t.status==='Complete').length;
@@ -316,10 +321,10 @@ function TeamCol({ member, date, S, drawerOpen, toggleDrawer, onOpenTask, onStat
       </div>
     </div>
   );
-}
+});
 
-/* ── DESKTOP TASK CARD (unchanged) ── */
-function TCard({ task, member, S, onOpenTask, onStatus }) {
+/* ── DESKTOP TASK CARD ── */
+const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
   const mood = sel.gmood(S, task.mood);
   const isHero=task.mood==='hero', isTop=task.mood==='top', isImp=task.mood==='imp';
   const isLight=!isHero&&!isImp&&!isTop;
@@ -354,10 +359,10 @@ function TCard({ task, member, S, onOpenTask, onStatus }) {
       )}
     </div>
   );
-}
+});
 
-/* ── SIDE PANEL (unchanged) ── */
-function SidePanel({ member, date, S, onOpenTask }) {
+/* ── SIDE PANEL ── */
+const SidePanel = memo(function SidePanel({ member, date, S, onOpenTask }) {
   if (!member) return <div style={{fontSize:12,color:'var(--t3)'}}>No member selected</div>;
   const tasks = sel.tasksForMD(S, member.id, date);
   const groups = [
@@ -383,10 +388,10 @@ function SidePanel({ member, date, S, onOpenTask }) {
       ); })}
     </div>
   ));
-}
+});
 
 /* ── MOBILE TEAM COL ── */
-function TeamColMobile({ member, date, S, expandedCards, onToggleExpand, onOpenTask, onStatus }) {
+const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCards, onToggleExpand, onOpenTask, onStatus }) {
   const allTasks = sel.tasksForMD(S, member.id, date);
   const visible = allTasks.filter(t=>t.status!=='Complete');
   const doneCount = allTasks.filter(t=>t.status==='Complete').length;
@@ -468,10 +473,10 @@ function TeamColMobile({ member, date, S, expandedCards, onToggleExpand, onOpenT
         onClick={()=>onOpenTask({ date, assignedTo:[member.id] })}>+ Task</button>
     </div>
   );
-}
+});
 
 /* ── MOBILE TASK CARD (simplified, expandable) ── */
-function MobileTaskCard({ task, member, S, expanded, onToggleExpand, onOpenTask, onStatus }) {
+const MobileTaskCard = memo(function MobileTaskCard({ task, member, S, expanded, onToggleExpand, onOpenTask, onStatus }) {
   const mood = sel.gmood(S, task.mood);
   const client = sel.gc(S, task.clientId);
   const timeStr = taskTimeStr(task);
@@ -511,4 +516,4 @@ function MobileTaskCard({ task, member, S, expanded, onToggleExpand, onOpenTask,
       )}
     </div>
   );
-}
+});

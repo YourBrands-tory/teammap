@@ -110,6 +110,8 @@ export default function useTaskGen2() {
       estH: tmpl.estH || 0,
       estM: tmpl.estM || 0,
       notes: tmpl.notes || '',
+      subtasks: [],
+      links: [],
       isMilestone: false,
       milestoneId: null,
     };

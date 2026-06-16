@@ -24,6 +24,7 @@ export default function Playground() {
     setActiveTab, setSidebarOpen, setTaskModal, setPendingCell,
     addTab, deleteTab, renameTab, saveRename, clearTab,
     convertToTask, handleTaskSaved, openTask, unlinkCell, setRenameModal,
+    quickCreateTask, updateCellTaskName,
   } = usePlayground();
 
   const isMobile = useIsMobile();
@@ -83,6 +84,8 @@ export default function Playground() {
               onConvertToTask={convertToTask}
               onOpenTask={openTask}
               onUnlink={unlinkCell}
+              onUpdateTaskName={updateCellTaskName}
+              onQuickCreate={quickCreateTask}
             />
           </div>
         </div>

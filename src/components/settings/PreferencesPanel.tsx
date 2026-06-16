@@ -34,9 +34,7 @@ export default function PreferencesPanel({ maxCap, weekends, onUpdateSettings, o
   const handleReset = () => {
     if (!confirm('Reset ALL data?')) return;
     const loadAll = useStore.getState().loadAll;
-    // The store doesn't have a reset to defaults; the legacy code
-    // reloaded the default state. For now, reload from Supabase.
-    loadAll();
+    loadAll(true);
   };
 
   return (

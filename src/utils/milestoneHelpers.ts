@@ -12,6 +12,8 @@ export interface Task {
   estH: number;
   estM: number;
   notes: string;
+  subtasks?: { text: string; done: boolean }[];
+  links?: { label: string; url: string }[];
   isMilestone: boolean;
   milestoneId: string | null;
   deleted: boolean;

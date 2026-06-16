@@ -23,6 +23,7 @@ const taskFromRow = (r) => ({
   id:r.id, name:r.name, clientId:r.client_id, date:r.date, mood:r.mood,
   status:r.status, assignedTo:r.assigned_to||[], tags:r.tags||[],
   estH:r.est_h||0, estM:r.est_m||0, notes:r.notes||'',
+  subtasks:r.subtasks||[], links:r.links||[],
   isMilestone:!!r.is_milestone, milestoneId:r.milestone_id||null,
   deleted:!!r.deleted, createdAt:Number(r.created_at)||Date.now(), updatedAt:Number(r.updated_at)||Date.now(),
 });
@@ -30,6 +31,7 @@ const taskToRow = (t) => ({
   id:t.id, name:t.name, client_id:t.clientId||null, date:t.date, mood:t.mood,
   status:t.status, assigned_to:t.assignedTo||[], tags:t.tags||[],
   est_h:t.estH||0, est_m:t.estM||0, notes:t.notes||'',
+  subtasks:t.subtasks||[], links:t.links||[],
   is_milestone:!!t.isMilestone, milestone_id:t.milestoneId||null,
   deleted:!!t.deleted, created_at:t.createdAt||Date.now(), updated_at:t.updatedAt||Date.now(),
 });
@@ -70,7 +72,9 @@ export const useStore = create((set, get) => ({
   setSession: (session) => set({ session }),
 
   // ── boot: pull profile + all data ─────────────────────────────────────────
-  loadAll: async () => {
+  loadAll: async (force) => {
+    const cur = get().S;
+    if (!force && cur?.tasks?.length) return; // already loaded, skip unless forced
     set({ loading: true });
     const { data: sess } = await supabase.auth.getSession();
     const session = sess?.session || null;
@@ -129,7 +133,7 @@ export const useStore = create((set, get) => ({
   upsertTask: async (task) => {
     const now = Date.now();
     const t = { estH:0, estM:0, tags:[], assignedTo:[], notes:'', status:'Not Started',
-      isMilestone:false, milestoneId:null, deleted:false, ...task };
+      subtasks:[], links:[], isMilestone:false, milestoneId:null, deleted:false, ...task };
     if (!t.id) { t.id = uid(); t.createdAt = now; }
     t.updatedAt = now;
     get()._patchS((S) => {
