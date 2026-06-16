@@ -44,19 +44,25 @@ create table if not exists tasks (
   date          date,
   mood          text,
   status        text default 'Not Started',
-  assigned_to   jsonb default '[]'::jsonb,     -- array of member ids
+  assigned_to   jsonb default '[]'::jsonb,
   tags          jsonb default '[]'::jsonb,
   est_h         int default 0,
   est_m         int default 0,
   notes         text default '',
+  subtasks      jsonb default '[]'::jsonb,
+  links         jsonb default '[]'::jsonb,
   is_milestone  boolean default false,
   milestone_id  text,
   deleted       boolean default false,
-  created_at    bigint,                         -- ms epoch (matches old data)
+  created_at    bigint,
   updated_at    bigint
 );
 create index if not exists tasks_date_idx on tasks(date);
 create index if not exists tasks_deleted_idx on tasks(deleted);
+
+-- add subtasks/links columns if upgrading from a schema that lacks them
+alter table tasks add column if not exists subtasks jsonb default '[]'::jsonb;
+alter table tasks add column if not exists links jsonb default '[]'::jsonb;
 
 create table if not exists milestones (
   id           text primary key,
