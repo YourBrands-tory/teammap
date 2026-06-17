@@ -62,26 +62,18 @@ export const useStore = create((set, get) => ({
 
   S: JSON.parse(JSON.stringify(EMPTY_S)),
 
-  // ── Custom login: query members table directly via raw REST call ──────────
+  // ── Custom login: query members table directly — NO Supabase Auth ─────────
   login: async (selectedRole, email, password) => {
     const normalizedEmail = email?.trim()?.toLowerCase() || '';
     const normalizedPassword = password?.trim() || '';
-    const roleList = selectedRole === 'manager' ? 'admin,manager' : 'member';
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    const anon = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const url = `${base}/rest/v1/members?select=id,name,role,color&email=ilike.${encodeURIComponent(normalizedEmail)}&password=eq.${encodeURIComponent(normalizedPassword)}&role=in.(${roleList})&limit=1`;
-    let data = null;
-    let error = null;
-    try {
-      const res = await fetch(url, {
-        headers: { 'apikey': anon, 'Authorization': `Bearer ${anon}` },
-      });
-      if (!res.ok) { error = { message: `HTTP ${res.status} ${res.statusText}` }; }
-      else {
-        const rows = await res.json();
-        data = rows?.[0] || null;
-      }
-    } catch (e) { error = e; }
+    const roleFilter = selectedRole === 'manager' ? ['admin','manager'] : ['member'];
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, name, role, color')
+      .filter('email', 'ilike', normalizedEmail)
+      .eq('password', normalizedPassword)
+      .in('role', roleFilter)
+      .maybeSingle();
 
     if (error) return { error: 'Database error. Please try again.' };
     if (!data) return { error: selectedRole === 'manager'
