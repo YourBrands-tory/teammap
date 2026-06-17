@@ -55,6 +55,7 @@ export const useStore = create((set, get) => ({
   session: null,
   role: null,
   loading: true,
+  isAuthLoading: true,
   saveFlash: 0,
   _rtChannel: null,
 
@@ -80,19 +81,35 @@ export const useStore = create((set, get) => ({
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) {
       // Auth user doesn't exist yet — create one on first login, then sign in
-      await supabase.auth.signUp({ email, password });
-      await supabase.auth.signInWithPassword({ email, password });
+      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      if (!signUpError) {
+        // User created — sign in to get the session
+        const { error: retryError } = await supabase.auth.signInWithPassword({ email, password });
+        if (retryError) {
+          console.warn('[auth] signIn after signUp failed:', retryError.message);
+        }
+      } else {
+        console.warn('[auth] signUp failed:', signUpError.message);
+        // User may already exist from prior signUp but unconfirmed — try signing in anyway
+        await supabase.auth.signInWithPassword({ email, password });
+      }
     }
 
+    // Debug: check what Supabase sees after auth flow
+    const { data: { session: finalSession } } = await supabase.auth.getSession();
+    console.log('[auth] login: final getSession() returns', finalSession ? 'session found' : 'NO session');
+
     const session = { memberId: data.id, role: data.role, name: data.name, color: data.color };
-    set({ session, role: data.role, loading: true });
+    set({ session, role: data.role, loading: true, isAuthLoading: false });
     await get().loadAll();
     return {};
   },
 
   // ── Restore session via Supabase Auth (survives PWA close/reopen) ──────────
   restoreSession: async () => {
+    console.log('[auth] restoreSession: calling getSession()…');
     const { data: { session: authSession } } = await supabase.auth.getSession();
+    console.log('[auth] restoreSession: getSession() returned', authSession ? 'session found' : 'NO session');
 
     if (authSession?.user?.email) {
       const { data } = await supabase
@@ -102,13 +119,16 @@ export const useStore = create((set, get) => ({
         .maybeSingle();
 
       if (data) {
+        console.log('[auth] restoreSession: member found, restoring session for', data.name);
         const session = { memberId: data.id, role: data.role, name: data.name, color: data.color };
-        set({ session, role: data.role, loading: true });
+        set({ session, role: data.role, loading: true, isAuthLoading: false });
         await get().loadAll();
         return;
+      } else {
+        console.log('[auth] restoreSession: no member found for email', authSession.user.email);
       }
     }
-    set({ loading: false });
+    set({ isAuthLoading: false, loading: false });
   },
 
   setSession: (session) => set({ session }),
@@ -116,14 +136,16 @@ export const useStore = create((set, get) => ({
   // ── Auth state listener (handles external sign-outs) ───────────────────────
   _authSubscription: null,
   initAuthListener: () => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    console.log('[auth] initAuthListener: registering onAuthStateChange…');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[auth] onAuthStateChange event:', event, 'session:', session ? 'exists' : 'null');
       if (event === 'SIGNED_OUT') {
         const ch = get()._rtChannel;
         if (ch) { supabase.removeChannel(ch); }
         set({
           session: null, role: null,
           S: JSON.parse(JSON.stringify(EMPTY_S)),
-          loading: false, _rtChannel: null,
+          loading: false, isAuthLoading: false, _rtChannel: null,
         });
       }
     });
@@ -135,11 +157,15 @@ export const useStore = create((set, get) => ({
     useUIStore.getState().clearUIState();
     const ch = get()._rtChannel;
     if (ch) { supabase.removeChannel(ch); }
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('[auth] signOut threw:', e);
+    }
     set({
       session: null, role: null,
       S: JSON.parse(JSON.stringify(EMPTY_S)),
-      loading: false, _rtChannel: null,
+      loading: false, isAuthLoading: false, _rtChannel: null,
     });
   },
 

@@ -38,6 +38,7 @@ export default function App() {
   const session = useStore(s => s.session);
   const role = useStore(s => s.role);
   const loading = useStore(s => s.loading);
+  const isAuthLoading = useStore(s => s.isAuthLoading);
   const login = useStore(s => s.login);
 
   const defaultView = 'tkd';
@@ -85,6 +86,10 @@ export default function App() {
     el.addEventListener('scroll', handler, { passive: true });
     return () => el.removeEventListener('scroll', handler);
   }, [view, setScrollPosition]);
+
+  if (isAuthLoading) {
+    return <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',color:'var(--t2)'}}>Loading…</div>;
+  }
 
   if (loading) {
     return <div style={{display:'flex',height:'100vh',alignItems:'center',justifyContent:'center',color:'var(--t2)'}}>Loading…</div>;
