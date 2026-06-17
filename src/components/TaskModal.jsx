@@ -22,7 +22,7 @@ function clearDraft() {
   try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
 }
 
-export default function TaskModal({ task = {}, onClose, onSave }) {
+export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '' }) {
   const S = useStore(s => s.S);
   const upsertTask = useStore(s => s.upsertTask);
   const upsertTag = useStore(s => s.upsertTag);
@@ -217,7 +217,12 @@ export default function TaskModal({ task = {}, onClose, onSave }) {
   return (
     <div className="mbg" onMouseDown={(e)=>e.target.classList.contains('mbg')&&handleClose()}>
       <div className="modal modal-lg" onMouseDown={e=>e.stopPropagation()}>
-        <h2 style={{marginBottom:12}}>{isEdit ? 'Edit task' : 'New task'}</h2>
+        <h2 style={{marginBottom:4}}>{isEdit ? 'Edit task' : 'New task'}</h2>
+        {fromCellText && (
+          <div style={{fontSize:12,color:'var(--t2)',marginBottom:10,fontStyle:'italic'}}>
+            From cell: &ldquo;{fromCellText}&rdquo;
+          </div>
+        )}
         <div style={{fontSize:11,color:'var(--warn)',marginBottom:10}}>* Task name, assigned to &amp; mood are required</div>
 
         <label className="fl" style={{marginTop:0}}>Task name *</label>

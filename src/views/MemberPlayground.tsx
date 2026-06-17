@@ -8,11 +8,11 @@ import Modal from '../components/Modal';
 
 export default function MemberPlayground() {
   const {
-    S, tabs, tab, activeTab, sidebarOpen, taskModal, renameModal, pendingCell,
-    setActiveTab, setSidebarOpen, setTaskModal, setPendingCell,
+    S, tabs, tab, activeTab, sidebarOpen, taskModal, renameModal, pendingCell, fromCellText,
+    setActiveTab, setSidebarOpen, setTaskModal, setPendingCell, setFromCellText,
     addTab, deleteTab, renameTab, saveRename, clearTab,
     convertToTask, handleTaskSaved, openTask, unlinkCell, setRenameModal,
-    quickCreateTask, updateCellTaskName,
+    updateCellText,
   } = useMemberPlayground();
 
   const handleInsertClient = useCallback((clientId: string) => {
@@ -48,8 +48,7 @@ export default function MemberPlayground() {
               onConvertToTask={convertToTask}
               onOpenTask={openTask}
               onUnlink={unlinkCell}
-              onUpdateTaskName={updateCellTaskName}
-              onQuickCreate={quickCreateTask}
+              onUpdateCellText={updateCellText}
             />
           </div>
         </div>
@@ -58,7 +57,8 @@ export default function MemberPlayground() {
       {taskModal && (
         <TaskModal
           task={taskModal}
-          onClose={() => { setTaskModal(null); setPendingCell(null); }}
+          fromCellText={fromCellText}
+          onClose={() => { setTaskModal(null); setPendingCell(null); setFromCellText(''); }}
           onSave={pendingCell ? handleTaskSaved : undefined}
         />
       )}

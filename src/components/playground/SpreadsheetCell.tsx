@@ -13,30 +13,33 @@ interface Props {
   editValue: string;
   onEditValueChange: (value: string) => void;
   onSelect: (r: number, c: number) => void;
+  onStartEdit: (r: number, c: number) => void;
+  onSaveEdit: () => void;
+  onCancelEdit: () => void;
   onConvertToTask: (r: number, c: number) => void;
   onOpenTask: (taskId: string) => void;
-  onUnlink: (r: number, c: number) => void;
+  onUnlink: (r: number, c: number, taskId?: string) => void;
 }
 
 export default function SpreadsheetCell({
   row, col, cell, tasks, isSelected,
   isEditing, editValue, onEditValueChange,
-  onSelect, onConvertToTask, onOpenTask, onUnlink,
+  onSelect, onStartEdit, onSaveEdit, onCancelEdit,
+  onConvertToTask, onOpenTask, onUnlink,
 }: Props) {
   const linked = hasLinkedTask(tasks, cell);
   const linkedTask = linked && cell?.taskId ? tasks.find(t => t.id === cell.taskId && !t.deleted) : null;
-  const displayText = linkedTask?.name || '';
 
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFired = useRef(false);
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
     }
   }, [isEditing]);
 
@@ -57,10 +60,14 @@ export default function SpreadsheetCell({
   }, [onSelect, row, col]);
 
   const handleDoubleClick = useCallback(() => {
-    if (linked && cell?.taskId) {
-      onOpenTask(cell.taskId);
+    onStartEdit(row, col);
+  }, [onStartEdit, row, col]);
+
+  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
     }
-  }, [linked, cell, onOpenTask]);
+  }, []);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -91,20 +98,34 @@ export default function SpreadsheetCell({
     }
   }, []);
 
-  const handleConvertToTask = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    onConvertToTask(row, col);
-  }, [onConvertToTask, row, col]);
-
   const handleClearCell = useCallback(() => {
-    if (confirm('Clear this cell? This will remove the task from this cell.')) {
+    if (confirm('Clear this cell? This will remove all content and tasks from this cell.')) {
       onUnlink(row, col);
     }
     setContextMenu(null);
   }, [onUnlink, row, col]);
 
+  const handleRemoveTask = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (cell?.taskId) onUnlink(row, col, cell.taskId);
+  }, [onUnlink, row, col, cell]);
+
+  const handleOpenTask = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (cell?.taskId) onOpenTask(cell.taskId);
+  }, [onOpenTask, cell]);
+
+  const handleConvertToTask = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onConvertToTask(row, col);
+  }, [onConvertToTask, row, col]);
+
+  const value = isEditing ? editValue : (cell?.text || '');
+  const showPlus = value.trim().length > 0 && !cell?.taskId;
+
   return (
     <td
+      className={`pg-cell-td${isSelected ? ' selected' : ''}${isEditing ? ' editing' : ''}`}
       onMouseEnter={(e) => {
         const a = e.currentTarget.querySelector('.pg-cell-actions') as HTMLElement;
         if (a) a.style.display = 'flex';
@@ -114,39 +135,46 @@ export default function SpreadsheetCell({
         if (a) a.style.display = '';
       }}
     >
-      <div
-        className={`pg-cell${linked ? ' has-task' : ''}${isSelected ? ' selected' : ''}`}
-        role="button"
-        onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
-        onContextMenu={handleContextMenu}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchMove={handleTouchMove}
-        data-taskid={cell?.taskId || ''}
-      >
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            className="pg-cell-input"
-            type="text"
-            value={editValue}
-            onChange={e => onEditValueChange(e.target.value)}
-          />
-        ) : (
-          linked ? pgEsc(displayText) : ''
-        )}
-      </div>
-      <div className="pg-cell-actions">
-        {linked && cell?.taskId ? (
-          <>
-            <button className="pg-cell-btn task-done" onClick={(e) => { e.stopPropagation(); onOpenTask(cell.taskId!); }} title="Open task">&#128196;</button>
-            <button className="pg-cell-btn" onClick={(e) => { e.stopPropagation(); onUnlink(row, col); }} title="Unlink">&#10005;</button>
-          </>
-        ) : (
-          <button className="pg-cell-btn" onClick={handleConvertToTask} title="Convert to task">&#10133;</button>
-        )}
-      </div>
+      {isEditing ? (
+        <textarea
+          ref={textareaRef}
+          className="cell-editor"
+          value={editValue}
+          onChange={e => onEditValueChange(e.target.value)}
+          onBlur={onSaveEdit}
+          onKeyDown={handleEditorKeyDown}
+        />
+      ) : (
+        <div
+          className={`pg-cell${linked ? ' has-task' : ''}${isSelected ? ' selected' : ''}`}
+          role="button"
+          onClick={handleClick}
+          onDoubleClick={handleDoubleClick}
+          onContextMenu={handleContextMenu}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
+        >
+          {value ? (
+            <div className="cell-text">{pgEsc(value)}</div>
+          ) : null}
+          {linked && linkedTask && (
+            <div className="cell-task-badges">
+              <span className="cell-task-chip" style={{ background: '#e8f0fe' }}>
+                <span style={{ fontSize: 11, marginRight: 2 }}>📌</span>
+                <span className="cell-task-chip-name">{pgEsc(linkedTask.name || '')}</span>
+                <button className="cell-task-chip-btn" onClick={handleOpenTask} title="Open task">📄</button>
+                <button className="cell-task-chip-btn" onClick={handleRemoveTask} title="Remove from cell">✕</button>
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+      {showPlus && (
+        <div className="pg-cell-actions">
+          <button className="pg-cell-btn" onClick={handleConvertToTask} title="Convert to task">+</button>
+        </div>
+      )}
 
       {contextMenu && (
         <div className="pg-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={e => e.stopPropagation()}>

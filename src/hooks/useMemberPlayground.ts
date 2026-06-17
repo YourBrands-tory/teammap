@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { supabase } from '../lib/supabase';
 import { uid, today } from '../lib/constants';
+import { getCellData } from '../utils/playgroundHelpers';
 import type { TabData, PlaygroundData } from '../utils/playgroundHelpers';
 
 export default function useMemberPlayground() {
@@ -19,6 +20,7 @@ export default function useMemberPlayground() {
   const [taskModal, setTaskModal] = useState<any>(null);
   const [renameModal, setRenameModal] = useState<{ tabIndex: number; name: string } | null>(null);
   const [pendingCell, setPendingCell] = useState<{ row: number; col: number } | null>(null);
+  const [fromCellText, setFromCellText] = useState('');
 
   useEffect(() => {
     setViewState('pg', { activeTab, sidebarOpen });
@@ -40,6 +42,8 @@ export default function useMemberPlayground() {
     })();
   }, [memberId, loaded]);
 
+  const tab = tabs[activeTab] || tabs[0];
+
   // Persist to Supabase on change
   const persist = useCallback((updatedTabs: TabData[]) => {
     setTabs(updatedTabs);
@@ -51,8 +55,6 @@ export default function useMemberPlayground() {
       if (error) console.error('[useMemberPlayground] persist error:', error);
     });
   }, [memberId]);
-
-  const tab = tabs[activeTab] || tabs[0];
 
   const addTab = useCallback(() => {
     const updated = [...tabs, { id: uid(), name: `Sheet ${tabs.length + 1}`, data: {} }];
@@ -84,19 +86,33 @@ export default function useMemberPlayground() {
     persist(updated);
   }, [tabs, persist]);
 
+  const updateCellText = useCallback((row: number, col: number, text: string) => {
+    const key = `${row},${col}`;
+    const updated: TabData[] = tabs.map((t, i) => {
+      if (i !== activeTab) return t;
+      const existing = t.data[key] || { text: '', taskId: undefined };
+      return { ...t, data: { ...t.data, [key]: { ...existing, text } } };
+    });
+    persist(updated);
+  }, [tabs, activeTab, persist]);
+
   const convertToTask = useCallback((row: number, col: number) => {
+    const cell = getCellData(tab, row, col);
     setPendingCell({ row, col });
-    setTaskModal({ date: today(), name: '' });
-  }, []);
+    setFromCellText(cell.text || '');
+    setTaskModal({ date: today(), name: cell.text || '' });
+  }, [tab]);
 
   const handleTaskSaved = useCallback(async (savedTask: any) => {
     if (!pendingCell) return;
+    const key = `${pendingCell.row},${pendingCell.col}`;
     const updated: TabData[] = tabs.map((t, i) => {
       if (i !== activeTab) return t;
-      const key = `${pendingCell.row},${pendingCell.col}`;
-      return { ...t, data: { ...t.data, [key]: { taskId: savedTask.id } } };
+      const existing = t.data[key] || { text: '', taskId: undefined };
+      return { ...t, data: { ...t.data, [key]: { ...existing, taskId: savedTask.id } } };
     });
     setPendingCell(null);
+    setFromCellText('');
     await persist(updated);
   }, [pendingCell, tabs, activeTab, persist]);
 
@@ -108,10 +124,17 @@ export default function useMemberPlayground() {
     }
   }, [S.tasks]);
 
-  const unlinkCell = useCallback((row: number, col: number) => {
+  const unlinkCell = useCallback((row: number, col: number, taskId?: string) => {
+    const key = `${row},${col}`;
     const updated: TabData[] = tabs.map((t, i) => {
       if (i !== activeTab) return t;
-      const key = `${row},${col}`;
+      if (taskId) {
+        const existing = t.data[key] || { text: '', taskId: undefined };
+        if (existing.taskId === taskId) {
+          return { ...t, data: { ...t.data, [key]: { ...existing, taskId: undefined } } };
+        }
+        return t;
+      }
       const newData = { ...t.data };
       delete newData[key];
       return { ...t, data: newData };
@@ -129,7 +152,8 @@ export default function useMemberPlayground() {
     const key = `${row},${col}`;
     const updated: TabData[] = tabs.map((t, i) => {
       if (i !== activeTab) return t;
-      return { ...t, data: { ...t.data, [key]: { taskId: saved.id } } };
+      const existing = t.data[key] || { text: '', taskId: undefined };
+      return { ...t, data: { ...t.data, [key]: { ...existing, taskId: saved.id } } };
     });
     await persist(updated);
     return saved;
@@ -143,10 +167,10 @@ export default function useMemberPlayground() {
   }, [S.tasks, upsertTask]);
 
   return {
-    S, tabs, tab, activeTab, sidebarOpen, taskModal, renameModal, pendingCell,
-    setActiveTab, setSidebarOpen, setTaskModal, setPendingCell,
+    S, tabs, tab, activeTab, sidebarOpen, taskModal, renameModal, pendingCell, fromCellText,
+    setActiveTab, setSidebarOpen, setTaskModal, setPendingCell, setFromCellText,
     addTab, deleteTab, renameTab, saveRename, clearTab,
     convertToTask, handleTaskSaved, openTask, unlinkCell, setRenameModal,
-    upsertTask, quickCreateTask, updateCellTaskName,
+    upsertTask, updateCellText, quickCreateTask, updateCellTaskName,
   };
 }

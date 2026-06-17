@@ -2,7 +2,8 @@ export const PG_COLS = 10;
 export const ROW_HEIGHT = 56;
 
 export interface CellData {
-  taskId: string;
+  text: string;
+  taskId?: string;
 }
 
 export interface TabData {
@@ -25,7 +26,7 @@ export function getCellKey(row: number, col: number): string {
 
 export function getCellData(tab: TabData, row: number, col: number): CellData {
   const key = getCellKey(row, col);
-  return tab.data[key] || { taskId: '' };
+  return tab.data[key] || { text: '', taskId: undefined };
 }
 
 export function hasLinkedTask(
