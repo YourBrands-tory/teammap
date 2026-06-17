@@ -45,7 +45,7 @@ export default function Login({ onLogin }) {
           <span style={{fontSize:12,color:'var(--t3)',marginLeft:'auto',background:'var(--s2)',padding:'2px 10px',borderRadius:12}}>{selectedRole === 'manager' ? 'Manager' : 'Member'}</span>
         </div>
         <label className="fl">Email</label>
-        <input type="text" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@agency.com" autoFocus />
+        <input type="text" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@agency.com" autoFocus autoCapitalize="none" autoComplete="email" />
         <label className="fl">Password</label>
         <input type="text" style={{WebkitTextSecurity:'disc'}} value={pw}
           onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==='Enter'&&submit()} />

@@ -64,12 +64,14 @@ export const useStore = create((set, get) => ({
 
   // ── Custom login: query members table directly — NO Supabase Auth ─────────
   login: async (selectedRole, email, password) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
     const roleFilter = selectedRole === 'manager' ? ['admin','manager'] : ['member'];
     const { data, error } = await supabase
       .from('members')
       .select('id, name, role, color')
-      .eq('email', email)
-      .eq('password', password)
+      .filter('email', 'ilike', normalizedEmail)
+      .eq('password', normalizedPassword)
       .in('role', roleFilter)
       .maybeSingle();
 
