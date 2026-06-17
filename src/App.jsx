@@ -39,7 +39,7 @@ export default function App() {
   const loading = useStore(s => s.loading);
   const login = useStore(s => s.login);
 
-  const defaultView = 'lu';
+  const defaultView = 'tkd';
 
   const uiView = useUIStore(s => s.view);
   const setView = useUIStore(s => s.setView);
@@ -66,6 +66,7 @@ export default function App() {
     setView(v);
   }, [setView, setScrollPosition]);
 
+  // Restore scroll when switching to a view that has saved scroll
   useEffect(() => {
     const el = document.querySelector('.view.active');
     if (el && uiScrollPositions[view] != null) {
@@ -73,6 +74,7 @@ export default function App() {
     }
   }, [view, uiScrollPositions]);
 
+  // Track scroll on the active view only
   useEffect(() => {
     const el = document.querySelector('.view.active');
     if (!el) return;
@@ -97,13 +99,18 @@ export default function App() {
   }
 
   // Manager/admin role → full dashboard
-  const Render = ALL_VIEWS[view] || LineUp;
+  // All views stay mounted — inactive ones are hidden with display:none.
+  // This preserves each view's local state (scroll position, open modals, form input, etc.)
   return (
     <div className="app">
       <Nav current={view} onSwitch={handleSwitch} />
-      <Suspense fallback={<LoadingFallback />}>
-        <Render />
-      </Suspense>
+      {Object.entries(ALL_VIEWS).map(([key, View]) => (
+        <div key={key} style={{ display: view === key ? '' : 'none' }} className={`view${view === key ? ' active' : ''}`}>
+          <Suspense fallback={<LoadingFallback />}>
+            <View />
+          </Suspense>
+        </div>
+      ))}
     </div>
   );
 }
