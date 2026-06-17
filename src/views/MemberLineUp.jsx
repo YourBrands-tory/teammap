@@ -3,6 +3,7 @@ import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { today, fmtD } from '../lib/constants';
 import { dayProgress } from '../utils/lineUpHelpers';
+import { getCompleteStatus } from '../utils/statusUtils';
 import LineUpCard from '../components/lineup/LineUpCard';
 import HiddenTasksPanel from '../components/HiddenTasksPanel';
 import TaskModal from '../components/TaskModal';
@@ -31,11 +32,12 @@ export default function MemberLineUp() {
   }, [S, memberId, date]);
 
   // Active tasks (exclude Complete and hidden)
+  const completeStatus = getCompleteStatus(S.task_statuses);
   const activeTasks = useMemo(() => {
-    return myTasksOnDate.filter(t => t.status !== 'Complete' && !t.hidden);
-  }, [myTasksOnDate]);
+    return myTasksOnDate.filter(t => t.status !== completeStatus && !t.hidden);
+  }, [myTasksOnDate, completeStatus]);
 
-  const prog = useMemo(() => dayProgress(myTasksOnDate), [myTasksOnDate]);
+  const prog = useMemo(() => dayProgress(myTasksOnDate, S.task_statuses), [myTasksOnDate, S.task_statuses]);
 
   // Only hidden tasks assigned to this member
   const myHiddenTasks = useMemo(() => {

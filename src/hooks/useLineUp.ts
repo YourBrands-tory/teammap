@@ -35,9 +35,9 @@ export default function useLineUp() {
 
   const goToday = useCallback(() => setDate(today()), []);
 
-  const tasks = getFilteredAndSortedTasks(S, date, filters, sortMode);
+  const tasks = getFilteredAndSortedTasks(S, date, filters, sortMode, S.task_statuses);
   const allOnDate = S.tasks.filter((t: any) => t.date === date && !t.deleted);
-  const prog = dayProgress(allOnDate);
+  const prog = dayProgress(allOnDate, S.task_statuses);
 
   const totalMins = allOnDate.reduce((a: number, t: any) => a + ((t.estH || 0) * 60 + (t.estM || 0)), 0);
 

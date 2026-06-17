@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, memo } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
-import { today, fmtD, taskTimeStr, STC, STB } from '../lib/constants';
+import { today, fmtD, taskTimeStr } from '../lib/constants';
+import { getStatusMaps, getCompleteStatus, getStandUpStatus } from '../utils/statusUtils';
 import Avatar from '../components/Avatar';
 import TaskModal from '../components/TaskModal';
 import StatusPopup from '../components/StatusPopup';
@@ -12,6 +13,8 @@ const hm = (m) => m ? `${Math.floor(m/60)}h${m%60?' '+m%60+'m':''}` : null;
 
 export default function TaskDashboard() {
   const S = useStore(s => s.S);
+  const completeStatus = getCompleteStatus(S.task_statuses);
+  const standUpStatus = getStandUpStatus(S.task_statuses);
   const updateSettings = useStore(s => s.updateSettings);
   const uiViewState = useUIStore(s => s.viewStates.tkd || {});
   const setViewState = useUIStore(s => s.setViewState);
@@ -41,7 +44,7 @@ export default function TaskDashboard() {
 
   const allTasks = sel.tasksOnDate(S, dashDate);
   const total = allTasks.length;
-  const done = allTasks.filter(t=>t.status==='Complete').length;
+  const done = allTasks.filter(t=>t.status===completeStatus).length;
   const dayPct = total ? Math.round(done/total*100) : 0;
   const spM = sel.gm(S, S.settings.spMember) || S.members[0];
 
@@ -224,16 +227,18 @@ export default function TaskDashboard() {
 
 /* ── DESKTOP TEAM COL ── */
 const TeamCol = memo(function TeamCol({ member, date, S, drawerOpen, toggleDrawer, onOpenTask, onStatus }) {
+  const completeStatus = getCompleteStatus(S.task_statuses);
+  const standUpStatus = getStandUpStatus(S.task_statuses);
   const allTasks = sel.tasksForMD(S, member.id, date);
-  const visible = allTasks.filter(t=>t.status!=='Complete');
-  const doneCount = allTasks.filter(t=>t.status==='Complete').length;
+  const visible = allTasks.filter(t=>t.status!==completeStatus);
+  const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
   const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;
   const barColor = pct===100?'#2d6a4f':pct>60?'#52b788':'#2196c4';
   const totalDisp = hm(allTasks.reduce((a,t)=>a+minsOf(t),0));
 
   const SECONDARY = S.moods.filter(m=>!PRIMARY.includes(m.id)).map(m=>m.id);
-  const secTasks = visible.filter(t=>SECONDARY.includes(t.mood) && t.status!=='Stand Up');
-  const suTasks = visible.filter(t=>t.status==='Stand Up');
+  const secTasks = visible.filter(t=>SECONDARY.includes(t.mood) && t.status!==standUpStatus);
+  const suTasks = visible.filter(t=>t.status===standUpStatus);
 
   return (
     <div className="tcol">
@@ -268,13 +273,13 @@ const TeamCol = memo(function TeamCol({ member, date, S, drawerOpen, toggleDrawe
 
         {PRIMARY.map(mid => {
           const mood = sel.gmood(S, mid); if (!mood) return null;
-          const mt = visible.filter(t=>t.mood===mid && t.status!=='Stand Up');
+          const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
           if ((mid==='top'||mid==='creative') && !mt.length) return null;
           const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
           const secClass = isHero?'hero-sec':isImp?'imp-sec':isTop?'top-sec':'other-sec';
           const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
           const totalMoodCount = allTasks.filter(t=>t.mood===mid).length;
-          const doneInMood = totalMoodCount - allTasks.filter(t=>t.mood===mid && t.status!=='Complete').length;
+          const doneInMood = totalMoodCount - allTasks.filter(t=>t.mood===mid && t.status!==completeStatus).length;
           const secStyle = isHero?{background:mood.bg,border:`2px solid ${mood.color}55`}
             : isImp?{background:mood.bg+'88',border:`1.5px solid ${mood.color}44`} : {};
           const headBg = isHero?mood.color+'15':isImp?mood.color+'10':'transparent';
@@ -302,9 +307,9 @@ const TeamCol = memo(function TeamCol({ member, date, S, drawerOpen, toggleDrawe
 
         {drawerOpen && secTasks.length>0 && (
           <div style={{display:'flex',flexDirection:'column',gap:3}}>
-            {SECONDARY.filter(mid=>visible.some(t=>t.mood===mid && t.status!=='Stand Up')).map(mid => {
+            {SECONDARY.filter(mid=>visible.some(t=>t.mood===mid && t.status!==standUpStatus)).map(mid => {
               const mood = sel.gmood(S, mid); if (!mood) return null;
-              const mt = visible.filter(t=>t.mood===mid && t.status!=='Stand Up');
+              const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
               return (
                 <div key={mid} className="msec other-sec">
                   <div className="msec-head">
@@ -352,6 +357,7 @@ function CircProg({ done, total }) {
 
 /* ── DESKTOP TASK CARD ── */
 const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
+  const { STC, STB } = getStatusMaps(useStore.getState().S.task_statuses);
   const mood = sel.gmood(S, task.mood);
   const isHero=task.mood==='hero', isTop=task.mood==='top', isImp=task.mood==='imp';
   const isLight=!isHero&&!isImp&&!isTop;
@@ -450,15 +456,17 @@ const SidePanel = memo(function SidePanel({ member, date, S, onOpenTask }) {
 
 /* ── MOBILE TEAM COL ── */
 const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCards, onToggleExpand, onOpenTask, onStatus }) {
+  const completeStatus = getCompleteStatus(S.task_statuses);
+  const standUpStatus = getStandUpStatus(S.task_statuses);
   const allTasks = sel.tasksForMD(S, member.id, date);
-  const visible = allTasks.filter(t=>t.status!=='Complete');
-  const doneCount = allTasks.filter(t=>t.status==='Complete').length;
+  const visible = allTasks.filter(t=>t.status!==completeStatus);
+  const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
   const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;
   const totalDisp = hm(allTasks.reduce((a,t)=>a+minsOf(t),0));
 
   const SECONDARY = S.moods.filter(m=>!PRIMARY.includes(m.id)).map(m=>m.id);
-  const secTasks = visible.filter(t=>SECONDARY.includes(t.mood) && t.status!=='Stand Up');
-  const suTasks = visible.filter(t=>t.status==='Stand Up');
+  const secTasks = visible.filter(t=>SECONDARY.includes(t.mood) && t.status!==standUpStatus);
+  const suTasks = visible.filter(t=>t.status===standUpStatus);
 
   return (
     <div className="td-mob-col-inner">
@@ -473,13 +481,13 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
       {/* Primary moods */}
       {PRIMARY.map(mid => {
         const mood = sel.gmood(S, mid); if (!mood) return null;
-        const mt = visible.filter(t=>t.mood===mid && t.status!=='Stand Up');
+        const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
         if ((mid==='top'||mid==='creative') && !mt.length) return null;
         const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
         const secClass = isHero?'hero-sec':isImp?'imp-sec':isTop?'top-sec':'other-sec';
         const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
         const totalMoodCount = allTasks.filter(t=>t.mood===mid).length;
-        const doneInMood = totalMoodCount - allTasks.filter(t=>t.mood===mid && t.status!=='Complete').length;
+        const doneInMood = totalMoodCount - allTasks.filter(t=>t.mood===mid && t.status!==completeStatus).length;
         const secStyle = isHero?{background:mood.bg,border:`2px solid ${mood.color}55`,padding:4}
           : isImp?{background:mood.bg+'88',border:`1.5px solid ${mood.color}44`,padding:3} : {};
         const headBg = isHero?mood.color+'15':isImp?mood.color+'10':'transparent';
@@ -506,9 +514,9 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
       })}
 
       {/* Secondary drawer (always expanded on mobile) */}
-      {secTasks.length>0 && SECONDARY.filter(mid=>visible.some(t=>t.mood===mid && t.status!=='Stand Up')).map(mid => {
+      {secTasks.length>0 && SECONDARY.filter(mid=>visible.some(t=>t.mood===mid && t.status!==standUpStatus)).map(mid => {
         const mood = sel.gmood(S, mid); if (!mood) return null;
-        const mt = visible.filter(t=>t.mood===mid && t.status!=='Stand Up');
+        const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
         return (
           <div key={mid} className="msec other-sec" style={{marginBottom:2}}>
             <div className="msec-head" style={{padding:'2px 4px'}}>
@@ -535,6 +543,7 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
 
 /* ── MOBILE TASK CARD (simplified, expandable) ── */
 const MobileTaskCard = memo(function MobileTaskCard({ task, member, S, expanded, onToggleExpand, onOpenTask, onStatus }) {
+  const { STC, STB } = getStatusMaps(useStore.getState().S.task_statuses);
   const mood = sel.gmood(S, task.mood);
   const client = sel.gc(S, task.clientId);
   const timeStr = taskTimeStr(task);

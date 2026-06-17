@@ -1,4 +1,5 @@
-import { fmtD, taskTimeStr, STC, STB } from '../../lib/constants';
+import { fmtD, taskTimeStr } from '../../lib/constants';
+import { getStatusMaps } from '../../utils/statusUtils';
 import { sel } from '../../store/useStore';
 
 interface Props {
@@ -19,6 +20,7 @@ export default function TaskRow({ task, S, onOpen, onDelete }: Props) {
     .filter(Boolean);
   const ms = task.milestoneId ? S.milestones.find((m: any) => m.id === task.milestoneId) : null;
   const timeStr = taskTimeStr(task);
+  const { STC, STB } = getStatusMaps(S.task_statuses);
 
   return (
     <tr onClick={() => onOpen(task)}>

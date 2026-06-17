@@ -1,3 +1,5 @@
+import { getCompleteStatus } from './statusUtils';
+
 type CardSize = 'narrow' | 'mid' | 'big';
 
 interface Mood { id: string; cardSize?: CardSize; label?: string; }
@@ -24,8 +26,8 @@ export function getCardSize(moodId: string, moods: Mood[]): CardSize {
   return CARD_SIZES[moodId] || 'narrow';
 }
 
-export function getFilteredAndSortedTasks(S: AppState, date: string, filters: Filters, sortMode: SortMode): Task[] {
-  let tasks = S.tasks.filter(t => t.date === date && !t.deleted && !t.hidden && t.status !== 'Complete');
+export function getFilteredAndSortedTasks(S: AppState, date: string, filters: Filters, sortMode: SortMode, taskStatuses?: any[]): Task[] {
+  let tasks = S.tasks.filter(t => t.date === date && !t.deleted && !t.hidden && t.status !== getCompleteStatus(taskStatuses));
 
   if (filters.member) tasks = tasks.filter(t => t.assignedTo && t.assignedTo.includes(filters.member));
   if (filters.client) tasks = tasks.filter(t => t.clientId === filters.client);
@@ -64,8 +66,8 @@ export function hm(mins: number): string | null {
   return `${Math.floor(mins / 60)}h${mins % 60 ? ' ' + mins % 60 + 'm' : ''}`;
 }
 
-export function dayProgress(allTasks: Task[]): { done: number; total: number; pct: number } {
-  const done = allTasks.filter(t => t.status === 'Complete').length;
+export function dayProgress(allTasks: Task[], taskStatuses?: any[]): { done: number; total: number; pct: number } {
+  const done = allTasks.filter(t => t.status === getCompleteStatus(taskStatuses)).length;
   const total = allTasks.length;
   const pct = total ? Math.round(done / total * 100) : 0;
   return { done, total, pct };

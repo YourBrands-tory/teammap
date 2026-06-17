@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { today, fmtD, STC, STB, taskTimeStr } from '../lib/constants';
+import { today, fmtD, taskTimeStr } from '../lib/constants';
+import { getStatusMaps } from '../utils/statusUtils';
 import { useStore } from '../store/useStore';
 import useTasksMilestones from '../hooks/useTasksMilestones';
 import TaskGenerator from '../components/tasks/TaskGenerator';
@@ -10,6 +11,7 @@ import Modal from '../components/Modal';
 
 export default function TasksMilestones() {
   const S = useStore(s => s.S);
+  const { STC, STB } = getStatusMaps(S.task_statuses);
   const upsertMilestone = useStore(s => s.upsertMilestone);
   const upsertTask = useStore(s => s.upsertTask);
   const upsertClient = useStore(s => s.upsertClient);

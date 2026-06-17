@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useUIStore } from '../store/useUIStore';
 import { uid, today } from '../lib/constants';
+import { getDefaultStatus } from '../utils/statusUtils';
 import { getCellData } from '../utils/playgroundHelpers';
 import type { TabData } from '../utils/playgroundHelpers';
 
@@ -135,7 +136,7 @@ export default function useSpreadsheet({
   const quickCreateTask = useCallback(async (row: number, col: number, name: string) => {
     const firstMood = S.moods[0]?.id || '';
     const saved = await upsertTask({
-      name: name.trim(), date: today(), mood: firstMood, status: 'Not Started',
+      name: name.trim(), date: today(), mood: firstMood, status: getDefaultStatus(S.task_statuses),
       ...(memberId ? { assignedTo: [memberId] } : {}),
       subtasks: [], links: [],
     });

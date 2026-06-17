@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { uid, today } from '../lib/constants';
+import { getDefaultStatus } from '../utils/statusUtils';
 import type { TG2AllMulti, Template } from '../utils/taskGen2Helpers';
 import {
   filterTemplatesAll, toggleMulti, saveView, loadView, deleteView,
@@ -111,7 +112,7 @@ export default function useTaskGen2() {
       clientId: tmpl.clientId,
       date: taskDate || today(),
       mood: tmpl.mood || 'rapid',
-      status: 'Not Started' as const,
+      status: getDefaultStatus(S.task_statuses) as string,
       assignedTo: [...(tmpl.assignedTo || [])],
       tags: [],
       estH: tmpl.estH || 0,

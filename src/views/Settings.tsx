@@ -7,6 +7,7 @@ import ClientsPanel from '../components/settings/ClientsPanel';
 import MoodsPanel from '../components/settings/MoodsPanel';
 import TagsPanel from '../components/settings/TagsPanel';
 import FrequencyPanel from '../components/settings/FrequencyPanel';
+import StatusPanel from '../components/settings/StatusPanel';
 import NavigationPanel from '../components/settings/NavigationPanel';
 import PreferencesPanel from '../components/settings/PreferencesPanel';
 import MemberModal from '../components/modals/MemberModal';
@@ -14,6 +15,7 @@ import ClientModal from '../components/modals/ClientModal';
 import MoodModal from '../components/modals/MoodModal';
 import TagModal from '../components/modals/TagModal';
 import FrequencyModal from '../components/modals/FrequencyModal';
+import StatusModal from '../components/modals/StatusModal';
 
 export default function Settings() {
   const S = useStore(s => s.S);
@@ -30,6 +32,7 @@ export default function Settings() {
     stDrag, ftDragId, setStDrag, setFtDragId,
     delMember, delClient, toggleMoodHidden,
     delTag, delFreqTag,
+    addStatus, saveStatus, delStatus, reorderStatuses,
     reorderMembers, reorderClientsFn, reorderMoods, reorderTags,
     reorderFreqTags, reorderNav, renameNav,
     resetNav, updateSettings, exportJSON,
@@ -40,6 +43,7 @@ export default function Settings() {
   const [moodModal, setMoodModal] = useState<{ index: number; mood?: any } | null>(null);
   const [tagModal, setTagModal] = useState<any | null>(null);
   const [freqModal, setFreqModal] = useState<any | null>(null);
+  const [statusModal, setStatusModal] = useState<any | null>(null);
 
   const navDragRef = useRef<string | null>(null);
 
@@ -52,7 +56,8 @@ export default function Settings() {
     else if (type === 'client') reorderClientsFn(targetId);
     else if (type === 'mood') reorderMoods(targetId);
     else if (type === 'tag') reorderTags(targetId);
-  }, [reorderMembers, reorderClientsFn, reorderMoods, reorderTags]);
+    else if (type === 'status') reorderStatuses(targetId);
+  }, [reorderMembers, reorderClientsFn, reorderMoods, reorderTags, reorderStatuses]);
 
   const handleNavDrop = useCallback((targetId: string) => {
     const dragId = navDragRef.current;
@@ -138,6 +143,17 @@ export default function Settings() {
           }}
           onEdit={(f) => setFreqModal(f)}
           onDelete={delFreqTag}
+        />
+
+        <StatusPanel
+          statuses={S.task_statuses || []}
+          stDrag={stDrag}
+          onDragStart={handleStDragStart}
+          onDragEnd={() => {}}
+          onDrop={handleStDrop}
+          onAdd={addStatus}
+          onEdit={(s) => setStatusModal(s)}
+          onDelete={delStatus}
         />
 
         <NavigationPanel
@@ -229,6 +245,19 @@ export default function Settings() {
             await setStateKey('freqTags', updated);
           }}
           onClose={() => setFreqModal(null)}
+        />
+      )}
+
+      {statusModal && (
+        <StatusModal
+          status={statusModal}
+          onSave={async (id, label) => {
+            const updated = (S.task_statuses || []).map((s: any) =>
+              s.id === id ? { ...s, label: label.trim() || s.label } : s
+            );
+            await setStateKey('task_statuses', updated);
+          }}
+          onClose={() => setStatusModal(null)}
         />
       )}
     </div>

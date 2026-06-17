@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useStore, sel } from '../store/useStore';
-import { uid, COLORS } from '../lib/constants';
+import { uid, COLORS, DEFAULT_TASK_STATUSES } from '../lib/constants';
 import { reorderArray, reorderClients } from '../utils/settingsHelpers';
 
 export default function useSettings() {
@@ -110,6 +110,57 @@ export default function useSettings() {
     await setStateKey('freqTags', updated);
   }, [S.freqTags, setStateKey]);
 
+  // Task statuses
+  const addStatus = useCallback(async (label: string) => {
+    if (!label.trim()) return;
+    const st = S.task_statuses || [];
+    if (st.find((s: any) => s.label.toLowerCase() === label.toLowerCase())) return;
+    const updated = [...st, { id: uid(), label: label.trim(), order: st.length }];
+    await setStateKey('task_statuses', updated);
+  }, [S.task_statuses, setStateKey]);
+
+  const saveStatus = useCallback(async (id: string, label: string) => {
+    const updated = (S.task_statuses || []).map((s: any) =>
+      s.id === id ? { ...s, label: label.trim() || s.label } : s
+    );
+    await setStateKey('task_statuses', updated);
+  }, [S.task_statuses, setStateKey]);
+
+  const delStatus = useCallback(async (id: string) => {
+    if (!confirm('Remove this status? Tasks using it will fall back to "Not Started".')) return;
+    const deleted = (S.task_statuses || []).find((s: any) => s.id === id);
+    let updated = (S.task_statuses || []).filter((s: any) => s.id !== id);
+    if (!updated.length) {
+      updated = DEFAULT_TASK_STATUSES.map((label, i) => ({ id: uid(), label, order: i }));
+    }
+    await setStateKey('task_statuses', updated);
+    // Reset tasks that had the deleted status to the default status
+    if (deleted) {
+      const store = useStore.getState();
+      const remaining = updated.sort((a: any, b: any) => a.order - b.order);
+      const defaultLabel = remaining[0]?.label || 'Not Started';
+      for (const task of S.tasks) {
+        if (task.status === deleted.label) {
+          await store.upsertTask({ ...task, status: defaultLabel });
+        }
+      }
+    }
+  }, [S.task_statuses, S.tasks, setStateKey]);
+
+  const reorderStatuses = useCallback(async (targetId: string) => {
+    if (!stDrag.id || stDrag.id === targetId || stDrag.type !== 'status') return;
+    const fl = [...(S.task_statuses || [])].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    const fi = fl.findIndex((s: any) => s.id === stDrag.id);
+    const ti = fl.findIndex((s: any) => s.id === targetId);
+    if (fi === -1 || ti === -1) return;
+    const copy = [...fl];
+    const [dr] = copy.splice(fi, 1);
+    copy.splice(ti, 0, dr);
+    const updated = copy.map((s: any, i: number) => ({ ...s, order: i }));
+    await setStateKey('task_statuses', updated);
+    setStDrag({ id: null, type: null });
+  }, [stDrag, S.task_statuses, setStateKey]);
+
   // Reorder
   const reorderMembers = useCallback(async (targetId: string) => {
     if (!stDrag.id || stDrag.id === targetId || stDrag.type !== 'member') return;
@@ -189,6 +240,7 @@ export default function useSettings() {
     saveMood, toggleMoodHidden,
     addTag, saveTag, delTag,
     addFreqTag, saveFreqTag, delFreqTag,
+    addStatus, saveStatus, delStatus, reorderStatuses,
     reorderMembers, reorderClientsFn, reorderMoods, reorderTags, reorderFreqTags, reorderNav, renameNav,
     resetNav, updateSettings, exportJSON, importJSON,
   };

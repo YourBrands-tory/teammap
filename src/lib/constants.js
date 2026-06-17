@@ -6,9 +6,6 @@ export const PRIOS = ['Critical','High','Medium','Low'];
 export const PC = { Critical:'#e76f51', High:'#d97706', Medium:'#2d6a4f', Low:'#2196c4' };
 export const PB = { Critical:'#fde8e2', High:'#fef3c7', Medium:'#d8f3dc', Low:'#e3f2fd' };
 export const CC = { Strategy:'#7c3aed', Operations:'#2196c4', Support:'#2d6a4f', Creative:'#e76f51', Technical:'#0f7c6c', Finance:'#d97706', Comms:'#be185d' };
-export const STATS = ['Not Started','Stand Up','WIP','Complete','Pass'];
-export const STC = { 'Not Started':'#a09d97','Stand Up':'#e76f51','WIP':'#2196c4','Complete':'#2d6a4f','Pass':'#7c3aed' };
-export const STB = { 'Not Started':'#f2f0ec','Stand Up':'#fde8e2','WIP':'#e3f2fd','Complete':'#d8f3dc','Pass':'#ede9fe' };
 export const MOOD_ORDER = ['top','hero','imp','creative','rapid','share'];
 
 export const DMOODS = [
@@ -35,3 +32,8 @@ export const uid = () => 'x'+(Date.now()+Math.random()).toString(36).replace('.'
 export const ini = (n) => (n||'').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
 export const fmtTime = (h,m) => { if(!h&&!m) return ''; const p=[]; if(h)p.push(h+'h'); if(m)p.push(m+'m'); return p.join(' '); };
 export const taskTimeStr = (t) => fmtTime(t.estH||0, t.estM||0);
+
+export const DEFAULT_TASK_STATUSES = ['Not Started','Stand Up','WIP','Complete','Pass'];
+
+export const STATUS_TEXT_COLORS = ['#a09d97','#e76f51','#2196c4','#2d6a4f','#7c3aed','#d97706','#be185d','#0f7c6c','#1d4ed8','#059669'];
+export const STATUS_BG_COLORS = ['#f2f0ec','#fde8e2','#e3f2fd','#d8f3dc','#ede9fe','#fef3c7','#fce7f3','#d1fae5','#dbeafe','#d1fae5'];

@@ -1,4 +1,5 @@
-import { MOOD_ORDER, STATS } from '../lib/constants';
+import { MOOD_ORDER } from '../lib/constants';
+import { getStatusMaps } from './statusUtils';
 
 export interface LVFilters {
   member: string;
@@ -26,9 +27,12 @@ export function filterAndSortTasks(
   filters: LVFilters,
   sort: LVSort,
   lookup: Lookup,
+  taskStatuses: any[],
 ): any[] {
   let result = tasks.filter((t: any) => !t.deleted);
-  if (filters.hideCompleted) result = result.filter((t: any) => t.status !== 'Complete');
+  const completeLabel = taskStatuses?.find((s: any) => s.label === 'Complete' || s.label.toLowerCase().includes('complete'))?.label || 'Complete';
+  const { STATS } = getStatusMaps(taskStatuses);
+  if (filters.hideCompleted) result = result.filter((t: any) => t.status !== completeLabel);
   if (filters.member) result = result.filter((t: any) => t.assignedTo && t.assignedTo.includes(filters.member));
   if (filters.client) result = result.filter((t: any) => t.clientId === filters.client);
   if (filters.mood) result = result.filter((t: any) => t.mood === filters.mood);

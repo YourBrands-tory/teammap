@@ -1,5 +1,5 @@
-import { sel } from '../../store/useStore';
-import { STB, STC } from '../../lib/constants';
+import { useStore, sel } from '../../store/useStore';
+import { getStatusMaps, getCompleteStatus } from '../../utils/statusUtils';
 
 interface Milestone {
   id: string;
@@ -21,6 +21,7 @@ interface Props {
 export default function MilestoneLinks({
   S, milestones, selectedProjectId, onToggleLink, onAddMilestone, onAddTask, onEditMilestone,
 }: Props) {
+  const { STC, STB } = getStatusMaps(S.task_statuses);
   const sortedClients = sel.scl(S);
   const proj = selectedProjectId ? sortedClients.find((c: any) => c.id === selectedProjectId) : null;
 
@@ -39,12 +40,13 @@ export default function MilestoneLinks({
   const linked = milestones.filter((m: Milestone) => (m.linkedClients || []).includes(proj.id));
   const unlinked = milestones.filter((m: Milestone) => !(m.linkedClients || []).includes(proj.id));
   const tasks = S.tasks.filter((t: any) => !t.deleted);
+  const completeStatus = getCompleteStatus(S.task_statuses);
 
   function renderMSCard(ms: Milestone, isLinked: boolean) {
     const lt = tasks.filter((t: any) => t.milestoneId === ms.id && !t.deleted);
-    const done = lt.filter((t: any) => t.status === 'Complete').length;
+    const done = lt.filter((t: any) => t.status === completeStatus).length;
     const pct = lt.length ? Math.round(done / lt.length * 100) : 0;
-    const next = lt.find((t: any) => t.status !== 'Complete');
+    const next = lt.find((t: any) => t.status !== completeStatus);
     const totalMins = lt.reduce((a: number, t: any) => a + ((t.estH || 0) * 60 + (t.estM || 0)), 0);
     const timeDisp = totalMins ? `${Math.floor(totalMins / 60)}h${totalMins % 60 ? ' ' + totalMins % 60 + 'm' : ''}` : null;
 

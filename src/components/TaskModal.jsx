@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { STATS, COLORS, today, uid } from '../lib/constants';
+import { COLORS, today, uid } from '../lib/constants';
 import { useStore, sel } from '../store/useStore';
+import { getStatusMaps, getDefaultStatus } from '../utils/statusUtils';
 import Avatar from './Avatar';
 
 const DRAFT_KEY = 'tm_task_draft';
@@ -24,6 +25,7 @@ function clearDraft() {
 
 export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '' }) {
   const S = useStore(s => s.S);
+  const { STATS } = getStatusMaps(S.task_statuses);
   const upsertTask = useStore(s => s.upsertTask);
   const upsertTag = useStore(s => s.upsertTag);
   const upsertMilestone = useStore(s => s.upsertMilestone);
@@ -40,7 +42,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [assigned, setAssigned] = useState(initVal('assigned', task.assignedTo ? [...task.assignedTo] : []));
   const [clientId, setClientId] = useState(initVal('clientId', task.clientId || ''));
   const [date, setDate] = useState(initVal('date', task.date || today()));
-  const [status, setStatus] = useState(initVal('status', task.status || 'Not Started'));
+  const [status, setStatus] = useState(initVal('status', task.status || getDefaultStatus(S.task_statuses)));
   const [estH, setEstH] = useState(initVal('estH', task.estH || ''));
   const [estM, setEstM] = useState(initVal('estM', task.estM || ''));
   const [notes, setNotes] = useState(initVal('notes', task.notes || ''));
@@ -125,7 +127,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const toggleSubtask = (i) => {
     const next = subtasks.map((s, idx) => idx === i ? { ...s, done: !s.done } : s);
     setSubtasks(next);
-    const newStatus = next.length && next.every(s => s.done) ? 'Complete' : status;
+    const newStatus = next.length && next.every(s => s.done) ? (S.task_statuses?.find(s => s.label === 'Complete' || s.label.toLowerCase().includes('complete'))?.label || 'Complete') : status;
     if (task.id) {
       upsertTask({
         id: task.id, createdAt: task.createdAt,

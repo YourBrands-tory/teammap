@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { STATS, STC, STB } from '../lib/constants';
 import { useStore } from '../store/useStore';
+import { getStatusMaps } from '../utils/statusUtils';
 
 // Port of showStPop/setTaskStatus — a floating status picker anchored to a chip.
 export default function StatusPopup({ taskId, anchorRect, onClose }) {
   const ref = useRef(null);
   const setTaskStatus = useStore(s => s.setTaskStatus);
+  const { STATS, STC, STB } = getStatusMaps(useStore.getState().S.task_statuses);
 
   useEffect(() => {
     const onDoc = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };

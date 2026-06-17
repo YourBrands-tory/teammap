@@ -26,7 +26,7 @@ export default function useListView() {
   }), [S.members, S.clients, S.moods, S.tags]);
 
   const tasks = useMemo(() =>
-    filterAndSortTasks(S.tasks, lvFilters, lvSort, lookup),
+    filterAndSortTasks(S.tasks, lvFilters, lvSort, lookup, S.task_statuses),
     [S.tasks, lvFilters, lvSort, lookup],
   );
 

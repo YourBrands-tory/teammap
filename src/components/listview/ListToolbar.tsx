@@ -1,4 +1,4 @@
-import { STATS } from '../../lib/constants';
+import { getStatusMaps } from '../../utils/statusUtils';
 import { sel } from '../../store/useStore';
 import type { LVFilters } from '../../utils/listViewHelpers';
 
@@ -18,6 +18,7 @@ export default function ListToolbar({
   onSetFilter, onClearFilters, onToggleHideCompleted, onNewTask,
 }: Props) {
   const sortedClients = sel.scl(S);
+  const { STATS } = getStatusMaps(S.task_statuses);
 
   return (
     <div className="lv-toolbar">

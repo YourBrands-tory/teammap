@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { taskTimeStr, STC, STB, STATS } from '../../lib/constants';
+import { taskTimeStr } from '../../lib/constants';
 import { getCardSize } from '../../utils/lineUpHelpers';
+import { getStatusMaps } from '../../utils/statusUtils';
 
 interface Task {
   id: string; name: string; mood: string; status: string; clientId?: string;
@@ -14,7 +15,7 @@ interface Task {
 interface Member { id: string; name: string; color: string; }
 interface Client { id: string; name: string; color: string; }
 interface Mood { id: string; icon: string; label: string; color: string; bg: string; }
-interface S { members: Member[]; clients: Client[]; moods: Mood[]; }
+interface S { members: Member[]; clients: Client[]; moods: Mood[]; task_statuses?: { id: string; label: string; order: number }[]; }
 
 interface Props {
   task: Task;
@@ -41,6 +42,7 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
   const hasSubtasks = task.subtasks && task.subtasks.length > 0;
   const subTotal = task.subtasks?.length || 0;
   const subDone = task.subtasks?.filter(s => s.done).length || 0;
+  const { STATS, STC, STB } = getStatusMaps(S.task_statuses);
 
   let sortable: any = {};
   if (!isOverlay) {

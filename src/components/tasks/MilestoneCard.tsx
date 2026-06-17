@@ -1,5 +1,6 @@
 import { useStore, sel } from '../../store/useStore';
-import { taskTimeStr, STC, STB } from '../../lib/constants';
+import { taskTimeStr } from '../../lib/constants';
+import { getStatusMaps } from '../../utils/statusUtils';
 import { msTasks, msProgress, msTime, msNext, msAssignedNames } from '../../utils/milestoneHelpers';
 import type { Milestone } from '../../utils/milestoneHelpers';
 
@@ -13,10 +14,11 @@ interface Props {
 export default function MilestoneCard({ milestone, onEdit, onAddTask, onDelete }: Props) {
   const S = useStore(s => s.S);
   const lt = msTasks(milestone.id, S.tasks);
-  const { done, total, pct } = msProgress(lt);
+  const { done, total, pct } = msProgress(lt, S.task_statuses);
   const timeDisp = msTime(lt);
-  const next = msNext(lt);
+  const next = msNext(lt, S.task_statuses);
   const asgn = msAssignedNames(milestone.assignedTo || [], S.members);
+  const { STC, STB } = getStatusMaps(S.task_statuses);
 
   return (
     <div style={{

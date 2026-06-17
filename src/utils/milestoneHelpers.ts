@@ -1,4 +1,4 @@
-import { STB, STC } from '../lib/constants';
+import { getCompleteStatus } from './statusUtils';
 
 export interface Task {
   id: string;
@@ -41,8 +41,8 @@ export function msTasks(milestoneId: string, tasks: Task[]): Task[] {
   return tasks.filter(t => t.milestoneId === milestoneId && !t.deleted);
 }
 
-export function msProgress(tasks: Task[]): { done: number; total: number; pct: number } {
-  const done = tasks.filter(t => t.status === 'Complete').length;
+export function msProgress(tasks: Task[], taskStatuses?: any[]): { done: number; total: number; pct: number } {
+  const done = tasks.filter(t => t.status === getCompleteStatus(taskStatuses)).length;
   const total = tasks.length;
   return { done, total, pct: total ? Math.round(done / total * 100) : 0 };
 }
@@ -53,8 +53,8 @@ export function msTime(tasks: Task[]): string | null {
   return `${Math.floor(totalMins / 60)}h${totalMins % 60 ? ' ' + totalMins % 60 + 'm' : ''}`;
 }
 
-export function msNext(tasks: Task[]): Task | undefined {
-  return tasks.find(t => t.status !== 'Complete');
+export function msNext(tasks: Task[], taskStatuses?: any[]): Task | undefined {
+  return tasks.find(t => t.status !== getCompleteStatus(taskStatuses));
 }
 
 export function msAssignedNames(assignedTo: string[], members: Member[]): string[] {

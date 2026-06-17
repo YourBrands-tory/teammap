@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useUIStore } from './useUIStore';
 import {
-  DMOODS, DEFAULT_NAV_ORDER, DEFAULT_NAV_LABELS, uid,
+  DMOODS, DEFAULT_NAV_ORDER, DEFAULT_NAV_LABELS, DEFAULT_TASK_STATUSES, uid,
 } from '../lib/constants';
 
 const taskFromRow = (r) => {
@@ -40,18 +40,16 @@ const msToRow       = (m) => ({ id:m.id, name:m.name, description:m.description|
 const tagFromRow    = (r) => ({ id:r.id, label:r.label, color:r.color });
 const tagToRow      = (t) => ({ id:t.id, label:t.label, color:t.color });
 
-const STATE_KEYS = ['settings','moods','navOrder','navLabels','freqTags','templates','playground','tg2Views','lineUpOrder','lineUpHidden'];
+const STATE_KEYS = ['settings','moods','navOrder','navLabels','freqTags','templates','playground','tg2Views','lineUpOrder','lineUpHidden','task_statuses'];
 
 const EMPTY_S = {
   members:[], clients:[], links:[], tasks:[], milestones:[], tags:[],
   moods: JSON.parse(JSON.stringify(DMOODS)),
   settings:{ maxCap:6, weekends:false, spMember:null },
   navOrder:[...DEFAULT_NAV_ORDER], navLabels:{...DEFAULT_NAV_LABELS},
-  freqTags:[], templates:[], playground:{ tabs:[{ id:'pg1', name:'Sheet 1', data:{} }] },
+  freqTags:[], task_statuses:[], templates:[], playground:{ tabs:[{ id:'pg1', name:'Sheet 1', data:{} }] },
   tg2Views:[], lineUpOrder:{}, lineUpHidden:{},
 };
-
-const SESSION_KEY = 'teammap_session';
 
 export const useStore = create((set, get) => ({
   session: null,
@@ -62,7 +60,7 @@ export const useStore = create((set, get) => ({
 
   S: JSON.parse(JSON.stringify(EMPTY_S)),
 
-  // ── Custom login: query members table directly — NO Supabase Auth ─────────
+  // ── Login: members query + establish Supabase Auth session for persistence ─
   login: async (selectedRole, email, password) => {
     const roleFilter = selectedRole === 'manager' ? ['admin','manager'] : ['member'];
     const { data, error } = await supabase
@@ -78,39 +76,66 @@ export const useStore = create((set, get) => ({
       ? 'No manager found with that email and password.'
       : 'No member found with that email and password.' };
 
-    const session = { memberId: data.id, role: data.role, name: data.name, color: data.color };
-    try {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    } catch (e) { /* sessionStorage may be full or unavailable */ }
+    // Establish Supabase Auth session so it persists across PWA restart
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      // Auth user doesn't exist yet — create one on first login, then sign in
+      await supabase.auth.signUp({ email, password });
+      await supabase.auth.signInWithPassword({ email, password });
+    }
 
+    const session = { memberId: data.id, role: data.role, name: data.name, color: data.color };
     set({ session, role: data.role, loading: true });
     await get().loadAll();
     return {};
   },
 
-  // ── Restore session from sessionStorage on page load ──────────────────────
+  // ── Restore session via Supabase Auth (survives PWA close/reopen) ──────────
   restoreSession: async () => {
-    let session = null;
-    try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
-      if (raw) session = JSON.parse(raw);
-    } catch (e) { /* ignore */ }
+    const { data: { session: authSession } } = await supabase.auth.getSession();
 
-    if (session?.memberId) {
-      set({ session, role: session.role, loading: true });
-      await get().loadAll();
-    } else {
-      set({ loading: false });
+    if (authSession?.user?.email) {
+      const { data } = await supabase
+        .from('members')
+        .select('id, name, role, color')
+        .eq('email', authSession.user.email)
+        .maybeSingle();
+
+      if (data) {
+        const session = { memberId: data.id, role: data.role, name: data.name, color: data.color };
+        set({ session, role: data.role, loading: true });
+        await get().loadAll();
+        return;
+      }
     }
+    set({ loading: false });
   },
 
   setSession: (session) => set({ session }),
 
-  signOut: () => {
+  // ── Auth state listener (handles external sign-outs) ───────────────────────
+  _authSubscription: null,
+  initAuthListener: () => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        const ch = get()._rtChannel;
+        if (ch) { supabase.removeChannel(ch); }
+        set({
+          session: null, role: null,
+          S: JSON.parse(JSON.stringify(EMPTY_S)),
+          loading: false, _rtChannel: null,
+        });
+      }
+    });
+    set({ _authSubscription: subscription });
+  },
+
+  // ── Explicit logout — only clears session on user action ───────────────────
+  signOut: async () => {
     useUIStore.getState().clearUIState();
     const ch = get()._rtChannel;
     if (ch) { supabase.removeChannel(ch); }
-    try { sessionStorage.removeItem(SESSION_KEY); } catch (e) { /* ignore */ }
+    await supabase.auth.signOut();
     set({
       session: null, role: null,
       S: JSON.parse(JSON.stringify(EMPTY_S)),
@@ -168,6 +193,10 @@ export const useStore = create((set, get) => ({
     if (!S.moods || !S.moods.length) S.moods = JSON.parse(JSON.stringify(DMOODS));
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members[0]?.id || null };
     if (S.settings.spMember == null) S.settings.spMember = S.members[0]?.id || null;
+    if (!S.task_statuses || !S.task_statuses.length) {
+      S.task_statuses = DEFAULT_TASK_STATUSES.map((label, i) => ({ id: uid(), label, order: i }));
+      supabase.from('app_state').upsert({ key: 'task_statuses', value: S.task_statuses }).then();
+    }
 
     set({ S, loading:false });
     get()._subscribeRealtime();
@@ -217,7 +246,9 @@ export const useStore = create((set, get) => ({
     const now = Date.now();
     const session = get().session;
     const existing = get().S.tasks.find(x => x.id === task.id);
-    const t = { estH:0, estM:0, tags:[], assignedTo:[], notes:'', status:'Not Started',
+    const ts = get().S.task_statuses;
+    const defaultStatus = ts?.length ? ts.sort((a,b)=>a.order-b.order)[0].label : 'Not Started';
+    const t = { estH:0, estM:0, tags:[], assignedTo:[], notes:'', status:defaultStatus,
       subtasks:[], links:[], isMilestone:false, milestoneId:null, deleted:false,
       ...(existing || {}), ...task };
     const isNew = !t.id;

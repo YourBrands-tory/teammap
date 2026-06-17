@@ -1,5 +1,6 @@
 import { useStore, sel } from '../../store/useStore';
-import { fmtD, taskTimeStr, STC, STB } from '../../lib/constants';
+import { fmtD, taskTimeStr } from '../../lib/constants';
+import { getStatusMaps } from '../../utils/statusUtils';
 import type { Task } from '../../utils/milestoneHelpers';
 
 interface Props {
@@ -32,6 +33,7 @@ export default function TaskGenerator({
   selectedClientId, onSelectClient, onBackToClients, onShowFilter,
 }: Props) {
   const S = useStore(s => s.S);
+  const { STC, STB } = getStatusMaps(S.task_statuses);
 
   const clientTasks = selectedClientId
     ? tasksOnDate.filter(t => t.clientId === selectedClientId)

@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { today, MOOD_ORDER } from '../lib/constants';
+import { getCompleteStatus } from '../utils/statusUtils';
 
 export default function useMemberKanban() {
   const S = useStore(s => s.S);
@@ -27,14 +28,16 @@ export default function useMemberKanban() {
 
   const goToday = useCallback(() => persistDate(today()), [persistDate]);
 
+  const completeStatus = getCompleteStatus(S.task_statuses);
+
   // Member's tasks for the selected date, grouped by mood, excluding completed
   const myTasks = useMemo(() => {
     if (!memberId) return [];
     return S.tasks.filter((t: any) =>
-      t.date === date && !t.deleted && t.status !== 'Complete' &&
+      t.date === date && !t.deleted && t.status !== completeStatus &&
       t.assignedTo && t.assignedTo.includes(memberId)
     );
-  }, [S.tasks, date, memberId]);
+  }, [S.tasks, date, memberId, completeStatus]);
 
   // Moods in canonical order, each with their tasks
   const moodsWithTasks = useMemo(() => {
