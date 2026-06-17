@@ -47,17 +47,20 @@ export default function useLineUp() {
   }, [S.tasks, upsertTask]);
 
   const hideTask = useCallback(async (taskId: string) => {
-    const hidden = [...(S.lineUpHidden[date] || []), taskId];
-    const order = S.lineUpOrder[date] ? S.lineUpOrder[date].filter((id: string) => id !== taskId) : undefined;
-    await setStateKey('lineUpHidden', { ...S.lineUpHidden, [date]: hidden });
-    if (order) await setStateKey('lineUpOrder', { ...S.lineUpOrder, [date]: order });
-  }, [S.lineUpHidden, S.lineUpOrder, date, setStateKey]);
+    const t = S.tasks.find((x: any) => x.id === taskId);
+    if (t) {
+      try { await upsertTask({ ...t, hidden: true }); }
+      catch { useUIStore.getState().setToast('Failed to hide task.'); }
+    }
+  }, [S.tasks, upsertTask]);
 
   const restoreTask = useCallback(async (taskId: string) => {
-    if (!S.lineUpHidden[date]) return;
-    const hidden = S.lineUpHidden[date].filter((id: string) => id !== taskId);
-    await setStateKey('lineUpHidden', { ...S.lineUpHidden, [date]: hidden });
-  }, [S.lineUpHidden, date, setStateKey]);
+    const t = S.tasks.find((x: any) => x.id === taskId);
+    if (t) {
+      try { await upsertTask({ ...t, hidden: false }); }
+      catch { useUIStore.getState().setToast('Failed to restore task.'); }
+    }
+  }, [S.tasks, upsertTask]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;

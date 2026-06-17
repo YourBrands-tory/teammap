@@ -1,15 +1,21 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useStore, sel } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import { today, fmtD } from '../lib/constants';
 import { dayProgress } from '../utils/lineUpHelpers';
 import LineUpCard from '../components/lineup/LineUpCard';
+import HiddenTasksPanel from '../components/HiddenTasksPanel';
 import TaskModal from '../components/TaskModal';
 
 export default function MemberLineUp() {
   const S = useStore(s => s.S);
-  const memberId = useStore(s => s.session?.memberId);
+  const session = useStore(s => s.session);
+  const memberId = session?.memberId;
+  const softDeleteTask = useStore(s => s.softDeleteTask);
 
   const [date, setDate] = useState(today());
+  const [panelWidth, setPanelWidth] = useState(240);
+  const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);
   const [taskModal, setTaskModal] = useState(null);
 
   const shift = useCallback((days) => {
@@ -24,12 +30,17 @@ export default function MemberLineUp() {
     return sel.tasksForMD(S, memberId, date);
   }, [S, memberId, date]);
 
-  // Active tasks (exclude Complete) for the card list
+  // Active tasks (exclude Complete and hidden)
   const activeTasks = useMemo(() => {
-    return myTasksOnDate.filter(t => t.status !== 'Complete');
+    return myTasksOnDate.filter(t => t.status !== 'Complete' && !t.hidden);
   }, [myTasksOnDate]);
 
   const prog = useMemo(() => dayProgress(myTasksOnDate), [myTasksOnDate]);
+
+  // Only hidden tasks assigned to this member
+  const myHiddenTasks = useMemo(() => {
+    return myTasksOnDate.filter(t => t.hidden);
+  }, [myTasksOnDate]);
 
   const setStatus = useCallback(async (taskId, status) => {
     const task = S.tasks.find(t => t.id === taskId);
@@ -39,8 +50,33 @@ export default function MemberLineUp() {
     }
   }, [S.tasks]);
 
-  // Member doesn't need hide
-  const noopHide = useCallback(() => {}, []);
+  const hideTask = useCallback(async (taskId) => {
+    const task = S.tasks.find(t => t.id === taskId);
+    if (task) {
+      try {
+        const { upsertTask } = useStore.getState();
+        await upsertTask({ ...task, hidden: true });
+      } catch {
+        useUIStore.getState().setToast('Failed to hide task — column may be missing.');
+      }
+    }
+  }, [S.tasks]);
+
+  const restoreTask = useCallback(async (taskId) => {
+    const task = S.tasks.find(t => t.id === taskId);
+    if (task) {
+      try {
+        const { upsertTask } = useStore.getState();
+        await upsertTask({ ...task, hidden: false });
+      } catch {
+        useUIStore.getState().setToast('Failed to restore task — column may be missing.');
+      }
+    }
+  }, [S.tasks]);
+
+  const handleDelete = useCallback(async (taskId) => {
+    await softDeleteTask(taskId);
+  }, [softDeleteTask]);
 
   return (
     <div className="lu-app">
@@ -72,28 +108,60 @@ export default function MemberLineUp() {
         </div>
       </div>
 
-      {/* ── Task list ── */}
+      {/* ── Two-column layout: main cards + hidden panel ── */}
       <div className="lu-body">
         <div className="lu-main">
           {!activeTasks.length ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 8, color: 'var(--t3)' }}>
-              <div style={{ fontSize: 36 }}>📋</div>
+              <div style={{ fontSize: 36 }}>&#128203;</div>
               <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>No tasks for this date</p>
             </div>
           ) : (
-            activeTasks.map(task => (
-              <LineUpCard
-                key={task.id}
-                task={task}
-                S={S}
-                onOpen={setTaskModal}
-                onStatusChange={setStatus}
-                onHide={noopHide}
-              />
-            ))
+            activeTasks.map(task => {
+              const creator = S.members.find(m => m.id === task.createdBy);
+              const isOwn = task.createdBy === memberId;
+              const isAdminOrManager = session?.role === 'admin' || session?.role === 'manager';
+              const isAssignedToMe = task.assignedTo?.includes(memberId);
+              const creatorIsNotMember = creator && creator.role !== 'member';
+              const canDelete = isOwn || isAdminOrManager || (isAssignedToMe && creatorIsNotMember);
+
+              return (
+                <LineUpCard
+                  key={task.id}
+                  task={task}
+                  S={S}
+                  onOpen={setTaskModal}
+                  onStatusChange={setStatus}
+                  onHide={hideTask}
+                  onDelete={canDelete ? handleDelete : undefined}
+                />
+              );
+            })
           )}
         </div>
+
+        <HiddenTasksPanel
+          hiddenTasks={myHiddenTasks} moods={S.moods} panelWidth={panelWidth}
+          onResize={setPanelWidth} onRestore={restoreTask} />
       </div>
+
+      <button className="lu-mobile-hidden-toggle" onClick={() => setMobileHiddenOpen(o => !o)}>
+        &#128065; Hidden ({myHiddenTasks.length})
+      </button>
+
+      {mobileHiddenOpen && (
+        <div className="lu-mobile-drawer" onClick={() => setMobileHiddenOpen(false)}>
+          <div className="lu-mobile-drawer-content" onClick={e => e.stopPropagation()}>
+            <div className="lu-mobile-drawer-head">
+              <span>&#128065; Hidden</span>
+              <button className="btn btn-sm" onClick={() => setMobileHiddenOpen(false)}>Close</button>
+            </div>
+            <HiddenTasksPanel
+              hiddenTasks={myHiddenTasks} moods={S.moods} panelWidth={300}
+              onRestore={(id) => { restoreTask(id); setMobileHiddenOpen(false); }} />
+          </div>
+        </div>
+      )}
 
       {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} />}
     </div>

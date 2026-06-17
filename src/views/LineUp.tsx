@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { DndContext, DragOverlay, pointerWithin } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import useLineUp from '../hooks/useLineUp';
 import LineUpHeader from '../components/lineup/LineUpHeader';
 import LineUpCard from '../components/lineup/LineUpCard';
-import HiddenPanel from '../components/lineup/HiddenPanel';
+import HiddenTasksPanel from '../components/HiddenTasksPanel';
 import TaskModal from '../components/TaskModal';
 
 export default function LineUp() {
@@ -19,6 +19,10 @@ export default function LineUp() {
   const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);
 
   const activeTask = activeId ? S.tasks.find((t: any) => t.id === activeId) : null;
+
+  const hiddenTasks = useMemo(() => {
+    return S.tasks.filter((t: any) => t.date === date && !t.deleted && t.hidden);
+  }, [S.tasks, date]);
 
   const handleShift = (dir: number, explicitDate?: string) => {
     if (explicitDate !== undefined) { setDate(explicitDate); return; }
@@ -62,13 +66,13 @@ export default function LineUp() {
           )}
         </div>
 
-        <HiddenPanel
-          S={S} date={date} panelWidth={panelWidth}
+        <HiddenTasksPanel
+          hiddenTasks={hiddenTasks} moods={S.moods} panelWidth={panelWidth}
           onResize={setPanelWidth} onRestore={restoreTask} />
       </div>
 
       <button className="lu-mobile-hidden-toggle" onClick={() => setMobileHiddenOpen(o => !o)}>
-        &#128065; Hidden ({((S.lineUpHidden || {})[date] || []).length})
+        &#128065; Hidden ({hiddenTasks.length})
       </button>
 
       {mobileHiddenOpen && (
@@ -78,9 +82,9 @@ export default function LineUp() {
               <span>&#128065; Hidden</span>
               <button className="btn btn-sm" onClick={() => setMobileHiddenOpen(false)}>Close</button>
             </div>
-            <HiddenPanel
-              S={S} date={date} panelWidth={300}
-              onResize={() => {}} onRestore={(id) => { restoreTask(id); setMobileHiddenOpen(false); }} />
+            <HiddenTasksPanel
+              hiddenTasks={hiddenTasks} moods={S.moods} panelWidth={300}
+              onRestore={(id) => { restoreTask(id); setMobileHiddenOpen(false); }} />
           </div>
         </div>
       )}

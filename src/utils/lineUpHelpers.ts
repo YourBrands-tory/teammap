@@ -1,7 +1,7 @@
 type CardSize = 'narrow' | 'mid' | 'big';
 
 interface Mood { id: string; cardSize?: CardSize; label?: string; }
-interface Task { id: string; date: string; deleted?: boolean; status: string; assignedTo?: string[]; clientId?: string; mood: string; }
+interface Task { id: string; date: string; deleted?: boolean; hidden?: boolean; status: string; assignedTo?: string[]; clientId?: string; mood: string; }
 interface Member { id: string; name: string; color: string; }
 interface Client { id: string; name: string; color: string; order?: number; }
 
@@ -11,7 +11,6 @@ interface AppState {
   clients: Client[];
   moods: Mood[];
   lineUpOrder: Record<string, string[]>;
-  lineUpHidden: Record<string, string[]>;
 }
 
 type SortMode = 'mood' | 'team' | 'client';
@@ -26,9 +25,7 @@ export function getCardSize(moodId: string, moods: Mood[]): CardSize {
 }
 
 export function getFilteredAndSortedTasks(S: AppState, date: string, filters: Filters, sortMode: SortMode): Task[] {
-  let tasks = S.tasks.filter(t => t.date === date && !t.deleted && t.status !== 'Complete');
-  const hidden = S.lineUpHidden[date] || [];
-  tasks = tasks.filter(t => !hidden.includes(t.id));
+  let tasks = S.tasks.filter(t => t.date === date && !t.deleted && !t.hidden && t.status !== 'Complete');
 
   if (filters.member) tasks = tasks.filter(t => t.assignedTo && t.assignedTo.includes(filters.member));
   if (filters.client) tasks = tasks.filter(t => t.clientId === filters.client);

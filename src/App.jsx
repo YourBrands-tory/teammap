@@ -3,6 +3,7 @@ import Nav from './components/Nav';
 import Login from './views/Login';
 import MemberView from './views/MemberView';
 import TaskDashboard from './views/TaskDashboard';
+import Toast from './components/Toast';
 import { useStore } from './store/useStore';
 import { useUIStore } from './store/useUIStore';
 
@@ -111,6 +112,7 @@ export default function App() {
           </Suspense>
         </div>
       ))}
+      <Toast />
     </div>
   );
 }

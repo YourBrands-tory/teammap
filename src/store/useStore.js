@@ -13,7 +13,7 @@ const taskFromRow = (r) => {
     subtasks:r.subtasks||[], links:r.links||[],
     createdBy:r.created_by||null,
     isMilestone:!!r.is_milestone, milestoneId:r.milestone_id||null,
-    deleted:!!r.deleted, createdAt:Number(r.created_at)||Date.now(), updatedAt:Number(r.updated_at)||Date.now(),
+    deleted:!!r.deleted, hidden:!!r.hidden, createdAt:Number(r.created_at)||Date.now(), updatedAt:Number(r.updated_at)||Date.now(),
   };
   if (t.subtasks?.length || t.links?.length) {
     console.log('[taskFromRow] loaded', t.id, { subtasks: t.subtasks.length, links: t.links.length });
@@ -27,7 +27,7 @@ const taskToRow = (t) => ({
   subtasks:t.subtasks||[], links:t.links||[],
   created_by:t.createdBy||null,
   is_milestone:!!t.isMilestone, milestone_id:t.milestoneId||null,
-  deleted:!!t.deleted, created_at:t.createdAt||Date.now(), updated_at:t.updatedAt||Date.now(),
+  deleted:!!t.deleted, hidden:!!t.hidden, created_at:t.createdAt||Date.now(), updated_at:t.updatedAt||Date.now(),
 });
 const memberFromRow = (r) => ({ id:r.id, name:r.name, role:r.role, color:r.color, capacity:r.capacity ?? 6 });
 const memberToRow   = (m) => ({ id:m.id, name:m.name, role:m.role, color:m.color, capacity:m.capacity ?? 6 });

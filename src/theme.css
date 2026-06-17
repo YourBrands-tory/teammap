@@ -12,7 +12,7 @@
   --r:10px;--rl2:16px;--rx:20px;
   font-family:'DM Sans',sans-serif;
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-size:14px;overflow:hidden}
+html,body{height:100%;background:var(--bg);color:var(--text);font-size:14px}
 .app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 /* nav */
 .nav{position:relative;display:flex;align-items:center;border-bottom:1px solid var(--border);background:var(--surface);padding:0 16px;height:50px;flex-shrink:0;gap:1px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
@@ -516,6 +516,8 @@ td:hover .pg-cell-actions{display:flex}
 .lu-card.size-narrow .lu-actions{flex-direction:row;padding:0 8px}
 .lu-hide-btn{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--s2);color:var(--t3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:.15s;flex-shrink:0}
 .lu-hide-btn:hover{background:var(--wl);color:var(--warn);border-color:var(--warn)}
+.lu-del-btn{width:22px;height:22px;border-radius:50%;border:1px solid var(--border);background:var(--s2);color:var(--warn);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:.15s;flex-shrink:0}
+.lu-del-btn:hover{background:var(--rl);color:var(--red);border-color:var(--red)}
 .lu-open-btn{font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-family:inherit;font-weight:600;color:var(--t2);transition:.15s;white-space:nowrap}
 .lu-open-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 
@@ -769,7 +771,7 @@ td:hover .pg-cell-actions{display:flex}
   .nav-item-drag{min-height:44px}
   .st-drag{font-size:18px;padding:4px}
   .panel-collapse-btn{min-height:28px;min-width:28px}
-  .lu-hide-btn,.lu-restore-btn{width:28px;height:28px;font-size:14px}
+  .lu-hide-btn,.lu-restore-btn,.lu-del-btn{width:28px;height:28px;font-size:14px}
   .td-mob-card{min-height:44px}
   .td-mob-card-name{font-size:13px}
   .td-mob-date-btn{min-height:38px;min-width:38px}
@@ -822,3 +824,10 @@ td:hover .pg-cell-actions{display:flex}
   .tcols{overflow-x:auto!important}
   .lv-table-wrap{overflow-x:auto!important}
 }
+
+/* ── MEMBER VIEW - natural page scrolling ─────────────────── */
+.app.member-app{min-height:100vh;overflow:visible}
+.member-tab-content{flex:1;display:flex;flex-direction:column;min-height:0}
+.member-tab-content .pg-app{overflow:visible}
+.member-tab-content .pg-body{overflow:visible}
+.member-tab-content .pg-scroll-wrap{overflow:visible!important}

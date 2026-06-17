@@ -22,10 +22,11 @@ interface Props {
   onOpen: (t: any) => void;
   onStatusChange: (id: string, s: string) => void;
   onHide: (id: string) => void;
+  onDelete?: (id: string) => void;
   isOverlay?: boolean;
 }
 
-export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, isOverlay }: Props) {
+export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, onDelete, isOverlay }: Props) {
   const [linkPop, setLinkPop] = useState(false);
   const cardSize = getCardSize(task.mood, S.moods);
   const isNarrow = cardSize === 'narrow';
@@ -128,6 +129,7 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, is
       </div>
       <div className="lu-actions">
         {!isNarrow && <button className="lu-open-btn" onClick={e => { e.stopPropagation(); onOpen(task); }}>Open</button>}
+        {onDelete && <button className="lu-del-btn" onClick={e => { e.stopPropagation(); onDelete(task.id); }} title="Delete">&#128465;</button>}
         <button className="lu-hide-btn" onClick={e => { e.stopPropagation(); onHide(task.id); }} title="Hide">&#10005;</button>
       </div>
     </div>

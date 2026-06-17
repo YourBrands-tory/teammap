@@ -37,6 +37,21 @@ export const useUIStore = create(
 
       scrollPositions: {},
 
+      toast: null,
+      _toastTimer: null,
+
+      setToast: (msg, duration = 4000) => {
+        const timer = get()._toastTimer;
+        if (timer) clearTimeout(timer);
+        set({ toast: msg, _toastTimer: setTimeout(() => set({ toast: null, _toastTimer: null }), duration) });
+      },
+
+      clearToast: () => {
+        const timer = get()._toastTimer;
+        if (timer) clearTimeout(timer);
+        set({ toast: null, _toastTimer: null });
+      },
+
       clearUIState: () => set({ view: 'lu', openModal: null, viewStates: {}, scrollPositions: {} }),
 
       setView: (v) => set({ view: v }),

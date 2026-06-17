@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore';
 import MemberLineUp from './MemberLineUp';
 import MemberPlayground from './MemberPlayground';
 import MemberKanban from './MemberKanban';
+import Toast from '../components/Toast';
 
 const TABS = [
   { id: 'lu', label: 'Line Up', icon: '📋' },
@@ -16,7 +17,7 @@ export default function MemberView() {
   const signOut = useStore(s => s.signOut);
 
   return (
-    <div className="app">
+    <div className="app member-app">
       {/* ── Member nav bar ── */}
       <div className="nav" style={{display:'flex',alignItems:'center'}}>
         <div className="nav-brand" style={{fontSize:16}}>Team<span>Map</span></div>
@@ -39,9 +40,10 @@ export default function MemberView() {
       </div>
 
       {/* ── Tab content — all mounted, inactive hidden with display:none ── */}
-      <div style={{ display: tab === 'lu' ? '' : 'none', height: '100%' }}><MemberLineUp /></div>
-      <div style={{ display: tab === 'pg' ? '' : 'none', height: '100%' }}><MemberPlayground /></div>
-      <div style={{ display: tab === 'kb' ? '' : 'none', height: '100%' }}><MemberKanban /></div>
+      <div className="member-tab-content" style={{ display: tab === 'lu' ? '' : 'none' }}><MemberLineUp /></div>
+      <div className="member-tab-content" style={{ display: tab === 'pg' ? '' : 'none' }}><MemberPlayground /></div>
+      <div className="member-tab-content" style={{ display: tab === 'kb' ? '' : 'none' }}><MemberKanban /></div>
+      <Toast />
     </div>
   );
 }
