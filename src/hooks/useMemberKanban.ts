@@ -5,7 +5,7 @@ import { today, MOOD_ORDER } from '../lib/constants';
 
 export default function useMemberKanban() {
   const S = useStore(s => s.S);
-  const memberId = useStore(s => s.S.settings.spMember);
+  const memberId = useStore(s => s.session?.memberId);
   const upsertTask = useStore(s => s.upsertTask);
   const uiViewState = useUIStore(s => s.viewStates.kb || {});
   const setViewState = useUIStore(s => s.setViewState);

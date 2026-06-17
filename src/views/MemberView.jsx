@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import MemberLineUp from './MemberLineUp';
+import MemberPlayground from './MemberPlayground';
+import MemberKanban from './MemberKanban';
 
 const TABS = [
   { id: 'lu', label: 'Line Up', icon: '📋' },
@@ -36,24 +38,10 @@ export default function MemberView() {
         </div>
       </div>
 
-      {/* ── Tab content ── */}
-      {tab === 'lu' && <MemberLineUp />}
-      {tab === 'pg' && (
-        <div className="view active" style={{display:'flex',alignItems:'center',justifyContent:'center',color:'var(--t3)'}}>
-          <div style={{textAlign:'center'}}>
-            <div style={{fontSize:24,fontWeight:700,color:'var(--t2)',marginBottom:8}}>Playground</div>
-            <div style={{fontSize:14}}>Your personal spreadsheet — coming in the next step</div>
-          </div>
-        </div>
-      )}
-      {tab === 'kb' && (
-        <div className="view active" style={{display:'flex',alignItems:'center',justifyContent:'center',color:'var(--t3)'}}>
-          <div style={{textAlign:'center'}}>
-            <div style={{fontSize:24,fontWeight:700,color:'var(--t2)',marginBottom:8}}>Kanban</div>
-            <div style={{fontSize:14}}>Your tasks grouped by mood — coming in the next step</div>
-          </div>
-        </div>
-      )}
+      {/* ── Tab content — all mounted, inactive hidden with display:none ── */}
+      <div style={{ display: tab === 'lu' ? '' : 'none', height: '100%' }}><MemberLineUp /></div>
+      <div style={{ display: tab === 'pg' ? '' : 'none', height: '100%' }}><MemberPlayground /></div>
+      <div style={{ display: tab === 'kb' ? '' : 'none', height: '100%' }}><MemberKanban /></div>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import type { TabData, PlaygroundData } from '../utils/playgroundHelpers';
 
 export default function useMemberPlayground() {
   const S = useStore(s => s.S);
-  const memberId = useStore(s => s.S.settings.spMember);
+  const memberId = useStore(s => s.session?.memberId);
   const upsertTask = useStore(s => s.upsertTask);
   const uiViewState = useUIStore(s => s.viewStates.pg || {});
   const setViewState = useUIStore(s => s.setViewState);
