@@ -9,10 +9,11 @@ interface Props {
   cell: CellData | undefined;
   tasks: Task[];
   isSelected: boolean;
+  isActive: boolean;
   isEditing: boolean;
   editValue: string;
   onEditValueChange: (value: string) => void;
-  onSelect: (r: number, c: number) => void;
+  onSelect: (r: number, c: number, shiftKey?: boolean) => void;
   onStartEdit: (r: number, c: number) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
@@ -22,7 +23,7 @@ interface Props {
 }
 
 export default function SpreadsheetCell({
-  row, col, cell, tasks, isSelected,
+  row, col, cell, tasks, isSelected, isActive,
   isEditing, editValue, onEditValueChange,
   onSelect, onStartEdit, onSaveEdit, onCancelEdit,
   onConvertToTask, onOpenTask, onUnlink,
@@ -56,7 +57,7 @@ export default function SpreadsheetCell({
       longPressFired.current = false;
       return;
     }
-    onSelect(row, col);
+    onSelect(row, col, e.shiftKey);
   }, [onSelect, row, col]);
 
   const handleDoubleClick = useCallback(() => {
@@ -125,7 +126,9 @@ export default function SpreadsheetCell({
 
   return (
     <td
-      className={`pg-cell-td${isSelected ? ' selected' : ''}${isEditing ? ' editing' : ''}`}
+      data-row={row}
+      data-col={col}
+      className={`pg-cell-td${isSelected ? ' range-selected' : ''}${isActive ? ' selected' : ''}${isEditing ? ' editing' : ''}`}
       onMouseEnter={(e) => {
         const a = e.currentTarget.querySelector('.pg-cell-actions') as HTMLElement;
         if (a) a.style.display = 'flex';
@@ -146,7 +149,7 @@ export default function SpreadsheetCell({
         />
       ) : (
         <div
-          className={`pg-cell${linked ? ' has-task' : ''}${isSelected ? ' selected' : ''}`}
+          className={`pg-cell${linked ? ' has-task' : ''}${isActive ? ' selected' : ''}`}
           role="button"
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}

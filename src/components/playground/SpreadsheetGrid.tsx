@@ -21,17 +21,28 @@ export default function SpreadsheetGrid({
 }: Props) {
   const [selectedRow, setSelectedRow] = useState(0);
   const [selectedCol, setSelectedCol] = useState(0);
+  const [anchorRow, setAnchorRow] = useState(0);
+  const [anchorCol, setAnchorCol] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
   const gridRef = useRef<HTMLDivElement>(null);
   const wasEditing = useRef(false);
+  const isDragging = useRef(false);
 
   const sortedClients = [...clients].sort((a, b) => (a.order || 0) - (b.order || 0));
   const rowIndices = sortedClients.length > 0
     ? sortedClients.map((_, i) => i)
     : [0];
   const totalRows = rowIndices.length;
+
+  const isInSelection = useCallback((r: number, c: number): boolean => {
+    const minRow = Math.min(anchorRow, selectedRow);
+    const maxRow = Math.max(anchorRow, selectedRow);
+    const minCol = Math.min(anchorCol, selectedCol);
+    const maxCol = Math.max(anchorCol, selectedCol);
+    return r >= minRow && r <= maxRow && c >= minCol && c <= maxCol;
+  }, [anchorRow, anchorCol, selectedRow, selectedCol]);
 
   const saveEdit = useCallback(() => {
     if (!isEditing) return;
@@ -54,30 +65,110 @@ export default function SpreadsheetGrid({
 
   const startEdit = useCallback((row: number, col: number) => {
     const cell = getCellData(tab, row, col);
+    setAnchorRow(row);
+    setAnchorCol(col);
     setSelectedRow(row);
     setSelectedCol(col);
     setEditValue(cell.text);
     setIsEditing(true);
   }, [tab]);
 
-  const handleCellSelect = useCallback((row: number, col: number) => {
+  const clearSelectedCells = useCallback(() => {
+    const minRow = Math.min(anchorRow, selectedRow);
+    const maxRow = Math.max(anchorRow, selectedRow);
+    const minCol = Math.min(anchorCol, selectedCol);
+    const maxCol = Math.max(anchorCol, selectedCol);
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        onUpdateCellText(r, c, '');
+        onUnlink(r, c);
+      }
+    }
+    gridRef.current?.focus();
+  }, [anchorRow, anchorCol, selectedRow, selectedCol, onUpdateCellText, onUnlink]);
+
+  const handleCellSelect = useCallback((row: number, col: number, shiftKey?: boolean) => {
     if (isEditing && row === selectedRow && col === selectedCol) return;
     commitEdit();
-    setSelectedRow(row);
-    setSelectedCol(col);
+    if (shiftKey) {
+      setSelectedRow(row);
+      setSelectedCol(col);
+    } else {
+      setAnchorRow(row);
+      setAnchorCol(col);
+      setSelectedRow(row);
+      setSelectedCol(col);
+    }
+    gridRef.current?.focus();
   }, [isEditing, selectedRow, selectedCol, commitEdit]);
 
   const moveTo = useCallback((row: number, col: number) => {
     if (row < 0 || row >= totalRows) return;
     if (col < 0 || col >= PG_COLS) return;
     commitEdit();
+    setAnchorRow(row);
+    setAnchorCol(col);
     setSelectedRow(row);
     setSelectedCol(col);
   }, [totalRows, commitEdit]);
 
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0 || e.shiftKey) return;
+    const td = (e.target as HTMLElement).closest('td');
+    if (!td) return;
+    const row = parseInt(td.dataset.row ?? '');
+    const col = parseInt(td.dataset.col ?? '');
+    if (isNaN(row) || isNaN(col)) return;
+    if (isEditing && row === selectedRow && col === selectedCol) return;
+    commitEdit();
+    setAnchorRow(row);
+    setAnchorCol(col);
+    setSelectedRow(row);
+    setSelectedCol(col);
+    isDragging.current = true;
+    gridRef.current?.focus();
+  }, [isEditing, selectedRow, selectedCol, commitEdit]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    const td = (e.target as HTMLElement).closest('td');
+    if (!td) return;
+    const row = parseInt(td.dataset.row ?? '');
+    const col = parseInt(td.dataset.col ?? '');
+    if (isNaN(row) || isNaN(col)) return;
+    setSelectedRow(row);
+    setSelectedCol(col);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseUp = () => { isDragging.current = false; };
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => document.removeEventListener('mouseup', handleMouseUp);
+  }, []);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (isEditing) {
       switch (e.key) {
+        case 'ArrowUp':
+          e.preventDefault();
+          commitEdit();
+          moveTo(selectedRow - 1, selectedCol);
+          return;
+        case 'ArrowDown':
+          e.preventDefault();
+          commitEdit();
+          moveTo(selectedRow + 1, selectedCol);
+          return;
+        case 'ArrowLeft':
+          e.preventDefault();
+          commitEdit();
+          moveTo(selectedRow, selectedCol - 1);
+          return;
+        case 'ArrowRight':
+          e.preventDefault();
+          commitEdit();
+          moveTo(selectedRow, selectedCol + 1);
+          return;
         case 'Enter': {
           e.preventDefault();
           saveEdit();
@@ -113,22 +204,46 @@ export default function SpreadsheetGrid({
     }
 
     switch (e.key) {
-      case 'ArrowUp':
+      case 'ArrowUp': {
         e.preventDefault();
-        moveTo(selectedRow - 1, selectedCol);
+        commitEdit();
+        if (e.shiftKey) {
+          setSelectedRow(Math.max(selectedRow - 1, 0));
+        } else {
+          moveTo(selectedRow - 1, selectedCol);
+        }
         break;
-      case 'ArrowDown':
+      }
+      case 'ArrowDown': {
         e.preventDefault();
-        moveTo(selectedRow + 1, selectedCol);
+        commitEdit();
+        if (e.shiftKey) {
+          setSelectedRow(Math.min(selectedRow + 1, totalRows - 1));
+        } else {
+          moveTo(selectedRow + 1, selectedCol);
+        }
         break;
-      case 'ArrowLeft':
+      }
+      case 'ArrowLeft': {
         e.preventDefault();
-        moveTo(selectedRow, selectedCol - 1);
+        commitEdit();
+        if (e.shiftKey) {
+          setSelectedCol(Math.max(selectedCol - 1, 0));
+        } else {
+          moveTo(selectedRow, selectedCol - 1);
+        }
         break;
-      case 'ArrowRight':
+      }
+      case 'ArrowRight': {
         e.preventDefault();
-        moveTo(selectedRow, selectedCol + 1);
+        commitEdit();
+        if (e.shiftKey) {
+          setSelectedCol(Math.min(selectedCol + 1, PG_COLS - 1));
+        } else {
+          moveTo(selectedRow, selectedCol + 1);
+        }
         break;
+      }
       case 'Tab': {
         e.preventDefault();
         const dir = e.shiftKey ? -1 : 1;
@@ -140,12 +255,20 @@ export default function SpreadsheetGrid({
         }
         break;
       }
+      case 'F2':
       case 'Enter':
         e.preventDefault();
         startEdit(selectedRow, selectedCol);
         break;
+      case 'Delete':
+      case 'Backspace':
+        e.preventDefault();
+        clearSelectedCells();
+        break;
       case 'Escape':
         e.preventDefault();
+        setAnchorRow(0);
+        setAnchorCol(0);
         setSelectedRow(0);
         setSelectedCol(0);
         break;
@@ -158,7 +281,7 @@ export default function SpreadsheetGrid({
         }
         break;
     }
-  }, [isEditing, selectedRow, selectedCol, totalRows, tab, saveEdit, cancelEdit, moveTo, startEdit]);
+  }, [isEditing, selectedRow, selectedCol, totalRows, tab, saveEdit, cancelEdit, moveTo, startEdit, clearSelectedCells]);
 
   useEffect(() => {
     gridRef.current?.focus();
@@ -180,7 +303,8 @@ export default function SpreadsheetGrid({
         <SpreadsheetCell
           key={`${r},${c}`}
           row={r} col={c} cell={cell} tasks={tasks}
-          isSelected={selectedRow === r && selectedCol === c}
+          isSelected={isInSelection(r, c)}
+          isActive={selectedRow === r && selectedCol === c}
           isEditing={isEditing && selectedRow === r && selectedCol === c}
           editValue={editValue}
           onEditValueChange={setEditValue}
@@ -203,6 +327,8 @@ export default function SpreadsheetGrid({
       tabIndex={0}
       className="pg-grid-container"
       onKeyDown={handleKeyDown}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
     >
       <table className="pg-table">
         <colgroup>

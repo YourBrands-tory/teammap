@@ -444,6 +444,7 @@ td:hover .pg-cell-actions{display:flex}
 .pg-cell-btn.task-done{background:var(--al);color:var(--accent);border-color:var(--accent)}
 
 /* ── PLAYGROUND CELL EDITOR ────────────────────────────────── */
+.pg-cell-td.range-selected{background:var(--al)}
 .pg-cell-td.selected{background:var(--al);box-shadow:inset 0 0 0 2px var(--accent);z-index:2}
 .pg-cell-td.editing{background:#dff3e2;border:2px solid #2f7a4f;border-radius:4px;box-shadow:none}
 .pg-cell-td.editing .cell-editor{width:100%;height:100%;margin:0;padding:8px;border:none;outline:none;box-shadow:none;background:transparent;border-radius:0;resize:none;overflow:hidden}
