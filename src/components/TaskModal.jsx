@@ -60,6 +60,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [saveError, setSaveError] = useState(null);
   const [saving, setSaving] = useState(false);
   const notesRef = useRef(null);
+  const taskNameRef = useRef(null);
 
   const resizeNotes = () => {
     const el = notesRef.current;
@@ -85,6 +86,8 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   }, [handleClose]);
 
   useEffect(() => { resizeNotes(); }, [notes]);
+
+  useEffect(() => { taskNameRef.current?.focus(); }, []);
 
   // auto-save draft on every meaningful change
   useEffect(() => {
@@ -228,7 +231,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         <div style={{fontSize:11,color:'var(--warn)',marginBottom:10}}>* Task name, assigned to &amp; mood are required</div>
 
         <label className="fl" style={{marginTop:0}}>Task name *</label>
-        <input type="text" placeholder="What needs to be done?" value={name}
+        <input ref={taskNameRef} type="text" placeholder="What needs to be done?" value={name}
           className={err.name?'req':''} onChange={e=>setName(e.target.value)} />
 
         <label className="fl">Mood *</label>
@@ -273,7 +276,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         <div style={{display:'flex',alignItems:'center',gap:6,marginTop:6,flexWrap:'wrap'}}>
           <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{width:150}} />
           <button className="btn btn-xs" onClick={()=>setDate(today())}>Today</button>
-          <button className="btn btn-xs" onClick={()=>setDate(today())}>Tomorrow</button>
+          <button className="btn btn-xs" onClick={()=>dateOffset(1)}>Tomorrow</button>
           <button className="btn btn-xs" onClick={()=>dateOffset(-1)}>Yesterday</button>
         </div>
 
