@@ -56,9 +56,11 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [newSubtask, setNewSubtask] = useState('');
   const [newLinkLabel, setNewLinkLabel] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
+  const loadTaskActivity = useStore(s => s.loadTaskActivity);
   const [tDetailTab, setTDetailTab] = useState('sub');
   const [saveError, setSaveError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [activity, setActivity] = useState([]);
   const notesRef = useRef(null);
   const taskNameRef = useRef(null);
 
@@ -88,6 +90,53 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   useEffect(() => { resizeNotes(); }, [notes]);
 
   useEffect(() => { taskNameRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    if (task.id) loadTaskActivity(task.id).then(setActivity);
+  }, [task.id, loadTaskActivity]);
+
+  function timeAgo(ts) {
+    const diff = Date.now() - ts;
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    const d = Math.floor(h / 24);
+    return d + 'd ago';
+  }
+
+  function fmtDT(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+
+  function actDesc(a) {
+    const n = a.userName;
+    switch (a.action) {
+      case 'created': return n + ' created this task';
+      case 'updated': return n + ' changed title';
+      case 'status_changed': return n + ' changed status' + (a.newValue ? ' to ' + a.newValue : '');
+      case 'mood_changed': return n + ' changed mood';
+      case 'date_changed': return n + ' changed date' + (a.newValue ? ' to ' + a.newValue : '');
+      case 'notes_updated': return n + ' updated notes';
+      case 'client_changed': return n + ' changed client';
+      case 'assigned_changed': return n + ' updated assignees';
+      case 'hidden': return n + ' hid this task';
+      case 'unhidden': return n + ' unhid this task';
+      case 'deleted': return n + ' moved this task to deleted';
+      case 'recovered': return n + ' recovered this task';
+      case 'subtask_added': return n + ' added subtask' + (a.newValue ? ' "' + a.newValue + '"' : '');
+      case 'subtask_completed': return n + ' completed subtask' + (a.newValue ? ' "' + a.newValue + '"' : '');
+      case 'subtask_deleted': return n + ' removed subtask' + (a.oldValue ? ' "' + a.oldValue + '"' : '');
+      case 'link_added': return n + ' added link' + (a.newValue ? ' ' + a.newValue : '');
+      case 'link_removed': return n + ' removed link' + (a.oldValue ? ' ' + a.oldValue : '');
+      case 'tag_added': return n + ' added a tag';
+      case 'tag_removed': return n + ' removed a tag';
+      default: return n + ' performed ' + a.action;
+    }
+  }
 
   // auto-save draft on every meaningful change
   useEffect(() => {
@@ -230,6 +279,14 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         )}
         <div style={{fontSize:11,color:'var(--warn)',marginBottom:10}}>* Task name, assigned to &amp; mood are required</div>
 
+        {isEdit && (task.createdBy || task.updatedBy) && (
+          <div style={{fontSize:11,color:'var(--t2)',marginBottom:10,lineHeight:1.6}}>
+            {task.createdBy && <span>Created by: {S.members.find(m=>m.id===task.createdBy)?.name || 'Unknown'} &bull; {fmtDT(task.createdAt)}</span>}
+            {task.createdBy && task.updatedBy && <br />}
+            {task.updatedBy && task.updatedAt !== task.createdAt && <span>Last updated by: {S.members.find(m=>m.id===task.updatedBy)?.name || 'Unknown'} &bull; {fmtDT(task.updatedAt)}</span>}
+          </div>
+        )}
+
         <label className="fl" style={{marginTop:0}}>Task name *</label>
         <input ref={taskNameRef} type="text" placeholder="What needs to be done?" value={name}
           className={err.name?'req':''} onChange={e=>setName(e.target.value)} />
@@ -321,13 +378,16 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
           <button className="btn btn-sm" onClick={addTagInline}>+ Tag</button>
         </div>
 
-        {/* ── Subtasks & Links tabs ── */}
+        {/* ── Subtasks, Links & Activity tabs ── */}
         <div className="tdetail-tabs">
           <div className={`tdetail-tab${tDetailTab==='sub'?' active':''}`} onClick={()=>setTDetailTab('sub')}>
             ☑ Subtasks {subtasks.length ? `(${subtasks.filter(s=>s.done).length}/${subtasks.length})` : ''}
           </div>
           <div className={`tdetail-tab${tDetailTab==='links'?' active':''}`} onClick={()=>setTDetailTab('links')}>
             🔗 Links {links.length ? `(${links.length})` : ''}
+          </div>
+          <div className={`tdetail-tab${tDetailTab==='act'?' active':''}`} onClick={()=>setTDetailTab('act')}>
+            📋 Activity {activity.length ? `(${activity.length})` : ''}
           </div>
         </div>
 
@@ -392,6 +452,19 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
               style={{flex:1,fontSize:12}} />
             <button className="btn btn-sm" onClick={addLinkInline}>+ Add</button>
           </div>
+        </div>
+
+        {/* ── Activity tab content ── */}
+        <div className={`tdetail-tab-content${tDetailTab==='act'?' active':''}`}>
+          {activity.length === 0 && (
+            <div style={{fontSize:12,color:'var(--t3)',padding:'12px 0'}}>No activity yet.</div>
+          )}
+          {activity.map(a => (
+            <div key={a.id} style={{display:'flex',alignItems:'baseline',gap:8,padding:'5px 0',fontSize:12,borderBottom:'1px solid var(--b3)'}}>
+              <span style={{color:'var(--t3)',whiteSpace:'nowrap',flexShrink:0}}>{timeAgo(a.createdAt)}</span>
+              <span style={{color:'var(--t1)'}}>{actDesc(a)}</span>
+            </div>
+          ))}
         </div>
 
         <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8}}>

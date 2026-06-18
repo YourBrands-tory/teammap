@@ -275,7 +275,6 @@ export default function SpreadsheetGrid({
       default:
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
           e.preventDefault();
-          const cell = getCellData(tab, selectedRow, selectedCol);
           setEditValue(e.key);
           setIsEditing(true);
         }

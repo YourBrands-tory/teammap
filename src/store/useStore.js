@@ -12,6 +12,7 @@ const taskFromRow = (r) => {
     estH:r.est_h||0, estM:r.est_m||0, notes:r.notes||'',
     subtasks:r.subtasks||[], links:r.links||[],
     createdBy:r.created_by||null,
+    updatedBy:r.updated_by||null,
     isMilestone:!!r.is_milestone, milestoneId:r.milestone_id||null,
     deleted:!!r.deleted, hidden:!!r.hidden, createdAt:Number(r.created_at)||Date.now(), updatedAt:Number(r.updated_at)||Date.now(),
   };
@@ -26,6 +27,7 @@ const taskToRow = (t) => ({
   est_h:t.estH||0, est_m:t.estM||0, notes:t.notes||'',
   subtasks:t.subtasks||[], links:t.links||[],
   created_by:t.createdBy||null,
+  updated_by:t.updatedBy||null,
   is_milestone:!!t.isMilestone, milestone_id:t.milestoneId||null,
   deleted:!!t.deleted, hidden:!!t.hidden, created_at:t.createdAt||Date.now(), updated_at:t.updatedAt||Date.now(),
 });
@@ -252,6 +254,43 @@ export const useStore = create((set, get) => ({
     if (error) console.error('persist', key, error);
   },
 
+  // ── Activity logging ──────────────────────────────────────────────────────
+  _addActivity: async (taskId, activities) => {
+    const session = get().session;
+    if (!session?.memberId || !activities.length) return;
+    const rows = activities.map(a => ({
+      task_id: taskId,
+      action: a.action,
+      field: a.field || null,
+      old_value: a.oldValue ?? null,
+      new_value: a.newValue ?? null,
+      user_id: session.memberId,
+    }));
+    const { error } = await supabase.from('task_activity').insert(rows);
+    if (error) console.error('[activity] insert error:', error);
+  },
+
+  loadTaskActivity: async (taskId) => {
+    const { data } = await supabase
+      .from('task_activity')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    const members = get().S.members;
+    return (data || []).map(r => ({
+      id: r.id,
+      taskId: r.task_id,
+      action: r.action,
+      field: r.field,
+      oldValue: r.old_value,
+      newValue: r.new_value,
+      userId: r.user_id,
+      userName: members.find(m => m.id === r.user_id)?.name || 'Unknown',
+      createdAt: Number(r.created_at) || Date.now(),
+    }));
+  },
+
   // ── TASKS ─────────────────────────────────────────────────────────────────
   upsertTask: async (task) => {
     const now = Date.now();
@@ -264,40 +303,54 @@ export const useStore = create((set, get) => ({
       ...(existing || {}), ...task };
     const isNew = !t.id;
     if (isNew) { t.id = uid(); t.createdAt = now; t.createdBy = session?.memberId || null; }
+    t.updatedBy = session?.memberId || null;
     t.updatedAt = now;
     get()._patchS((S) => {
       const i = S.tasks.findIndex(x => x.id === t.id);
       S.tasks = i >= 0 ? S.tasks.map(x => x.id === t.id ? t : x) : [...S.tasks, t];
     });
+
+    // ── Detect changes and log activity ──
+    const activities = [];
+    if (isNew) {
+      activities.push({ action: 'created', field: null, oldValue: null, newValue: null });
+    } else if (existing) {
+      const f = (a, b) => JSON.stringify(a) !== JSON.stringify(b);
+      if (f(existing.name, t.name)) activities.push({ action: 'updated', field: 'name', oldValue: existing.name, newValue: t.name });
+      if (f(existing.status, t.status)) activities.push({ action: 'status_changed', field: 'status', oldValue: existing.status, newValue: t.status });
+      if (f(existing.mood, t.mood)) activities.push({ action: 'mood_changed', field: 'mood', oldValue: existing.mood, newValue: t.mood });
+      if (f(existing.date, t.date)) activities.push({ action: 'date_changed', field: 'date', oldValue: existing.date, newValue: t.date });
+      if (f(existing.notes, t.notes)) activities.push({ action: 'notes_updated', field: 'notes', oldValue: existing.notes, newValue: t.notes });
+      if (f(existing.clientId, t.clientId)) activities.push({ action: 'client_changed', field: 'client', oldValue: existing.clientId, newValue: t.clientId });
+      if (f(existing.assignedTo, t.assignedTo)) activities.push({ action: 'assigned_changed', field: 'assigned', oldValue: existing.assignedTo, newValue: t.assignedTo });
+      if (f(existing.hidden, t.hidden)) activities.push({ action: t.hidden ? 'hidden' : 'unhidden', field: 'hidden', oldValue: existing.hidden, newValue: t.hidden });
+      // Subtask diffs
+      const os = existing.subtasks || []; const ns = t.subtasks || [];
+      ns.forEach(s => { if (!os.find(o => o.text === s.text && o.done === s.done)) activities.push({ action: s.done ? 'subtask_completed' : 'subtask_added', field: 'subtasks', oldValue: null, newValue: s.text }); });
+      os.forEach(s => { if (!ns.find(n => n.text === s.text)) activities.push({ action: 'subtask_deleted', field: 'subtasks', oldValue: s.text, newValue: null }); });
+      // Link diffs
+      const ol = existing.links || []; const nl = t.links || [];
+      nl.forEach(l => { if (!ol.find(o => o.url === l.url)) activities.push({ action: 'link_added', field: 'links', oldValue: null, newValue: l.url }); });
+      ol.forEach(l => { if (!nl.find(n => n.url === l.url)) activities.push({ action: 'link_removed', field: 'links', oldValue: l.url, newValue: null }); });
+      // Tag diffs
+      const ot = existing.tags || []; const nt = t.tags || [];
+      nt.forEach(tg => { if (!ot.includes(tg)) activities.push({ action: 'tag_added', field: 'tags', oldValue: null, newValue: tg }); });
+      ot.forEach(tg => { if (!nt.includes(tg)) activities.push({ action: 'tag_removed', field: 'tags', oldValue: tg, newValue: null }); });
+    }
+    if (activities.length) get()._addActivity(t.id, activities);
+
     const row = taskToRow(t);
-    console.log('[upsertTask] task.subtasks:', JSON.stringify(task.subtasks));
-    console.log('[upsertTask] task.links:', JSON.stringify(task.links));
-    console.log('[upsertTask] t.subtasks:', JSON.stringify(t.subtasks));
-    console.log('[upsertTask] row.subtasks:', JSON.stringify(row.subtasks));
-    console.log('[upsertTask] row keys:', Object.keys(row));
     let error = null, result = null;
     try {
       if (isNew) {
-        console.log('[upsertTask] INSERT row:', JSON.stringify(row));
         result = await supabase.from('tasks').insert(row);
       } else {
         const { id: rowId, created_at, created_by, ...data } = row;
-        console.log('[upsertTask] UPDATE data keys:', Object.keys(data));
-        console.log('[upsertTask] UPDATE data.subtasks:', JSON.stringify(data.subtasks));
-        console.log('[upsertTask] UPDATE data.links:', JSON.stringify(data.links));
         result = await supabase.from('tasks').update(data).eq('id', rowId);
       }
-    } catch (e) {
-      console.error('[upsertTask] exception:', e);
-      error = e;
-    }
+    } catch (e) { error = e; }
     if (result && result.error) error = result.error;
-    console.log('[upsertTask] Supabase response:', result);
-    if (error) {
-      console.error('[upsertTask] error:', error);
-      throw error;
-    }
-    console.log('[upsertTask] saved OK', row.id);
+    if (error) throw error;
     return t;
   },
   setTaskStatus: async (taskId, status) => {
@@ -306,19 +359,22 @@ export const useStore = create((set, get) => ({
       S.tasks = S.tasks.map(t => t.id===taskId ? (updated={...t,status,updatedAt:Date.now()}) : t);
     });
     if (updated) {
-      console.log('[setTaskStatus] updating', { id: taskId, status, hadSubtasks: (updated.subtasks?.length||0) > 0, hadLinks: (updated.links?.length||0) > 0 });
-      const { error } = await supabase.from('tasks')
-        .update({ status, updated_at: updated.updatedAt }).eq('id', taskId);
-      if (error) console.error('[setTaskStatus] error', error);
+      await supabase.from('tasks')
+        .update({ status, updated_by: get().session?.memberId || null, updated_at: updated.updatedAt }).eq('id', taskId);
+      get()._addActivity(taskId, [{ action: 'status_changed', field: 'status', oldValue: updated.status, newValue: status }]);
     }
   },
   softDeleteTask: async (taskId) => {
+    const session = get().session;
     get()._patchS((S)=>{ S.tasks = S.tasks.map(t=>t.id===taskId?{...t,deleted:true,updatedAt:Date.now()}:t); });
-    await supabase.from('tasks').update({ deleted:true, updated_at:Date.now() }).eq('id', taskId);
+    await supabase.from('tasks').update({ deleted:true, updated_by: session?.memberId || null, updated_at:Date.now() }).eq('id', taskId);
+    get()._addActivity(taskId, [{ action: 'deleted', field: null, oldValue: null, newValue: null }]);
   },
   recoverTask: async (taskId) => {
+    const session = get().session;
     get()._patchS((S)=>{ S.tasks = S.tasks.map(t=>t.id===taskId?{...t,deleted:false,updatedAt:Date.now()}:t); });
-    await supabase.from('tasks').update({ deleted:false, updated_at:Date.now() }).eq('id', taskId);
+    await supabase.from('tasks').update({ deleted:false, updated_by: session?.memberId || null, updated_at:Date.now() }).eq('id', taskId);
+    get()._addActivity(taskId, [{ action: 'recovered', field: null, oldValue: null, newValue: null }]);
   },
   purgeTask: async (taskId) => {
     get()._patchS((S)=>{ S.tasks = S.tasks.filter(t=>t.id!==taskId); });

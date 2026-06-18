@@ -39,8 +39,12 @@ export default function SpreadsheetCell({
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.select();
+      const el = textareaRef.current;
+      const val = el.value;
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(val.length, val.length);
+      });
     }
   }, [isEditing]);
 
