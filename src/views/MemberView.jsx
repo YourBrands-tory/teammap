@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import MemberLineUp from './MemberLineUp';
 import MemberPlayground from './MemberPlayground';
@@ -13,13 +13,41 @@ const TABS = [
 
 export default function MemberView() {
   const [tab, setTab] = useState('lu');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
   const memberSession = useStore(s => s.session);
   const signOut = useStore(s => s.signOut);
+
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target) && !e.target.closest('.nav-hamburger')) {
+        closeMenu();
+      }
+    };
+    const onEsc = (e) => e.key === 'Escape' && closeMenu();
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [menuOpen, closeMenu]);
+
+  const handleTab = (id) => {
+    setTab(id);
+    closeMenu();
+  };
 
   return (
     <div className="app member-app">
       {/* ── Member nav bar ── */}
       <div className="nav" style={{display:'flex',alignItems:'center'}}>
+        <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} onTouchStart={() => setMenuOpen(o => !o)} aria-label="Menu">
+          <span className={`nav-hamburger-line${menuOpen ? ' open' : ''}`} />
+        </button>
         <div className="nav-brand" style={{fontSize:16}}>Team<span>Map</span></div>
         <div className="nav-desktop-items" style={{display:'flex',alignItems:'center',gap:0,marginLeft:16}}>
           {TABS.map(t => (
@@ -38,6 +66,26 @@ export default function MemberView() {
           </button>
         </div>
       </div>
+
+      {menuOpen && (
+        <div className="nav-mobile-menu" ref={menuRef}>
+          <div className="nav-mobile-close-row">
+            <span className="nav-mobile-title">Menu</span>
+            <button className="nav-mobile-x" onClick={closeMenu} onTouchStart={closeMenu} aria-label="Close menu">✕</button>
+          </div>
+          {TABS.map(t => (
+            <div key={t.id} className={`nav-mobile-item${tab===t.id?' active':''}`} onClick={() => handleTab(t.id)}>
+              <span style={{fontSize:16,width:24,textAlign:'center'}}>{t.icon}</span>
+              <span>{t.label}</span>
+            </div>
+          ))}
+          <div style={{borderTop:'1px solid var(--border)',margin:'8px 0'}} />
+          <div className="nav-mobile-item" onClick={() => { closeMenu(); signOut(); }} style={{color:'var(--warn)'}}>
+            <span style={{fontSize:16,width:24,textAlign:'center'}}>🚪</span>
+            <span>Log out</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Tab content — all mounted, inactive hidden with display:none ── */}
       <div className="member-tab-content" style={{ display: tab === 'lu' ? '' : 'none' }}><MemberLineUp /></div>

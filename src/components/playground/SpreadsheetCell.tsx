@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { pgEsc, hasLinkedTask } from '../../utils/playgroundHelpers';
 import type { CellData } from '../../utils/playgroundHelpers';
 
@@ -31,11 +31,14 @@ export default function SpreadsheetCell({
   const linked = hasLinkedTask(tasks, cell);
   const linkedTask = linked && cell?.taskId ? tasks.find(t => t.id === cell.taskId && !t.deleted) : null;
 
+  const isTouchDevice = useMemo(() => 'ontouchstart' in window || navigator.maxTouchPoints > 0, []);
+
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFired = useRef(false);
+  const touchHandled = useRef(false);
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -57,12 +60,19 @@ export default function SpreadsheetCell({
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    if (touchHandled.current) {
+      touchHandled.current = false;
+      return;
+    }
     if (longPressFired.current) {
       longPressFired.current = false;
       return;
     }
     onSelect(row, col, e.shiftKey);
-  }, [onSelect, row, col]);
+    if (isTouchDevice) {
+      onStartEdit(row, col);
+    }
+  }, [onSelect, onStartEdit, row, col, isTouchDevice]);
 
   const handleDoubleClick = useCallback(() => {
     onStartEdit(row, col);
@@ -80,21 +90,30 @@ export default function SpreadsheetCell({
     setContextMenu({ x: e.clientX, y: e.clientY });
   }, []);
 
-  const handleTouchStart = useCallback(() => {
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isTouchDevice) {
+      e.preventDefault();
+    }
     longPressFired.current = false;
+    touchHandled.current = false;
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       const rect = document.querySelector('.pg-scroll-wrap')?.getBoundingClientRect();
       setContextMenu({ x: rect ? rect.left + 40 : 100, y: rect ? rect.top + 40 : 100 });
     }, 500);
-  }, []);
+  }, [isTouchDevice]);
 
   const handleTouchEnd = useCallback(() => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-  }, []);
+    if (isTouchDevice && !longPressFired.current) {
+      touchHandled.current = true;
+      onSelect(row, col);
+      onStartEdit(row, col);
+    }
+  }, [onSelect, onStartEdit, row, col, isTouchDevice]);
 
   const handleTouchMove = useCallback(() => {
     if (longPressTimer.current) {
