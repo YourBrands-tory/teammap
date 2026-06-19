@@ -3,7 +3,7 @@ import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { today } from '../lib/constants';
 import { dayProgress } from '../utils/lineUpHelpers';
-import { getCompleteStatus, getReviewStatus } from '../utils/statusUtils';
+import { getCompleteStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
 import LineUpHeader from '../components/lineup/LineUpHeader';
 import LineUpCard from '../components/lineup/LineUpCard';
 import HiddenTasksPanel from '../components/HiddenTasksPanel';
@@ -145,6 +145,21 @@ export default function MemberLineUp() {
         onShift={shift} onGoToday={goToday}
         onSetSortMode={handleSetSortMode} onSetFilter={setFilter}
         onNewTask={() => {}} />
+
+      {/* Daily task limit indicator */}
+      {(() => {
+        const pStatus = getPassStatus(S.task_statuses);
+        const dailyCount = myTasksOnDate.filter(t => t.status !== completeStatus && t.status !== pStatus && !t.hidden).length;
+        const member = S.members.find(m => m.id === memberId);
+        const lim = member?.capacity ?? 6;
+        const capColor = dailyCount > lim ? '#e76f51' : dailyCount === lim ? '#d97706' : 'var(--t2)';
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 16px', fontSize: 12, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            <span style={{ color: 'var(--t3)' }}>Your daily limit:</span>
+            <span style={{ fontWeight: 700, color: capColor }}>{dailyCount}/{lim}</span>
+          </div>
+        );
+      })()}
 
       <div className="lu-body">
         <div className="lu-main">

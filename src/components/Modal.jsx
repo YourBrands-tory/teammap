@@ -3,7 +3,15 @@ import { useEffect } from 'react';
 export default function Modal({ onClose, children, large }) {
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    const onEsc = (e) => e.key === 'Escape' && onClose();
+    const onEsc = (e) => {
+      const target = e.target;
+      const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable;
+      if (isTyping) return;
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('keydown', onEsc);
     return () => {
       document.body.style.overflow = '';

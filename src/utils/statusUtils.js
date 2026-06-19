@@ -43,6 +43,13 @@ export function getStandUpStatus(taskStatuses) {
   return found?.label || 'Stand Up';
 }
 
+export function getPassStatus(taskStatuses) {
+  const found = (taskStatuses || []).find(
+    s => s.label.toLowerCase() === 'pass'
+  );
+  return found?.label || 'Pass';
+}
+
 export function getReviewStatus(taskStatuses) {
   const found = (taskStatuses || []).find(
     s => s.label.toLowerCase() === 'review' || s.label.toLowerCase().includes('review')

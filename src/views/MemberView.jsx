@@ -27,7 +27,15 @@ export default function MemberView() {
         closeMenu();
       }
     };
-    const onEsc = (e) => e.key === 'Escape' && closeMenu();
+    const onEsc = (e) => {
+      const target = e.target;
+      const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable;
+      if (isTyping) return;
+      if (e.key === 'Escape') closeMenu();
+    };
     document.addEventListener('mousedown', handler);
     document.addEventListener('keydown', onEsc);
     return () => {

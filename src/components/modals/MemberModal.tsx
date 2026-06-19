@@ -32,7 +32,7 @@ export default function MemberModal({ member, defaultCap, onSave, onClose }: Pro
       <input type="text" placeholder="e.g. Account Manager" value={role}
         onChange={e => setRole(e.target.value)} />
 
-      <label className="fl">Client capacity</label>
+      <label className="fl">Daily Task Limit</label>
       <input type="number" value={capacity} min={1} max={20}
         onChange={e => setCapacity(parseInt(e.target.value) || 6)}
         style={{ width: 100 }} />

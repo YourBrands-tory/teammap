@@ -1,5 +1,5 @@
 interface Member {
-  id: string; name: string; role?: string; color: string;
+  id: string; name: string; role?: string; color: string; capacity?: number;
 }
 
 interface Props {
@@ -34,6 +34,7 @@ export default function MembersPanel({
             <div style={{ width: 9, height: 9, borderRadius: '50%', background: m.color, flexShrink: 0 }} />
             <span className="st-li-name">{m.name}</span>
             <span className="st-li-sub">{m.role}</span>
+            <span style={{ fontSize: 11, color: 'var(--t2)', marginLeft: 8 }}>Daily Task Limit: {m.capacity ?? 6}</span>
             <div className="st-li-actions">
               <button className="btn btn-xs" onClick={() => onEdit(m)}>Edit</button>
               <button className="btn btn-xs btn-d" onClick={() => onDelete(m.id)}>✕</button>

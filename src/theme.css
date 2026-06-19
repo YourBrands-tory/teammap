@@ -135,8 +135,7 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
 /* imp: secondary prominent, fixed */
 .msec.imp-sec{flex-shrink:0;border-radius:8px;padding:4px;margin-bottom:6px}
 .msec.imp-sec .msec-tasks{height:140px;overflow-y:auto}
-/* others: appear only when tasks exist, scrollable fixed height */
-.msec.other-sec .msec-tasks{max-height:80px;overflow-y:auto}
+/* others: appear only when tasks exist */
 .msec.su-sec .msec-tasks{max-height:90px;overflow-y:auto}
 /* always show scrollbar inside mood task areas */
 .msec-tasks::-webkit-scrollbar{width:3px}

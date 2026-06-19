@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { COLORS, today, uid } from '../lib/constants';
 import { useStore, sel } from '../store/useStore';
-import { getStatusMaps, getDefaultStatus } from '../utils/statusUtils';
+import { getStatusMaps, getDefaultStatus, getCompleteStatus, getPassStatus } from '../utils/statusUtils';
 import Avatar from './Avatar';
 
 const DRAFT_KEY = 'tm_task_draft';
@@ -79,7 +79,15 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
-    const onEsc = (e) => e.key === 'Escape' && handleClose();
+    const onEsc = (e) => {
+      const target = e.target;
+      const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable;
+      if (isTyping) return;
+      if (e.key === 'Escape') handleClose();
+    };
     document.addEventListener('keydown', onEsc);
     return () => {
       document.body.style.overflow = '';
@@ -228,6 +236,28 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     if (!assigned.length) e.assigned = true;
     setErr(e);
     if (Object.keys(e).length) return;
+
+    // Daily task limit check
+    const cStatus = getCompleteStatus(S.task_statuses);
+    const pStatus = getPassStatus(S.task_statuses);
+    const taskDate = date || today();
+    for (const mid of assigned) {
+      const member = S.members.find(m => m.id === mid);
+      if (!member) continue;
+      const limit = member.capacity ?? 6;
+      const dailyCount = S.tasks.filter(t =>
+        t.assignedTo?.includes(mid) &&
+        t.date === taskDate &&
+        !t.deleted &&
+        t.status !== cStatus &&
+        t.status !== pStatus &&
+        t.id !== task.id
+      ).length;
+      if (dailyCount >= limit) {
+        setSaveError(`${member.name} already has ${dailyCount}/${limit} tasks for ${new Date(taskDate + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.\n\nComplete, move, or unassign another task before adding a new one.`);
+        return;
+      }
+    }
 
     let milestoneId = msId || null;
     if (isMs && !milestoneId) {

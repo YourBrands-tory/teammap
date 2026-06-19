@@ -325,6 +325,13 @@ export default function SpreadsheetGrid({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable;
+      if (isTyping) return;
+
       if (isEditing) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedCells.length > 0) {

@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect, memo } from 'react';
+import { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { today, fmtD, taskTimeStr } from '../lib/constants';
-import { getStatusMaps, getCompleteStatus, getStandUpStatus, getReviewStatus } from '../utils/statusUtils';
+import { getStatusMaps, getCompleteStatus, getStandUpStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
 import Avatar from '../components/Avatar';
 import TaskModal from '../components/TaskModal';
 import StatusPopup from '../components/StatusPopup';
@@ -15,6 +15,7 @@ export default function TaskDashboard() {
   const session = useStore(s => s.session);
   const isManager = session?.role === 'admin' || session?.role === 'manager';
   const completeStatus = getCompleteStatus(S.task_statuses);
+  const passStatus = getPassStatus(S.task_statuses);
   const standUpStatus = getStandUpStatus(S.task_statuses);
   const reviewStatus = getReviewStatus(S.task_statuses);
   const updateSettings = useStore(s => s.updateSettings);
@@ -184,15 +185,21 @@ export default function TaskDashboard() {
             <div className="td-mob-sheet-body">
               {mobileSheet === 'members' ? (
                 /* Full member list */
-                S.members.map((m, i) => (
-                  <button key={m.id}
-                    className={`td-mob-member-row${i === mobileMemberIdx ? ' active' : ''}`}
-                    onClick={() => { setMobileMemberIdx(i); setMobileSheet(null); setExpandedCards({}); }}>
-                    <Avatar name={m.name} color={m.color} size={32} />
-                    <span style={{fontWeight:600}}>{m.name}</span>
-                    <span style={{fontSize:12,color:'var(--t3)'}}>{m.role}</span>
-                  </button>
-                ))
+                S.members.map((m, i) => {
+                  const mdaily = S.tasks.filter(t => t.assignedTo?.includes(m.id) && t.date === dashDate && !t.deleted && t.status !== completeStatus && t.status !== passStatus).length;
+                  const mcap = m.capacity ?? 6;
+                  const mc = mdaily > mcap ? '#e76f51' : mdaily === mcap ? '#d97706' : 'var(--t3)';
+                  return (
+                    <button key={m.id}
+                      className={`td-mob-member-row${i === mobileMemberIdx ? ' active' : ''}`}
+                      onClick={() => { setMobileMemberIdx(i); setMobileSheet(null); setExpandedCards({}); }}>
+                      <Avatar name={m.name} color={m.color} size={32} />
+                      <span style={{fontWeight:600}}>{m.name}</span>
+                      <span style={{fontSize:11,color:mc,fontWeight:700,marginLeft:'auto'}}>{mdaily}/{mcap}</span>
+                      <span style={{fontSize:12,color:'var(--t3)',marginLeft:8}}>{m.role}</span>
+                    </button>
+                  );
+                })
               ) : (
                 /* Side panel content */
                 <>
@@ -246,18 +253,57 @@ export default function TaskDashboard() {
 /* ── DESKTOP TEAM COL ── */
 const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFilter, drawerOpen, toggleDrawer, onOpenTask, onStatus }) {
   const completeStatus = getCompleteStatus(S.task_statuses);
+  const passStatus = getPassStatus(S.task_statuses);
   const standUpStatus = getStandUpStatus(S.task_statuses);
   const allTasks = sel.tasksForMD(S, member.id, date);
   const memberReviewCount = allTasks.filter(t=>t.status===reviewStatus).length;
   const baseVisible = allTasks.filter(t=>t.status!==completeStatus);
-  const visible = reviewFilter ? baseVisible.filter(t=>t.status===reviewStatus) : baseVisible;
+  const reviewVisible = reviewFilter ? baseVisible.filter(t=>t.status===reviewStatus) : baseVisible;
+  const dailyActive = S.tasks.filter(t => t.assignedTo?.includes(member.id) && t.date === date && !t.deleted && t.status !== completeStatus && t.status !== passStatus).length;
+  const dailyCap = member.capacity ?? 6;
+  const capColor = dailyActive > dailyCap ? '#e76f51' : dailyActive === dailyCap ? '#d97706' : 'var(--t3)';
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
   const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;
   const barColor = pct===100?'#2d6a4f':pct>60?'#52b788':'#2196c4';
   const totalDisp = hm(allTasks.reduce((a,t)=>a+minsOf(t),0));
 
+  const primaryMoodIds = ['hero', 'imp', 'top'];
   const visibleMoods = S.moods.filter(m => !m.hidden);
-  const suTasks = visible.filter(t=>t.status===standUpStatus);
+  const hiddenMoodIds = useMemo(() => S.moods.filter(m => m.hidden).map(m => m.id), [S.moods]);
+  const visibleTasks = reviewVisible.filter(t => !hiddenMoodIds.includes(t.mood));
+  const suTasks = visibleTasks.filter(t=>t.status===standUpStatus);
+
+  const overflowMoods = visibleMoods.filter(m => !primaryMoodIds.includes(m.id));
+  const overflowTasks = useMemo(() => {
+    return reviewVisible.filter(t =>
+      t.status !== standUpStatus && (
+        overflowMoods.some(m => m.id === t.mood) ||
+        hiddenMoodIds.includes(t.mood)
+      )
+    );
+  }, [reviewVisible, overflowMoods, hiddenMoodIds, standUpStatus]);
+
+  const overflowMoodLabels = useMemo(() => {
+    const labels = overflowMoods.map(m => m.label);
+    if (!labels.length) return '';
+    if (labels.length <= 2) return labels.join(' & ');
+    return labels.slice(0, 2).join(', ') + ' & others';
+  }, [overflowMoods]);
+
+  const overflowMoodIds = useMemo(() => {
+    const ids = new Set(overflowMoods.map(m => m.id));
+    hiddenMoodIds.forEach(id => ids.add(id));
+    return ids;
+  }, [overflowMoods, hiddenMoodIds]);
+
+  const groupedOverflowTasks = useMemo(() => {
+    return overflowTasks.reduce((acc, task) => {
+      const mood = task.mood;
+      if (!acc[mood]) acc[mood] = [];
+      acc[mood].push(task);
+      return acc;
+    }, {});
+  }, [overflowTasks]);
 
   return (
     <div className="tcol">
@@ -265,11 +311,12 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
         <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
           <Avatar name={member.name} color={member.color} size={22} />
           <span style={{fontSize:12,fontWeight:800,flex:1}}>{member.name}</span>
-          <span style={{fontSize:10,color:'var(--t3)'}}>{totalDisp||''}</span>
+          <span style={{fontSize:10,fontWeight:600,color:capColor}}>{dailyActive}/{dailyCap}</span>
+          <span style={{fontSize:10,color:'var(--t3)',marginLeft:4}}>{totalDisp||''}</span>
         </div>
         <div style={{display:'flex',justifyContent:'space-between',fontSize:10,marginBottom:3}}>
           <span style={{color:'var(--t3)'}}>
-            {visible.length} active{doneCount?` · ${doneCount}✓`:''}
+            {reviewVisible.length} active{doneCount?` · ${doneCount}✓`:''}
             {memberReviewCount > 0 && !reviewFilter ? <span style={{color:'var(--warn)',fontWeight:700,marginLeft:4}}>· {memberReviewCount} review{memberReviewCount>1?'s':''} pending</span> : ''}
             {reviewFilter && memberReviewCount === 0 ? <span style={{color:'var(--t2)',marginLeft:4}}>— no reviews</span> : ''}
           </span>
@@ -288,9 +335,9 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
           </div>
         )}
 
-        {visibleMoods.map(mood => {
+        {visibleMoods.filter(m => primaryMoodIds.includes(m.id)).map(mood => {
           const mid = mood.id;
-          const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
+          const mt = visibleTasks.filter(t=>t.mood===mid && t.status!==standUpStatus);
           if ((mid==='top'||mid==='creative') && !mt.length) return null;
           const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
           const secClass = isHero?'hero-sec':isImp?'imp-sec':isTop?'top-sec':'other-sec';
@@ -321,6 +368,49 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
             </div>
           );
         })}
+
+        {overflowTasks.length > 0 && (
+          <div>
+            <button
+              onClick={toggleDrawer}
+              style={{
+                width:'100%',display:'flex',alignItems:'center',gap:6,padding:'5px 8px',
+                border:'1px dashed var(--border)',borderRadius:6,background:'transparent',
+                color:'var(--t2)',fontSize:11,fontWeight:600,cursor:'pointer',
+                fontFamily:'inherit',textAlign:'left',
+              }}>
+              {drawerOpen ? '▲ Hide' : `+${overflowTasks.length} more`}
+              {overflowMoodLabels ? <span style={{color:'var(--t3)',fontWeight:400}}>({overflowMoodLabels})</span> : null}
+            </button>
+            {drawerOpen && S.moods.filter(m => overflowMoodIds.has(m.id)).map(mood => {
+              const moodTasks = groupedOverflowTasks[mood.id] || [];
+              if (!moodTasks.length) return null;
+              const mid = mood.id;
+              const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
+              const totalMoodCount = allTasks.filter(t=>t.mood===mid).length;
+              const doneInMood = totalMoodCount - allTasks.filter(t=>t.mood===mid && t.status!==completeStatus).length;
+              return (
+                <div key={mid} className="msec" style={{marginTop:4}}>
+                  <div className="msec-head" style={{background:'transparent'}}>
+                    <span style={{fontSize:10}}>{mood.icon}</span>
+                    <span className="msec-label" style={{color:mood.color,fontSize:9.5}}>{mood.label}</span>
+                    <span className="msec-cnt" style={{background:mood.color+'22',color:mood.color}}>
+                      {moodTasks.length}{doneInMood?<span style={{opacity:.55,fontSize:8}}> {doneInMood}✓</span>:null}
+                    </span>
+                    {hm(moodMins) && <span style={{fontSize:9,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
+                    <button onClick={(e)=>{e.stopPropagation();onOpenTask({ date, mood:mid, assignedTo:[member.id] });}}
+                      style={{width:16,height:16,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
+                        color:mood.color,fontSize:11,lineHeight:1,cursor:'pointer',display:'flex',alignItems:'center',
+                        justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto'}}>+</button>
+                  </div>
+                  <div className="msec-tasks">
+                    {moodTasks.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <button className="addbtn" style={{fontSize:11,flexShrink:0}}
           onClick={()=>onOpenTask({ date, assignedTo:[member.id] })}>+ Task</button>
@@ -459,9 +549,45 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
   const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;
   const totalDisp = hm(allTasks.reduce((a,t)=>a+minsOf(t),0));
+  const [overflowOpen, setOverflowOpen] = useState(false);
 
+  const primaryMoodIds = ['hero', 'imp', 'top'];
   const visibleMoods = S.moods.filter(m => !m.hidden);
-  const suTasks = visible.filter(t=>t.status===standUpStatus);
+  const hiddenMoodIds = useMemo(() => S.moods.filter(m => m.hidden).map(m => m.id), [S.moods]);
+  const visibleTasks = visible.filter(t => !hiddenMoodIds.includes(t.mood));
+  const suTasks = visibleTasks.filter(t=>t.status===standUpStatus);
+
+  const overflowMoods = visibleMoods.filter(m => !primaryMoodIds.includes(m.id));
+  const overflowTasks = useMemo(() => {
+    return visible.filter(t =>
+      t.status !== standUpStatus && (
+        overflowMoods.some(m => m.id === t.mood) ||
+        hiddenMoodIds.includes(t.mood)
+      )
+    );
+  }, [visible, overflowMoods, hiddenMoodIds, standUpStatus]);
+
+  const overflowMoodLabels = useMemo(() => {
+    const labels = overflowMoods.map(m => m.label);
+    if (!labels.length) return '';
+    if (labels.length <= 2) return labels.join(' & ');
+    return labels.slice(0, 2).join(', ') + ' & others';
+  }, [overflowMoods]);
+
+  const overflowMoodIds = useMemo(() => {
+    const ids = new Set(overflowMoods.map(m => m.id));
+    hiddenMoodIds.forEach(id => ids.add(id));
+    return ids;
+  }, [overflowMoods, hiddenMoodIds]);
+
+  const groupedOverflowTasks = useMemo(() => {
+    return overflowTasks.reduce((acc, task) => {
+      const mood = task.mood;
+      if (!acc[mood]) acc[mood] = [];
+      acc[mood].push(task);
+      return acc;
+    }, {});
+  }, [overflowTasks]);
 
   return (
     <div className="td-mob-col-inner">
@@ -473,9 +599,9 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
         </div>
       )}
 
-      {visibleMoods.map(mood => {
+      {visibleMoods.filter(m => primaryMoodIds.includes(m.id)).map(mood => {
         const mid = mood.id;
-        const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
+        const mt = visibleTasks.filter(t=>t.mood===mid && t.status!==standUpStatus);
         if ((mid==='top'||mid==='creative') && !mt.length) return null;
         const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
         const secClass = isHero?'hero-sec':isImp?'imp-sec':isTop?'top-sec':'other-sec';
@@ -506,6 +632,47 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
           </div>
         );
       })}
+
+      {overflowTasks.length > 0 && (
+        <div>
+          <button
+            onClick={() => setOverflowOpen(o => !o)}
+            style={{
+              width:'100%',display:'flex',alignItems:'center',gap:6,padding:'5px 8px',
+              border:'1px dashed var(--border)',borderRadius:6,background:'transparent',
+              color:'var(--t2)',fontSize:11,fontWeight:600,cursor:'pointer',
+              fontFamily:'inherit',textAlign:'left',
+            }}>
+            {overflowOpen ? '▲ Hide' : `+${overflowTasks.length} more`}
+            {overflowMoodLabels ? <span style={{color:'var(--t3)',fontWeight:400}}>({overflowMoodLabels})</span> : null}
+          </button>
+          {overflowOpen && S.moods.filter(m => overflowMoodIds.has(m.id)).map(mood => {
+            const moodTasks = groupedOverflowTasks[mood.id] || [];
+            if (!moodTasks.length) return null;
+            const mid = mood.id;
+            const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
+            return (
+              <div key={mid} className="msec" style={{marginTop:4}}>
+                <div className="msec-head" style={{background:'transparent',padding:'2px 4px'}}>
+                  <span style={{fontSize:10}}>{mood.icon}</span>
+                  <span className="msec-label" style={{color:mood.color,fontSize:9}}>{mood.label}</span>
+                  <span className="msec-cnt" style={{background:mood.color+'22',color:mood.color,fontSize:9}}>
+                    {moodTasks.length}
+                  </span>
+                  {hm(moodMins) && <span style={{fontSize:8,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
+                  <button onClick={(e)=>{e.stopPropagation();onOpenTask({ date, mood:mid, assignedTo:[member.id] });}}
+                    style={{width:22,height:22,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
+                      color:mood.color,fontSize:14,lineHeight:1,cursor:'pointer',display:'flex',alignItems:'center',
+                      justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto'}}>+</button>
+                </div>
+                <div className="msec-tasks">
+                  {moodTasks.map(t => <MobileTaskCard key={t.id} task={t} member={member} S={S} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <button className="addbtn" style={{fontSize:11,marginTop:4,flexShrink:0}}
         onClick={()=>onOpenTask({ date, assignedTo:[member.id] })}>+ Task</button>

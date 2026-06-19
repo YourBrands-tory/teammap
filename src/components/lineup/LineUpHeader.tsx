@@ -1,12 +1,14 @@
 import { fmtD } from '../../lib/constants';
+import { getCompleteStatus, getPassStatus } from '../../utils/statusUtils';
 
 type SortMode = 'mood' | 'team' | 'client' | null;
 type Filters = { member: string; client: string; mood: string; review: boolean; search: string };
 
-interface Member { id: string; name: string; }
+interface Member { id: string; name: string; capacity?: number; }
 interface Client { id: string; name: string; }
 interface Mood { id: string; icon: string; label: string; hidden?: boolean; }
-interface S { members: Member[]; clients: Client[]; moods: Mood[]; }
+interface Task { id: string; date: string; assignedTo?: string[]; status: string; deleted?: boolean; }
+interface S { members: Member[]; clients: Client[]; moods: Mood[]; tasks: Task[]; task_statuses?: { id: string; label: string; order: number }[]; }
 interface Prog { done: number; total: number; pct: number; }
 
 interface Props {
@@ -31,6 +33,8 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
     : '0h';
 
   const sortModes = (isManager ? ['mood', 'team', 'client'] : ['mood', 'client']) as Exclude<SortMode, null>[];
+  const cStatus = getCompleteStatus(S.task_statuses);
+  const pStatus = getPassStatus(S.task_statuses);
 
   return (
     <div className="lu-hdr">
@@ -75,7 +79,17 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
       {isManager && (
         <select className="fsel" value={filters.member} onChange={e => onSetFilter('member', e.target.value)}>
           <option value="">All members</option>
-          {S.members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          {S.members.map(m => {
+            const dailyCount = (S.tasks || []).filter(t =>
+              t.assignedTo?.includes(m.id) &&
+              t.date === date &&
+              !t.deleted &&
+              t.status !== cStatus &&
+              t.status !== pStatus
+            ).length;
+            const lim = m.capacity ?? 6;
+            return <option key={m.id} value={m.id}>{m.name} ({dailyCount}/{lim})</option>;
+          })}
         </select>
       )}
       <select className="fsel" value={filters.client} onChange={e => onSetFilter('client', e.target.value)}>

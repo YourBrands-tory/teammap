@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { uid, today } from '../lib/constants';
-import { getDefaultStatus } from '../utils/statusUtils';
+import { getDefaultStatus, getCompleteStatus, getPassStatus } from '../utils/statusUtils';
 import type { TG2AllMulti, Template } from '../utils/taskGen2Helpers';
 import {
   filterTemplatesAll, toggleMulti, saveView, loadView, deleteView,
@@ -107,13 +107,36 @@ export default function useTaskGen2() {
   const createTaskFromTemplate = useCallback(async (tmplId: string, taskDate: string) => {
     const tmpl = (S.templates || []).find((t: Template) => t.id === tmplId);
     if (!tmpl) return;
+
+    // Daily task limit check
+    const cStatus = getCompleteStatus(S.task_statuses);
+    const pStatus = getPassStatus(S.task_statuses);
+    const date = taskDate || today();
+    const assignedTo = tmpl.assignedTo || [];
+    for (const mid of assignedTo) {
+      const member = S.members.find((m: any) => m.id === mid);
+      if (!member) continue;
+      const limit = member.capacity ?? 6;
+      const dailyCount = (S.tasks || []).filter((t: any) =>
+        t.assignedTo?.includes(mid) &&
+        t.date === date &&
+        !t.deleted &&
+        t.status !== cStatus &&
+        t.status !== pStatus
+      ).length;
+      if (dailyCount >= limit) {
+        useUIStore.getState().setToast(`${member.name} already has ${dailyCount}/${limit} tasks for ${new Date(date + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.`);
+        return;
+      }
+    }
+
     const newTask = {
       name: tmpl.name,
       clientId: tmpl.clientId,
-      date: taskDate || today(),
+      date,
       mood: tmpl.mood || 'rapid',
       status: getDefaultStatus(S.task_statuses) as string,
-      assignedTo: [...(tmpl.assignedTo || [])],
+      assignedTo: [...assignedTo],
       tags: [],
       estH: tmpl.estH || 0,
       estM: tmpl.estM || 0,
@@ -126,7 +149,7 @@ export default function useTaskGen2() {
     await upsertTask(newTask);
     setCreateConfirm(tmplId);
     setTimeout(() => setCreateConfirm(null), 3000);
-  }, [S.templates, upsertTask]);
+  }, [S.templates, S.tasks, S.members, S.task_statuses, upsertTask]);
 
   // —— All Templates actions ——
   const handleToggleMulti = useCallback((key: keyof TG2AllMulti, id: string) => {
