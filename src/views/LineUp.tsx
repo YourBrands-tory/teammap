@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { DndContext, DragOverlay, pointerWithin } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useStore } from '../store/useStore';
 import useLineUp from '../hooks/useLineUp';
 import LineUpHeader from '../components/lineup/LineUpHeader';
 import LineUpCard from '../components/lineup/LineUpCard';
@@ -8,6 +9,8 @@ import HiddenTasksPanel from '../components/HiddenTasksPanel';
 import TaskModal from '../components/TaskModal';
 
 export default function LineUp() {
+  const session = useStore(s => s.session);
+  const isManager = session?.role === 'admin' || session?.role === 'manager';
   const {
     S, date, sortMode, filters, tasks, allOnDate, prog, totalMins,
     panelWidth, activeId, taskModal,
@@ -33,7 +36,7 @@ export default function LineUp() {
     <div className="lu-app">
       <LineUpHeader
         date={date} prog={prog} totalMins={totalMins} sortMode={sortMode}
-        S={S} filters={filters}
+        S={S} filters={filters} isManager={isManager}
         onShift={handleShift} onGoToday={goToday}
         onSetSortMode={setSortMode} onSetFilter={setFilter}
         onNewTask={() => setTaskModal({ date })} />

@@ -3,7 +3,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { taskTimeStr } from '../../lib/constants';
 import { getCardSize } from '../../utils/lineUpHelpers';
-import { getStatusMaps } from '../../utils/statusUtils';
+import { getStatusMaps, getStatusesForRole } from '../../utils/statusUtils';
+import { useStore } from '../../store/useStore';
 
 interface Task {
   id: string; name: string; mood: string; status: string; clientId?: string;
@@ -29,6 +30,8 @@ interface Props {
 
 export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, onDelete, isOverlay }: Props) {
   const [linkPop, setLinkPop] = useState(false);
+  const session = useStore(ss => ss.session);
+  const role = session?.role || 'member';
   const cardSize = getCardSize(task.mood, S.moods);
   const isNarrow = cardSize === 'narrow';
   const isBig = cardSize === 'big';
@@ -43,6 +46,7 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
   const subTotal = task.subtasks?.length || 0;
   const subDone = task.subtasks?.filter(s => s.done).length || 0;
   const { STATS, STC, STB } = getStatusMaps(S.task_statuses);
+  const roleStatuses = getStatusesForRole(S.task_statuses, role);
 
   let sortable: any = {};
   if (!isOverlay) {
@@ -85,7 +89,7 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
               onClick={e => e.stopPropagation()}
               onChange={e => { e.stopPropagation(); onStatusChange(task.id, e.target.value); }}
               value={task.status}>
-              {STATS.map(s => <option key={s} value={s}>{s}</option>)}
+              {roleStatuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             {timeStr && <span className="lu-time-chip">{timeStr}</span>}
           </div>

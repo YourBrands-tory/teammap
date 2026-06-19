@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, memo } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { today, fmtD, taskTimeStr } from '../lib/constants';
-import { getStatusMaps, getCompleteStatus, getStandUpStatus } from '../utils/statusUtils';
+import { getStatusMaps, getCompleteStatus, getStandUpStatus, getReviewStatus } from '../utils/statusUtils';
 import Avatar from '../components/Avatar';
 import TaskModal from '../components/TaskModal';
 import StatusPopup from '../components/StatusPopup';
@@ -13,8 +13,11 @@ const hm = (m) => m ? `${Math.floor(m/60)}h${m%60?' '+m%60+'m':''}` : null;
 
 export default function TaskDashboard() {
   const S = useStore(s => s.S);
+  const session = useStore(s => s.session);
+  const isManager = session?.role === 'admin' || session?.role === 'manager';
   const completeStatus = getCompleteStatus(S.task_statuses);
   const standUpStatus = getStandUpStatus(S.task_statuses);
+  const reviewStatus = getReviewStatus(S.task_statuses);
   const updateSettings = useStore(s => s.updateSettings);
   const uiViewState = useUIStore(s => s.viewStates.tkd || {});
   const setViewState = useUIStore(s => s.setViewState);
@@ -22,6 +25,7 @@ export default function TaskDashboard() {
   const [modal, setModal] = useState(null);
   const [stPop, setStPop] = useState(null);
   const [drawers, setDrawers] = useState(uiViewState.drawers || {});
+  const [reviewFilter, setReviewFilter] = useState(uiViewState.reviewFilter || false);
 
   // Mobile state
   const [mobileMemberIdx, setMobileMemberIdx] = useState(0);
@@ -29,8 +33,8 @@ export default function TaskDashboard() {
   const [expandedCards, setExpandedCards] = useState(uiViewState.expandedCards || {});
 
   useEffect(() => {
-    setViewState('tkd', { dashDate, drawers, expandedCards });
-  }, [dashDate, drawers, expandedCards, setViewState]);
+    setViewState('tkd', { dashDate, drawers, expandedCards, reviewFilter });
+  }, [dashDate, drawers, expandedCards, reviewFilter, setViewState]);
 
   const openTask = useCallback((t) => setModal(t), []);
   const openStatus = useCallback((s) => setStPop(s), []);
@@ -46,6 +50,7 @@ export default function TaskDashboard() {
   const total = allTasks.length;
   const done = allTasks.filter(t=>t.status===completeStatus).length;
   const dayPct = total ? Math.round(done/total*100) : 0;
+  const reviewCount = allTasks.filter(t=>t.status===reviewStatus).length;
   const spM = sel.gm(S, S.settings.spMember) || S.members[0];
 
   const mobileMember = S.members[mobileMemberIdx] || S.members[0];
@@ -78,6 +83,19 @@ export default function TaskDashboard() {
             </div>
           </div>
         </div>
+        {isManager && reviewCount > 0 && (
+          <button
+            onClick={() => setReviewFilter(v => !v)}
+            style={{
+              display:'flex',alignItems:'center',gap:4,padding:'4px 10px',borderRadius:6,border:'none',
+              background:reviewFilter?'var(--al)':'var(--warn)',
+              color:reviewFilter?'var(--accent)':'#fff',fontSize:11,fontWeight:700,cursor:'pointer',
+              fontFamily:'inherit',whiteSpace:'nowrap',flexShrink:0,
+            }}
+          >
+            {reviewFilter ? '✕ ' : ''}Needs Review ({reviewCount})
+          </button>
+        )}
         <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
           <span style={{fontSize:11,color:'var(--t3)'}}>Side panel:</span>
           <select style={{width:110,fontSize:12,padding:'4px 8px'}} value={S.settings.spMember||''}
@@ -94,6 +112,7 @@ export default function TaskDashboard() {
           <div className="tcols">
             {S.members.map(m => (
               <TeamCol key={m.id} member={m} date={dashDate} S={S}
+                reviewStatus={reviewStatus} reviewFilter={reviewFilter}
                 drawerOpen={!!drawers[m.id]} toggleDrawer={()=>setDrawers(d=>({...d,[m.id]:!d[m.id]}))}
                 onOpenTask={openTask} onStatus={openStatus} />
             ))}
@@ -226,11 +245,13 @@ export default function TaskDashboard() {
 }
 
 /* ── DESKTOP TEAM COL ── */
-const TeamCol = memo(function TeamCol({ member, date, S, drawerOpen, toggleDrawer, onOpenTask, onStatus }) {
+const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFilter, drawerOpen, toggleDrawer, onOpenTask, onStatus }) {
   const completeStatus = getCompleteStatus(S.task_statuses);
   const standUpStatus = getStandUpStatus(S.task_statuses);
   const allTasks = sel.tasksForMD(S, member.id, date);
-  const visible = allTasks.filter(t=>t.status!==completeStatus);
+  const memberReviewCount = allTasks.filter(t=>t.status===reviewStatus).length;
+  const baseVisible = allTasks.filter(t=>t.status!==completeStatus);
+  const visible = reviewFilter ? baseVisible.filter(t=>t.status===reviewStatus) : baseVisible;
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
   const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;
   const barColor = pct===100?'#2d6a4f':pct>60?'#52b788':'#2196c4';
@@ -249,7 +270,11 @@ const TeamCol = memo(function TeamCol({ member, date, S, drawerOpen, toggleDrawe
           <span style={{fontSize:10,color:'var(--t3)'}}>{totalDisp||''}</span>
         </div>
         <div style={{display:'flex',justifyContent:'space-between',fontSize:10,marginBottom:3}}>
-          <span style={{color:'var(--t3)'}}>{visible.length} active{doneCount?` · ${doneCount}✓`:''}</span>
+          <span style={{color:'var(--t3)'}}>
+            {visible.length} active{doneCount?` · ${doneCount}✓`:''}
+            {memberReviewCount > 0 && !reviewFilter ? <span style={{color:'var(--warn)',fontWeight:700,marginLeft:4}}>· {memberReviewCount} review{memberReviewCount>1?'s':''} pending</span> : ''}
+            {reviewFilter && memberReviewCount === 0 ? <span style={{color:'var(--t2)',marginLeft:4}}>— no reviews</span> : ''}
+          </span>
           <span style={{fontWeight:700,color:pct===100?'var(--accent)':'var(--t2)'}}>{pct}%</span>
         </div>
         <div style={{height:5,background:'var(--s3)',borderRadius:3,overflow:'hidden',marginBottom:4}}>

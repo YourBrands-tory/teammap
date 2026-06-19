@@ -1,7 +1,7 @@
 import { fmtD } from '../../lib/constants';
 
 type SortMode = 'mood' | 'team' | 'client';
-type Filters = { member: string; client: string; mood: string };
+type Filters = { member: string; client: string; mood: string; review: boolean };
 
 interface Member { id: string; name: string; }
 interface Client { id: string; name: string; }
@@ -16,14 +16,15 @@ interface Props {
   sortMode: SortMode;
   S: S;
   filters: Filters;
+  isManager: boolean;
   onShift: (dir: number, val?: string) => void;
   onGoToday: () => void;
   onSetSortMode: (m: SortMode) => void;
-  onSetFilter: (k: keyof Filters, v: string) => void;
+  onSetFilter: (k: keyof Filters, v: string | boolean) => void;
   onNewTask: () => void;
 }
 
-export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filters,
+export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filters, isManager,
   onShift, onGoToday, onSetSortMode, onSetFilter, onNewTask }: Props) {
   const totalStr = totalMins
     ? `${Math.floor(totalMins / 60)}h${totalMins % 60 ? ' ' + totalMins % 60 + 'm' : ''}`
@@ -81,6 +82,16 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
         <option value="">All moods</option>
         {S.moods.map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
       </select>
+
+      {isManager && (
+        <button
+          className={`btn btn-sm${filters.review ? ' btn-p' : ''}`}
+          onClick={() => onSetFilter('review', !filters.review)}
+          style={{ flexShrink: 0 }}
+        >
+          Review{filters.review ? ' ✕' : ''}
+        </button>
+      )}
 
       <button className="btn btn-sm btn-p" onClick={onNewTask}>+ New task</button>
     </div>

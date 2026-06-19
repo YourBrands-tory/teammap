@@ -1,4 +1,4 @@
-import { getCompleteStatus } from './statusUtils';
+import { getCompleteStatus, getReviewStatus } from './statusUtils';
 
 type CardSize = 'narrow' | 'mid' | 'big';
 
@@ -16,7 +16,7 @@ interface AppState {
 }
 
 type SortMode = 'mood' | 'team' | 'client';
-type Filters = { member: string; client: string; mood: string };
+type Filters = { member: string; client: string; mood: string; review: boolean };
 
 export const CARD_SIZES: Record<string, CardSize> = { top:'narrow', rapid:'narrow', share:'narrow', creative:'mid', hero:'big', imp:'big' };
 
@@ -32,6 +32,10 @@ export function getFilteredAndSortedTasks(S: AppState, date: string, filters: Fi
   if (filters.member) tasks = tasks.filter(t => t.assignedTo && t.assignedTo.includes(filters.member));
   if (filters.client) tasks = tasks.filter(t => t.clientId === filters.client);
   if (filters.mood) tasks = tasks.filter(t => t.mood === filters.mood);
+  if (filters.review) {
+    const reviewLabel = getReviewStatus(taskStatuses);
+    tasks = tasks.filter(t => t.status === reviewLabel);
+  }
 
   const order = S.lineUpOrder[date] || [];
   const ordered: Task[] = [];

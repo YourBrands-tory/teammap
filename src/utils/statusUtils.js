@@ -42,3 +42,17 @@ export function getStandUpStatus(taskStatuses) {
   );
   return found?.label || 'Stand Up';
 }
+
+export function getReviewStatus(taskStatuses) {
+  const found = (taskStatuses || []).find(
+    s => s.label.toLowerCase() === 'review' || s.label.toLowerCase().includes('review')
+  );
+  return found?.label || 'Review';
+}
+
+export function getStatusesForRole(taskStatuses, role) {
+  const { STATS } = getStatusMaps(taskStatuses);
+  if (role === 'admin' || role === 'manager') return STATS;
+  const completeStatus = getCompleteStatus(taskStatuses);
+  return STATS.filter(s => s !== completeStatus);
+}

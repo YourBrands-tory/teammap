@@ -4,6 +4,7 @@ import { useUIStore } from './useUIStore';
 import {
   DMOODS, DEFAULT_NAV_ORDER, DEFAULT_NAV_LABELS, DEFAULT_TASK_STATUSES, uid,
 } from '../lib/constants';
+import { getCompleteStatus, getReviewStatus } from '../utils/statusUtils';
 
 const taskFromRow = (r) => {
   const t = {
@@ -303,6 +304,9 @@ export const useStore = create((set, get) => ({
       ...(existing || {}), ...task };
     const isNew = !t.id;
     if (isNew) { t.id = uid(); t.createdAt = now; t.createdBy = session?.memberId || null; }
+    if (session?.role === 'member' && t.status === getCompleteStatus(get().S.task_statuses)) {
+      throw new Error('Members cannot set status to Complete');
+    }
     t.updatedBy = session?.memberId || null;
     t.updatedAt = now;
     get()._patchS((S) => {
@@ -317,7 +321,12 @@ export const useStore = create((set, get) => ({
     } else if (existing) {
       const f = (a, b) => JSON.stringify(a) !== JSON.stringify(b);
       if (f(existing.name, t.name)) activities.push({ action: 'updated', field: 'name', oldValue: existing.name, newValue: t.name });
-      if (f(existing.status, t.status)) activities.push({ action: 'status_changed', field: 'status', oldValue: existing.status, newValue: t.status });
+      if (f(existing.status, t.status)) {
+        activities.push({ action: 'status_changed', field: 'status', oldValue: existing.status, newValue: t.status });
+        if (t.status === getReviewStatus(get().S.task_statuses)) {
+          activities.push({ action: 'marked_for_review', field: 'status', oldValue: existing.status, newValue: t.status });
+        }
+      }
       if (f(existing.mood, t.mood)) activities.push({ action: 'mood_changed', field: 'mood', oldValue: existing.mood, newValue: t.mood });
       if (f(existing.date, t.date)) activities.push({ action: 'date_changed', field: 'date', oldValue: existing.date, newValue: t.date });
       if (f(existing.notes, t.notes)) activities.push({ action: 'notes_updated', field: 'notes', oldValue: existing.notes, newValue: t.notes });
@@ -354,14 +363,22 @@ export const useStore = create((set, get) => ({
     return t;
   },
   setTaskStatus: async (taskId, status) => {
+    const session = get().session;
+    if (session?.role === 'member' && status === getCompleteStatus(get().S.task_statuses)) {
+      throw new Error('Members cannot set status to Complete');
+    }
     let updated=null;
     get()._patchS((S) => {
       S.tasks = S.tasks.map(t => t.id===taskId ? (updated={...t,status,updatedAt:Date.now()}) : t);
     });
     if (updated) {
       await supabase.from('tasks')
-        .update({ status, updated_by: get().session?.memberId || null, updated_at: updated.updatedAt }).eq('id', taskId);
-      get()._addActivity(taskId, [{ action: 'status_changed', field: 'status', oldValue: updated.status, newValue: status }]);
+        .update({ status, updated_by: session?.memberId || null, updated_at: updated.updatedAt }).eq('id', taskId);
+      const activities = [{ action: 'status_changed', field: 'status', oldValue: updated.status, newValue: status }];
+      if (status === getReviewStatus(get().S.task_statuses)) {
+        activities.push({ action: 'marked_for_review', field: 'status', oldValue: updated.status, newValue: status });
+      }
+      get()._addActivity(taskId, activities);
     }
   },
   softDeleteTask: async (taskId) => {

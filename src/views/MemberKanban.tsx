@@ -1,5 +1,5 @@
 import { fmtD } from '../lib/constants';
-import { getStatusMaps } from '../utils/statusUtils';
+import { getStatusMaps, getStatusesForRole } from '../utils/statusUtils';
 import { useStore } from '../store/useStore';
 import useMemberKanban from '../hooks/useMemberKanban';
 import TaskModal from '../components/TaskModal';
@@ -105,7 +105,10 @@ function KanbanCard({ task, client, assignees, onOpen, onStatusChange }: {
   onStatusChange: (s: string) => void;
 }) {
   const S = useStore(s => s.S);
+  const session = useStore(s => s.session);
+  const role = session?.role || 'member';
   const { STATS, STC, STB } = getStatusMaps(S.task_statuses);
+  const roleStatuses = getStatusesForRole(S.task_statuses, role);
   const timeStr = ((task.estH || 0) + (task.estM || 0))
     ? `${task.estH || 0}h${task.estM ? ' ' + task.estM + 'm' : ''}`
     : '';
@@ -150,7 +153,7 @@ function KanbanCard({ task, client, assignees, onOpen, onStatusChange }: {
         onChange={e => { e.stopPropagation(); onStatusChange(e.target.value); }}
         value={task.status}
       >
-        {STATS.map((s: string) => <option key={s} value={s}>{s}</option>)}
+        {roleStatuses.map((s: string) => <option key={s} value={s}>{s}</option>)}
       </select>
     </div>
   );

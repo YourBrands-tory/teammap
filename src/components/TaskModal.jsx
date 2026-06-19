@@ -118,6 +118,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
       case 'created': return n + ' created this task';
       case 'updated': return n + ' changed title';
       case 'status_changed': return n + ' changed status' + (a.newValue ? ' to ' + a.newValue : '');
+      case 'marked_for_review': return n + ' marked this task for review';
       case 'mood_changed': return n + ' changed mood';
       case 'date_changed': return n + ' changed date' + (a.newValue ? ' to ' + a.newValue : '');
       case 'notes_updated': return n + ' updated notes';

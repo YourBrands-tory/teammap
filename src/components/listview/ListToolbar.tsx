@@ -1,5 +1,6 @@
-import { getStatusMaps } from '../../utils/statusUtils';
-import { sel } from '../../store/useStore';
+import { useState } from 'react';
+import { getStatusMaps, getReviewStatus } from '../../utils/statusUtils';
+import { useStore, sel } from '../../store/useStore';
 import type { LVFilters } from '../../utils/listViewHelpers';
 
 interface Props {
@@ -17,8 +18,11 @@ export default function ListToolbar({
   S, lvFilters, activeCount, totalCount,
   onSetFilter, onClearFilters, onToggleHideCompleted, onNewTask,
 }: Props) {
+  const session = useStore(s => s.session);
+  const isManager = session?.role === 'admin' || session?.role === 'manager';
   const sortedClients = sel.scl(S);
   const { STATS } = getStatusMaps(S.task_statuses);
+  const reviewLabel = getReviewStatus(S.task_statuses);
 
   return (
     <div className="lv-toolbar">
@@ -75,6 +79,16 @@ export default function ListToolbar({
           <option key={s} value={s}>{s}</option>
         ))}
       </FilterSelect>
+
+      {isManager && (
+        <button
+          className={`btn btn-xs${lvFilters.status === reviewLabel ? ' btn-p' : ''}`}
+          onClick={() => onSetFilter('status', lvFilters.status === reviewLabel ? '' : reviewLabel)}
+          style={{ flexShrink: 0 }}
+        >
+          Review
+        </button>
+      )}
 
       <FilterSelect label="Tag" value={lvFilters.tag} onChange={v => onSetFilter('tag', v)}>
         <option value="">All tags</option>

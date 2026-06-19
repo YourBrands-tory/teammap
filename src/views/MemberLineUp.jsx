@@ -26,10 +26,21 @@ export default function MemberLineUp() {
   }, [date]);
 
   // Assigned tasks on this date (for progress, includes Complete)
+  // Sorted using the same ordering as the Manager Line Up (lineUpOrder + mood sort)
   const myTasksOnDate = useMemo(() => {
     if (!memberId) return [];
-    return sel.tasksForMD(S, memberId, date);
-  }, [S, memberId, date]);
+    const myTasks = sel.tasksForMD(S, memberId, date);
+    const order = S.lineUpOrder[date] || [];
+    const ordered = [];
+    const remaining = [...myTasks];
+    order.forEach(id => {
+      const idx = remaining.findIndex(t => t.id === id);
+      if (idx !== -1) ordered.push(remaining.splice(idx, 1)[0]);
+    });
+    const mo = S.moods.map(m => m.id);
+    remaining.sort((a, b) => mo.indexOf(a.mood) - mo.indexOf(b.mood));
+    return [...ordered, ...remaining];
+  }, [S, memberId, date, S.lineUpOrder, S.moods]);
 
   // Active tasks (exclude Complete and hidden)
   const completeStatus = getCompleteStatus(S.task_statuses);
