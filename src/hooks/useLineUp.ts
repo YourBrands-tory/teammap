@@ -5,8 +5,8 @@ import { today } from '../lib/constants';
 import { getFilteredAndSortedTasks, dayProgress } from '../utils/lineUpHelpers';
 import type { DragEndEvent } from '@dnd-kit/core';
 
-type SortMode = 'mood' | 'team' | 'client';
-type Filters = { member: string; client: string; mood: string; review: boolean };
+type SortMode = 'mood' | 'team' | 'client' | null;
+type Filters = { member: string; client: string; mood: string; review: boolean; search: string };
 
 export default function useLineUp() {
   const S = useStore(s => s.S);
@@ -16,8 +16,8 @@ export default function useLineUp() {
   const setViewState = useUIStore(s => s.setViewState);
 
   const [date, setDate] = useState(uiViewState.date || today());
-  const [sortMode, setSortMode] = useState<SortMode>((uiViewState.sortMode as SortMode) || 'mood');
-  const [filters, setFilters] = useState<Filters>(uiViewState.filters || { member: '', client: '', mood: '', review: false });
+  const [sortMode, setSortMode] = useState<SortMode>((uiViewState.sortMode as SortMode) || null);
+  const [filters, setFilters] = useState<Filters>(uiViewState.filters || { member: '', client: '', mood: '', review: false, search: '' });
   const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 240);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<any>(null);
@@ -79,10 +79,14 @@ export default function useLineUp() {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
 
+  const handleSetSortMode = useCallback((m: SortMode) => {
+    setSortMode(prev => prev === m ? null : m);
+  }, []);
+
   return {
     S, date, sortMode, filters, tasks, allOnDate, prog, totalMins,
     panelWidth, activeId, taskModal,
-    setDate, shift, goToday, setSortMode, setFilter,
+    setDate, shift, goToday, setSortMode: handleSetSortMode, setFilter,
     setStatus, hideTask, restoreTask,
     handleDragEnd, setActiveId, setTaskModal, setPanelWidth,
   };

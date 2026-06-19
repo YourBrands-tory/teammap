@@ -3,7 +3,7 @@ import { getCompleteStatus, getReviewStatus } from './statusUtils';
 type CardSize = 'narrow' | 'mid' | 'big';
 
 interface Mood { id: string; cardSize?: CardSize; label?: string; }
-interface Task { id: string; date: string; deleted?: boolean; hidden?: boolean; status: string; assignedTo?: string[]; clientId?: string; mood: string; }
+interface Task { id: string; name: string; date: string; deleted?: boolean; hidden?: boolean; status: string; assignedTo?: string[]; clientId?: string; mood: string; }
 interface Member { id: string; name: string; color: string; }
 interface Client { id: string; name: string; color: string; order?: number; }
 
@@ -15,8 +15,8 @@ interface AppState {
   lineUpOrder: Record<string, string[]>;
 }
 
-type SortMode = 'mood' | 'team' | 'client';
-type Filters = { member: string; client: string; mood: string; review: boolean };
+type SortMode = 'mood' | 'team' | 'client' | null;
+type Filters = { member: string; client: string; mood: string; review: boolean; search: string };
 
 export const CARD_SIZES: Record<string, CardSize> = { top:'narrow', rapid:'narrow', share:'narrow', creative:'mid', hero:'big', imp:'big' };
 
@@ -36,7 +36,32 @@ export function getFilteredAndSortedTasks(S: AppState, date: string, filters: Fi
     const reviewLabel = getReviewStatus(taskStatuses);
     tasks = tasks.filter(t => t.status === reviewLabel);
   }
+  if (filters.search) {
+    const q = filters.search.toLowerCase();
+    tasks = tasks.filter(t => t.name.toLowerCase().includes(q));
+  }
 
+  // When a sort mode is active, sort ALL filtered tasks by that mode
+  if (sortMode === 'mood') {
+    const mo = S.moods.map(m => m.id);
+    return [...tasks].sort((a, b) => mo.indexOf(a.mood) - mo.indexOf(b.mood));
+  }
+  if (sortMode === 'team') {
+    return [...tasks].sort((a, b) => {
+      const ma = S.members.find(m => m.id === (a.assignedTo?.[0]));
+      const mb = S.members.find(m => m.id === (b.assignedTo?.[0]));
+      return (ma?.name || '').localeCompare(mb?.name || '');
+    });
+  }
+  if (sortMode === 'client') {
+    return [...tasks].sort((a, b) => {
+      const ca = S.clients.find(c => c.id === a.clientId);
+      const cb = S.clients.find(c => c.id === b.clientId);
+      return (ca?.name || '').localeCompare(cb?.name || '');
+    });
+  }
+
+  // No sort: use drag order
   const order = S.lineUpOrder[date] || [];
   const ordered: Task[] = [];
   const remaining = [...tasks];
@@ -44,24 +69,6 @@ export function getFilteredAndSortedTasks(S: AppState, date: string, filters: Fi
     const idx = remaining.findIndex(t => t.id === id);
     if (idx !== -1) ordered.push(remaining.splice(idx, 1)[0]);
   });
-
-  if (sortMode === 'mood') {
-    const mo = S.moods.map(m => m.id);
-    remaining.sort((a, b) => mo.indexOf(a.mood) - mo.indexOf(b.mood));
-  } else if (sortMode === 'team') {
-    remaining.sort((a, b) => {
-      const ma = S.members.find(m => m.id === (a.assignedTo?.[0]));
-      const mb = S.members.find(m => m.id === (b.assignedTo?.[0]));
-      return (ma?.name || '').localeCompare(mb?.name || '');
-    });
-  } else if (sortMode === 'client') {
-    remaining.sort((a, b) => {
-      const ca = S.clients.find(c => c.id === a.clientId);
-      const cb = S.clients.find(c => c.id === b.clientId);
-      return (ca?.name || '').localeCompare(cb?.name || '');
-    });
-  }
-
   return [...ordered, ...remaining];
 }
 

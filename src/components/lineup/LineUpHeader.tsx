@@ -1,7 +1,7 @@
 import { fmtD } from '../../lib/constants';
 
-type SortMode = 'mood' | 'team' | 'client';
-type Filters = { member: string; client: string; mood: string; review: boolean };
+type SortMode = 'mood' | 'team' | 'client' | null;
+type Filters = { member: string; client: string; mood: string; review: boolean; search: string };
 
 interface Member { id: string; name: string; }
 interface Client { id: string; name: string; }
@@ -29,6 +29,8 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
   const totalStr = totalMins
     ? `${Math.floor(totalMins / 60)}h${totalMins % 60 ? ' ' + totalMins % 60 + 'm' : ''}`
     : '0h';
+
+  const sortModes = (isManager ? ['mood', 'team', 'client'] : ['mood', 'client']) as Exclude<SortMode, null>[];
 
   return (
     <div className="lu-hdr">
@@ -63,17 +65,19 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
         <span style={{ fontSize: 11, color: 'var(--t3)' }}>Sort</span>
-        {(['mood', 'team', 'client'] as const).map(m => (
+        {sortModes.map(m => (
           <button key={m} className={`btn btn-xs${sortMode === m ? ' btn-p' : ''}`} onClick={() => onSetSortMode(m)}>
             {m.charAt(0).toUpperCase() + m.slice(1)}
           </button>
         ))}
       </div>
 
-      <select className="fsel" value={filters.member} onChange={e => onSetFilter('member', e.target.value)}>
-        <option value="">All members</option>
-        {S.members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-      </select>
+      {isManager && (
+        <select className="fsel" value={filters.member} onChange={e => onSetFilter('member', e.target.value)}>
+          <option value="">All members</option>
+          {S.members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+      )}
       <select className="fsel" value={filters.client} onChange={e => onSetFilter('client', e.target.value)}>
         <option value="">All clients</option>
         {S.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -83,17 +87,26 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
         {S.moods.map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
       </select>
 
-      {isManager && (
-        <button
-          className={`btn btn-sm${filters.review ? ' btn-p' : ''}`}
-          onClick={() => onSetFilter('review', !filters.review)}
-          style={{ flexShrink: 0 }}
-        >
-          Review{filters.review ? ' ✕' : ''}
-        </button>
-      )}
+      <button
+        className={`btn btn-sm${filters.review ? ' btn-p' : ''}`}
+        onClick={() => onSetFilter('review', !filters.review)}
+        style={{ flexShrink: 0 }}
+      >
+        Review{filters.review ? ' ✕' : ''}
+      </button>
 
-      <button className="btn btn-sm btn-p" onClick={onNewTask}>+ New task</button>
+      <input
+        className="fsel"
+        type="text"
+        placeholder="Search tasks..."
+        value={filters.search}
+        onChange={e => onSetFilter('search', e.target.value)}
+        style={{ minWidth: 140, flexShrink: 0 }}
+      />
+
+      {isManager && (
+        <button className="btn btn-sm btn-p" onClick={onNewTask}>+ New task</button>
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
-import { today, fmtD } from '../lib/constants';
+import { today } from '../lib/constants';
 import { dayProgress } from '../utils/lineUpHelpers';
-import { getCompleteStatus } from '../utils/statusUtils';
+import { getCompleteStatus, getReviewStatus } from '../utils/statusUtils';
+import LineUpHeader from '../components/lineup/LineUpHeader';
 import LineUpCard from '../components/lineup/LineUpCard';
 import HiddenTasksPanel from '../components/HiddenTasksPanel';
 import TaskModal from '../components/TaskModal';
@@ -13,20 +14,32 @@ export default function MemberLineUp() {
   const session = useStore(s => s.session);
   const memberId = session?.memberId;
   const softDeleteTask = useStore(s => s.softDeleteTask);
+  const uiViewState = useUIStore(s => s.viewStates.mlu || {});
+  const setViewState = useUIStore(s => s.setViewState);
 
-  const [date, setDate] = useState(today());
-  const [panelWidth, setPanelWidth] = useState(240);
+  const [date, setDate] = useState(uiViewState.date || today());
+  const [sortMode, setSortMode] = useState(uiViewState.sortMode || null);
+  const [filters, setFilters] = useState(uiViewState.filters || { client: '', mood: '', review: false, search: '' });
+  const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 240);
   const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);
   const [taskModal, setTaskModal] = useState(null);
 
-  const shift = useCallback((days) => {
+  // Persist UI state on change
+  useEffect(() => {
+    setViewState('mlu', { date, sortMode, filters, panelWidth });
+  }, [date, sortMode, filters, panelWidth, setViewState]);
+
+  const shift = useCallback((days, explicitDate) => {
+    if (explicitDate !== undefined) { setDate(explicitDate); return; }
     const d = new Date(date + 'T12:00:00');
     d.setDate(d.getDate() + days);
     setDate(d.toISOString().slice(0, 10));
   }, [date]);
 
+  const goToday = useCallback(() => setDate(today()), []);
+
   // Assigned tasks on this date (for progress, includes Complete)
-  // Sorted using the same ordering as the Manager Line Up (lineUpOrder + mood sort)
+  // Ordered using the same drag order as the Manager Line Up (lineUpOrder only)
   const myTasksOnDate = useMemo(() => {
     if (!memberId) return [];
     const myTasks = sel.tasksForMD(S, memberId, date);
@@ -37,18 +50,43 @@ export default function MemberLineUp() {
       const idx = remaining.findIndex(t => t.id === id);
       if (idx !== -1) ordered.push(remaining.splice(idx, 1)[0]);
     });
-    const mo = S.moods.map(m => m.id);
-    remaining.sort((a, b) => mo.indexOf(a.mood) - mo.indexOf(b.mood));
     return [...ordered, ...remaining];
-  }, [S, memberId, date, S.lineUpOrder, S.moods]);
+  }, [S, memberId, date, S.lineUpOrder]);
 
-  // Active tasks (exclude Complete and hidden)
+  // Active tasks (exclude Complete and hidden, then apply filters, then sort)
   const completeStatus = getCompleteStatus(S.task_statuses);
   const activeTasks = useMemo(() => {
-    return myTasksOnDate.filter(t => t.status !== completeStatus && !t.hidden);
-  }, [myTasksOnDate, completeStatus]);
+    let tasks = myTasksOnDate.filter(t => t.status !== completeStatus && !t.hidden);
+    if (filters.client) tasks = tasks.filter(t => t.clientId === filters.client);
+    if (filters.mood) tasks = tasks.filter(t => t.mood === filters.mood);
+    if (filters.review) {
+      const reviewLabel = getReviewStatus(S.task_statuses);
+      tasks = tasks.filter(t => t.status === reviewLabel);
+    }
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      tasks = tasks.filter(t => t.name.toLowerCase().includes(q));
+    }
+    // Apply sort after all filters
+    if (sortMode === 'client') {
+      return [...tasks].sort((a, b) => {
+        const ca = S.clients.find(c => c.id === a.clientId);
+        const cb = S.clients.find(c => c.id === b.clientId);
+        return (ca?.name || '').localeCompare(cb?.name || '');
+      });
+    }
+    if (sortMode === 'mood') {
+      const mo = S.moods.map(m => m.id);
+      return [...tasks].sort((a, b) => mo.indexOf(a.mood) - mo.indexOf(b.mood));
+    }
+    return tasks;
+  }, [myTasksOnDate, completeStatus, filters, S.task_statuses, sortMode, S.clients, S.moods]);
 
   const prog = useMemo(() => dayProgress(myTasksOnDate, S.task_statuses), [myTasksOnDate, S.task_statuses]);
+
+  const totalMins = useMemo(() => {
+    return myTasksOnDate.reduce((a, t) => a + ((t.estH || 0) * 60 + (t.estM || 0)), 0);
+  }, [myTasksOnDate]);
 
   // Only hidden tasks assigned to this member
   const myHiddenTasks = useMemo(() => {
@@ -91,37 +129,23 @@ export default function MemberLineUp() {
     await softDeleteTask(taskId);
   }, [softDeleteTask]);
 
+  const setFilter = useCallback((key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handleSetSortMode = useCallback((m) => {
+    setSortMode(prev => prev === m ? null : m);
+  }, []);
+
   return (
     <div className="lu-app">
-      {/* ── Header: date nav + progress ── */}
-      <div className="lu-hdr" style={{ flexWrap: 'wrap' }}>
-        <span className="stl">Line Up</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => shift(-1)}>←</button>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ width: 140, fontSize: 12 }} />
-          <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => shift(1)}>→</button>
-        </div>
-        <button className="btn btn-sm" onClick={() => setDate(today())} style={{ fontWeight: 700 }}>Today</button>
-        <span style={{ fontSize: 12, color: 'var(--t2)' }}>{fmtD(date)}</span>
+      <LineUpHeader
+        date={date} prog={prog} totalMins={totalMins} sortMode={sortMode}
+        S={S} filters={{ ...filters, member: '' }} isManager={false}
+        onShift={shift} onGoToday={goToday}
+        onSetSortMode={handleSetSortMode} onSetFilter={setFilter}
+        onNewTask={() => {}} />
 
-        <div style={{ flex: 1, minWidth: 80, maxWidth: 220 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--t3)', marginBottom: 2 }}>
-            <span>Day progress</span>
-            <span style={{ fontWeight: 700, color: prog.pct === 100 ? 'var(--accent)' : 'var(--t2)' }}>
-              {prog.done}/{prog.total} · {prog.pct}%
-            </span>
-          </div>
-          <div style={{ height: 6, background: 'var(--s3)', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', borderRadius: 3,
-              background: prog.pct === 100 ? 'var(--accent)' : prog.pct > 60 ? 'var(--a2)' : 'var(--info)',
-              width: `${prog.pct}%`, transition: '.4s'
-            }} />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Two-column layout: main cards + hidden panel ── */}
       <div className="lu-body">
         <div className="lu-main">
           {!activeTasks.length ? (
