@@ -2,6 +2,7 @@ import { MOOD_ORDER } from '../lib/constants';
 import { getStatusMaps } from './statusUtils';
 
 export interface LVFilters {
+  search: string;
   member: string;
   client: string;
   mood: string;
@@ -38,6 +39,7 @@ export function filterAndSortTasks(
   if (filters.mood) result = result.filter((t: any) => t.mood === filters.mood);
   if (filters.status) result = result.filter((t: any) => t.status === filters.status);
   if (filters.tag) result = result.filter((t: any) => t.tags && t.tags.includes(filters.tag));
+  if (filters.search) result = result.filter((t: any) => t.name?.toLowerCase().includes(filters.search.toLowerCase()));
 
   result.sort((a: any, b: any) => {
     let av: any, bv: any;
@@ -73,7 +75,7 @@ export function toggleSort(prev: LVSort, col: string): LVSort {
 }
 
 export const DEFAULT_FILTERS: LVFilters = {
-  member: '', client: '', mood: '', status: '', tag: '', hideCompleted: true,
+  search: '', member: '', client: '', mood: '', status: '', tag: '', hideCompleted: true,
 };
 
 export const DEFAULT_SORT: LVSort = { col: 'date', dir: 'desc' };

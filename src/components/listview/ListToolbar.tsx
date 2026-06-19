@@ -27,6 +27,27 @@ export default function ListToolbar({
         {activeCount}/{totalCount}
       </span>
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: 'var(--t3)' }}>Search</span>
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="Search tasks..."
+            value={lvFilters.search}
+            onChange={e => onSetFilter('search', e.target.value)}
+            style={{ width: 140, padding: '3px 20px 3px 6px', fontSize: 12, borderRadius: 4, border: '1px solid var(--border)', outline: 'none' }}
+          />
+          {lvFilters.search && (
+            <span
+              onClick={() => onSetFilter('search', '')}
+              style={{ position: 'absolute', right: 4, cursor: 'pointer', fontSize: 14, lineHeight: 1, color: 'var(--t3)', userSelect: 'none' }}
+            >
+              &times;
+            </span>
+          )}
+        </div>
+      </div>
+
       <FilterSelect label="Member" value={lvFilters.member} onChange={v => onSetFilter('member', v)}>
         <option value="">All members</option>
         {S.members.map((m: any) => (
