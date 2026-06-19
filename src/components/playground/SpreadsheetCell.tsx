@@ -12,21 +12,24 @@ interface Props {
   isActive: boolean;
   isEditing: boolean;
   editValue: string;
+  rangeEdge: string;
   onEditValueChange: (value: string) => void;
-  onSelect: (r: number, c: number, shiftKey?: boolean) => void;
+  onSelect: (r: number, c: number, shiftKey?: boolean, ctrlKey?: boolean) => void;
   onStartEdit: (r: number, c: number) => void;
   onSaveEdit: () => void;
   onCancelEdit: () => void;
   onConvertToTask: (r: number, c: number) => void;
   onOpenTask: (taskId: string) => void;
   onUnlink: (r: number, c: number, taskId?: string) => void;
+  onClearSelectedCells: () => void;
 }
 
 export default function SpreadsheetCell({
   row, col, cell, tasks, isSelected, isActive,
-  isEditing, editValue, onEditValueChange,
+  isEditing, editValue, rangeEdge,
+  onEditValueChange,
   onSelect, onStartEdit, onSaveEdit, onCancelEdit,
-  onConvertToTask, onOpenTask, onUnlink,
+  onConvertToTask, onOpenTask, onUnlink, onClearSelectedCells,
 }: Props) {
   const linked = hasLinkedTask(tasks, cell);
   const linkedTask = linked && cell?.taskId ? tasks.find(t => t.id === cell.taskId && !t.deleted) : null;
@@ -68,7 +71,7 @@ export default function SpreadsheetCell({
       longPressFired.current = false;
       return;
     }
-    onSelect(row, col, e.shiftKey);
+    onSelect(row, col, e.shiftKey, e.ctrlKey || e.metaKey);
     if (isTouchDevice) {
       onStartEdit(row, col);
     }
@@ -123,11 +126,9 @@ export default function SpreadsheetCell({
   }, []);
 
   const handleClearCell = useCallback(() => {
-    if (confirm('Clear this cell? This will remove all content and tasks from this cell.')) {
-      onUnlink(row, col);
-    }
+    onClearSelectedCells();
     setContextMenu(null);
-  }, [onUnlink, row, col]);
+  }, [onClearSelectedCells]);
 
   const handleRemoveTask = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -151,7 +152,7 @@ export default function SpreadsheetCell({
     <td
       data-row={row}
       data-col={col}
-      className={`pg-cell-td${isSelected ? ' range-selected' : ''}${isActive ? ' selected' : ''}${isEditing ? ' editing' : ''}`}
+      className={`pg-cell-td${isSelected ? ' range-selected' : ''}${isActive ? ' selected' : ''}${isEditing ? ' editing' : ''}${rangeEdge ? ' range-edge-' + rangeEdge : ''}`}
       onMouseEnter={(e) => {
         const a = e.currentTarget.querySelector('.pg-cell-actions') as HTMLElement;
         if (a) a.style.display = 'flex';
@@ -203,9 +204,9 @@ export default function SpreadsheetCell({
       )}
 
       {contextMenu && (
-        <div className="pg-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={e => e.stopPropagation()}>
+        <div className="pg-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
           <button className="pg-context-item pg-context-item-danger" onClick={handleClearCell}>
-            Clear cell
+            Clear selected cells
           </button>
         </div>
       )}

@@ -12,7 +12,7 @@ export default function Playground() {
     setActiveTab, setSidebarOpen, setTaskModal, setPendingCell, setFromCellText,
     addTab, deleteTab, renameTab, saveRename, clearTab,
     convertToTask, handleTaskSaved, openTask, unlinkCell, setRenameModal,
-    updateCellText,
+    updateCellText, bulkClearCells,
   } = usePlayground();
 
   const handleInsertClient = useCallback((clientId: string) => {
@@ -49,6 +49,7 @@ export default function Playground() {
               onOpenTask={openTask}
               onUnlink={unlinkCell}
               onUpdateCellText={updateCellText}
+              onBulkClearCells={bulkClearCells}
             />
           </div>
         </div>

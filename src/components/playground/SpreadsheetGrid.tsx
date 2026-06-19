@@ -1,10 +1,13 @@
-import { useCallback, useState, useRef, useEffect } from 'react';
+import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import SpreadsheetCell from './SpreadsheetCell';
 import { PG_COLS, getCellData } from '../../utils/playgroundHelpers';
 import type { TabData } from '../../utils/playgroundHelpers';
 
 interface Task { id: string; deleted?: boolean; name?: string; }
 interface Client { id: string; name: string; color: string; industry: string; order?: number; }
+
+interface CellPosition { row: number; col: number; }
+
 interface Props {
   tab: TabData;
   tasks: Task[];
@@ -13,11 +16,13 @@ interface Props {
   onOpenTask: (taskId: string) => void;
   onUnlink: (r: number, c: number, taskId?: string) => void;
   onUpdateCellText: (r: number, c: number, text: string) => void;
+  onBulkClearCells: (cells: CellPosition[]) => void;
 }
 
 export default function SpreadsheetGrid({
   tab, tasks, clients,
   onConvertToTask, onOpenTask, onUnlink, onUpdateCellText,
+  onBulkClearCells,
 }: Props) {
   const [selectedRow, setSelectedRow] = useState(0);
   const [selectedCol, setSelectedCol] = useState(0);
@@ -25,6 +30,7 @@ export default function SpreadsheetGrid({
   const [anchorCol, setAnchorCol] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [toggledCells, setToggledCells] = useState<Set<string>>(new Set());
 
   const gridRef = useRef<HTMLDivElement>(null);
   const wasEditing = useRef(false);
@@ -37,12 +43,35 @@ export default function SpreadsheetGrid({
   const totalRows = rowIndices.length;
 
   const isInSelection = useCallback((r: number, c: number): boolean => {
+    if (toggledCells.has(`${r},${c}`)) return true;
     const minRow = Math.min(anchorRow, selectedRow);
     const maxRow = Math.max(anchorRow, selectedRow);
     const minCol = Math.min(anchorCol, selectedCol);
     const maxCol = Math.max(anchorCol, selectedCol);
     return r >= minRow && r <= maxRow && c >= minCol && c <= maxCol;
-  }, [anchorRow, anchorCol, selectedRow, selectedCol]);
+  }, [anchorRow, anchorCol, selectedRow, selectedCol, toggledCells]);
+
+  const selectedCells = useMemo((): CellPosition[] => {
+    const cells: CellPosition[] = [];
+    const minRow = Math.min(anchorRow, selectedRow);
+    const maxRow = Math.max(anchorRow, selectedRow);
+    const minCol = Math.min(anchorCol, selectedCol);
+    const maxCol = Math.max(anchorCol, selectedCol);
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        cells.push({ row: r, col: c });
+      }
+    }
+    const set = new Set(cells.map(c => `${c.row},${c.col}`));
+    toggledCells.forEach(key => {
+      if (!set.has(key)) {
+        const [r, c] = key.split(',').map(Number);
+        cells.push({ row: r, col: c });
+        set.add(key);
+      }
+    });
+    return cells;
+  }, [anchorRow, anchorCol, selectedRow, selectedCol, toggledCells]);
 
   const saveEdit = useCallback(() => {
     if (!isEditing) return;
@@ -74,26 +103,29 @@ export default function SpreadsheetGrid({
   }, [tab]);
 
   const clearSelectedCells = useCallback(() => {
-    const minRow = Math.min(anchorRow, selectedRow);
-    const maxRow = Math.max(anchorRow, selectedRow);
-    const minCol = Math.min(anchorCol, selectedCol);
-    const maxCol = Math.max(anchorCol, selectedCol);
-    for (let r = minRow; r <= maxRow; r++) {
-      for (let c = minCol; c <= maxCol; c++) {
-        onUpdateCellText(r, c, '');
-        onUnlink(r, c);
-      }
-    }
+    if (selectedCells.length === 0) return;
+    onBulkClearCells(selectedCells);
+    setToggledCells(new Set());
     gridRef.current?.focus();
-  }, [anchorRow, anchorCol, selectedRow, selectedCol, onUpdateCellText, onUnlink]);
+  }, [selectedCells, onBulkClearCells]);
 
-  const handleCellSelect = useCallback((row: number, col: number, shiftKey?: boolean) => {
+  const handleCellSelect = useCallback((row: number, col: number, shiftKey?: boolean, ctrlKey?: boolean) => {
     if (isEditing && row === selectedRow && col === selectedCol) return;
     commitEdit();
+    if (ctrlKey) {
+      setToggledCells(prev => {
+        const next = new Set(prev);
+        const key = `${row},${col}`;
+        if (next.has(key)) next.delete(key); else next.add(key);
+        return next;
+      });
+      return;
+    }
     if (shiftKey) {
       setSelectedRow(row);
       setSelectedCol(col);
     } else {
+      setToggledCells(new Set());
       setAnchorRow(row);
       setAnchorCol(col);
       setSelectedRow(row);
@@ -121,6 +153,16 @@ export default function SpreadsheetGrid({
     if (isNaN(row) || isNaN(col)) return;
     if (isEditing && row === selectedRow && col === selectedCol) return;
     commitEdit();
+    if (e.ctrlKey || e.metaKey) {
+      setToggledCells(prev => {
+        const next = new Set(prev);
+        const key = `${row},${col}`;
+        if (next.has(key)) next.delete(key); else next.add(key);
+        return next;
+      });
+      return;
+    }
+    setToggledCells(new Set());
     setAnchorRow(row);
     setAnchorCol(col);
     setSelectedRow(row);
@@ -260,11 +302,6 @@ export default function SpreadsheetGrid({
         e.preventDefault();
         startEdit(selectedRow, selectedCol);
         break;
-      case 'Delete':
-      case 'Backspace':
-        e.preventDefault();
-        clearSelectedCells();
-        break;
       case 'Escape':
         e.preventDefault();
         setAnchorRow(0);
@@ -287,17 +324,41 @@ export default function SpreadsheetGrid({
   }, []);
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditing) return;
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedCells.length > 0) {
+          e.preventDefault();
+          clearSelectedCells();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isEditing, selectedCells, clearSelectedCells]);
+
+  useEffect(() => {
     if (wasEditing.current && !isEditing) {
       gridRef.current?.focus();
     }
     wasEditing.current = isEditing;
   }, [isEditing]);
 
+  const rangeMinRow = Math.min(anchorRow, selectedRow);
+  const rangeMaxRow = Math.max(anchorRow, selectedRow);
+  const rangeMinCol = Math.min(anchorCol, selectedCol);
+  const rangeMaxCol = Math.max(anchorCol, selectedCol);
+  const multiSelected = rangeMinRow !== rangeMaxRow || rangeMinCol !== rangeMaxCol || toggledCells.size > 0;
+
   const rows: JSX.Element[] = [];
   for (const r of rowIndices) {
     const cells: JSX.Element[] = [];
     for (let c = 0; c < PG_COLS; c++) {
       const cell = getCellData(tab, r, c);
+      const inRange = r >= rangeMinRow && r <= rangeMaxRow && c >= rangeMinCol && c <= rangeMaxCol;
+      const rangeEdge = multiSelected && inRange
+        ? ((r === rangeMinRow ? 't' : '') + (r === rangeMaxRow ? 'b' : '') + (c === rangeMinCol ? 'l' : '') + (c === rangeMaxCol ? 'r' : ''))
+        : '';
       cells.push(
         <SpreadsheetCell
           key={`${r},${c}`}
@@ -306,6 +367,7 @@ export default function SpreadsheetGrid({
           isActive={selectedRow === r && selectedCol === c}
           isEditing={isEditing && selectedRow === r && selectedCol === c}
           editValue={editValue}
+          rangeEdge={rangeEdge}
           onEditValueChange={setEditValue}
           onSelect={handleCellSelect}
           onStartEdit={startEdit}
@@ -314,6 +376,7 @@ export default function SpreadsheetGrid({
           onConvertToTask={onConvertToTask}
           onOpenTask={onOpenTask}
           onUnlink={onUnlink}
+          onClearSelectedCells={clearSelectedCells}
         />,
       );
     }

@@ -85,6 +85,25 @@ export default function useSpreadsheet({
     persist(updated);
   }, [tabs, activeTab, persist]);
 
+  const bulkClearCells = useCallback((cells: { row: number; col: number }[]) => {
+    const updated = tabs.map((t, i) => {
+      if (i !== activeTab) return t;
+      const newData = { ...t.data };
+      cells.forEach(({ row, col }) => {
+        const key = `${row},${col}`;
+        const existing = newData[key];
+        if (existing) {
+          newData[key] = { ...existing, text: '', taskId: undefined };
+        } else {
+          newData[key] = { text: '', taskId: undefined };
+        }
+      });
+      return { ...t, data: newData };
+    });
+    setTabs(updated);
+    persist(updated);
+  }, [tabs, activeTab, persist]);
+
   const convertToTask = useCallback((row: number, col: number) => {
     const cell = getCellData(tab, row, col);
     setPendingCell({ row, col });
@@ -163,6 +182,6 @@ export default function useSpreadsheet({
     setActiveTab, setSidebarOpen, setTaskModal, setPendingCell, setFromCellText,
     addTab, deleteTab, renameTab, saveRename, clearTab,
     convertToTask, handleTaskSaved, openTask, unlinkCell, setRenameModal,
-    upsertTask, updateCellText, quickCreateTask, updateCellTaskName,
+    upsertTask, updateCellText, bulkClearCells, quickCreateTask, updateCellTaskName,
   };
 }

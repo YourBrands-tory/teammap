@@ -427,7 +427,7 @@ select.fsel{padding:4px 8px;border-radius:var(--r);font-size:12px;border:1px sol
 .pg-table{border-collapse:collapse;min-width:100%;table-layout:fixed}
 .pg-table tr{height:56px}
 .pg-table td{border:1px solid var(--border);padding:0;min-width:120px;width:160px;height:56px;position:relative;vertical-align:middle}
-.pg-cell{width:100%;height:56px;padding:5px 8px;font-size:13px;font-family:inherit;color:var(--text);background:transparent;border:none;outline:none;resize:none;line-height:1.4;overflow:hidden;cursor:text}
+.pg-cell{width:100%;height:56px;padding:5px 8px;font-size:13px;font-family:inherit;color:var(--text);background:transparent;border:none;outline:none;resize:none;line-height:1.4;overflow:hidden;cursor:text;user-select:none;-webkit-user-select:none}
 .pg-cell:focus{background:var(--al);z-index:2}
 .pg-cell.selected{background:var(--al);box-shadow:inset 0 0 0 2px var(--accent);z-index:2}
 .pg-cell.has-task{background:var(--al);color:var(--accent);font-weight:600}
@@ -446,6 +446,10 @@ td:hover .pg-cell-actions{display:flex}
 /* ── PLAYGROUND CELL EDITOR ────────────────────────────────── */
 .pg-cell-td.range-selected{background:var(--al)}
 .pg-cell-td.selected{background:var(--al);box-shadow:inset 0 0 0 2px var(--accent);z-index:2}
+.pg-cell-td.range-edge-t{border-top:2px solid var(--accent)!important}
+.pg-cell-td.range-edge-b{border-bottom:2px solid var(--accent)!important}
+.pg-cell-td.range-edge-l{border-left:2px solid var(--accent)!important}
+.pg-cell-td.range-edge-r{border-right:2px solid var(--accent)!important}
 .pg-cell-td.editing{background:#dff3e2;border:2px solid #2f7a4f;border-radius:4px;box-shadow:none}
 .pg-cell-td.editing .cell-editor{width:100%;height:100%;margin:0;padding:8px;border:none;outline:none;box-shadow:none;background:transparent;border-radius:0;resize:none;overflow:hidden}
 .cell-editor{width:100%;height:100%;padding:8px;border:none;outline:none;background:transparent;resize:none;font-size:13px;font-family:inherit;color:var(--text);line-height:1.4;display:block;box-sizing:border-box}
