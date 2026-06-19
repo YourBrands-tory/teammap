@@ -5,7 +5,7 @@ type Filters = { member: string; client: string; mood: string; review: boolean; 
 
 interface Member { id: string; name: string; }
 interface Client { id: string; name: string; }
-interface Mood { id: string; icon: string; label: string; }
+interface Mood { id: string; icon: string; label: string; hidden?: boolean; }
 interface S { members: Member[]; clients: Client[]; moods: Mood[]; }
 interface Prog { done: number; total: number; pct: number; }
 
@@ -84,7 +84,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
       </select>
       <select className="fsel" value={filters.mood} onChange={e => onSetFilter('mood', e.target.value)}>
         <option value="">All moods</option>
-        {S.moods.map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
+        {S.moods.filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
       </select>
 
       <button

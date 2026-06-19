@@ -68,7 +68,7 @@ export default function ListToolbar({
 
       <FilterSelect label="Mood" value={lvFilters.mood} onChange={v => onSetFilter('mood', v)}>
         <option value="">All moods</option>
-        {S.moods.map((m: any) => (
+        {S.moods.filter((m: any) => !m.hidden).map((m: any) => (
           <option key={m.id} value={m.id}>{m.icon} {m.label}</option>
         ))}
       </FilterSelect>

@@ -7,7 +7,6 @@ import Avatar from '../components/Avatar';
 import TaskModal from '../components/TaskModal';
 import StatusPopup from '../components/StatusPopup';
 
-const PRIMARY = ['top','hero','imp','creative'];
 const minsOf = (t) => (t.estH||0)*60 + (t.estM||0);
 const hm = (m) => m ? `${Math.floor(m/60)}h${m%60?' '+m%60+'m':''}` : null;
 
@@ -257,8 +256,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   const barColor = pct===100?'#2d6a4f':pct>60?'#52b788':'#2196c4';
   const totalDisp = hm(allTasks.reduce((a,t)=>a+minsOf(t),0));
 
-  const SECONDARY = S.moods.filter(m=>!PRIMARY.includes(m.id)).map(m=>m.id);
-  const secTasks = visible.filter(t=>SECONDARY.includes(t.mood) && t.status!==standUpStatus);
+  const visibleMoods = S.moods.filter(m => !m.hidden);
   const suTasks = visible.filter(t=>t.status===standUpStatus);
 
   return (
@@ -280,12 +278,6 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
         <div style={{height:5,background:'var(--s3)',borderRadius:3,overflow:'hidden',marginBottom:4}}>
           <div style={{height:'100%',borderRadius:3,background:barColor,width:`${pct}%`,transition:'.5s'}} />
         </div>
-        {secTasks.length>0 && (
-          <button onClick={toggleDrawer} style={{width:'100%',padding:'2px 0',background:'var(--s3)',border:'none',
-            borderRadius:4,fontSize:10,fontWeight:700,color:'var(--t2)',cursor:'pointer',fontFamily:'inherit'}}>
-            {drawerOpen ? '▲ Hide rapids & others' : `+ ${secTasks.length} more (Rapids & others)`}
-          </button>
-        )}
       </div>
 
       <div className="tcolb">
@@ -296,8 +288,8 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
           </div>
         )}
 
-        {PRIMARY.map(mid => {
-          const mood = sel.gmood(S, mid); if (!mood) return null;
+        {visibleMoods.map(mood => {
+          const mid = mood.id;
           const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
           if ((mid==='top'||mid==='creative') && !mt.length) return null;
           const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
@@ -329,29 +321,6 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
             </div>
           );
         })}
-
-        {drawerOpen && secTasks.length>0 && (
-          <div style={{display:'flex',flexDirection:'column',gap:3}}>
-            {SECONDARY.filter(mid=>visible.some(t=>t.mood===mid && t.status!==standUpStatus)).map(mid => {
-              const mood = sel.gmood(S, mid); if (!mood) return null;
-              const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
-              return (
-                <div key={mid} className="msec other-sec">
-                  <div className="msec-head">
-                    <span style={{fontSize:11}}>{mood.icon}</span>
-                    <span className="msec-label" style={{color:mood.color,fontSize:10}}>{mood.label}</span>
-                    <span className="msec-cnt" style={{background:mood.color+'22',color:mood.color}}>{mt.length}</span>
-                    <button onClick={(e)=>{e.stopPropagation();onOpenTask({ date, mood:mid, assignedTo:[member.id] });}}
-                      style={{width:16,height:16,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
-                        color:mood.color,fontSize:11,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',
-                        flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:'auto'}}>+</button>
-                  </div>
-                  <div className="msec-tasks">{mt.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)}</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         <button className="addbtn" style={{fontSize:11,flexShrink:0}}
           onClick={()=>onOpenTask({ date, assignedTo:[member.id] })}>+ Task</button>
@@ -454,14 +423,16 @@ const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
 const SidePanel = memo(function SidePanel({ member, date, S, onOpenTask }) {
   if (!member) return <div style={{fontSize:12,color:'var(--t3)'}}>No member selected</div>;
   const tasks = sel.tasksForMD(S, member.id, date);
-  const groups = [
-    { ids:tasks.filter(t=>t.mood==='top'),   label:'🔴 Top — Urgent',         color:'#dc2626', style:{borderLeft:'3px solid #dc2626',background:'#fff8f7'}, showClientStrong:true },
-    { ids:tasks.filter(t=>t.mood==='hero'),  label:'⚡ Hero',                  color:'#d97706', style:{borderLeft:'3px solid #d97706',background:'#fffbf0'} },
-    { ids:tasks.filter(t=>t.mood==='rapid'), label:'💨 Rapids',               color:'#0f7c6c', style:{} },
-    { ids:tasks.filter(t=>t.mood==='share'), label:'🔗 Follow-ups / Share',   color:'#2196c4', style:{borderLeft:'3px solid #2196c4'} },
-  ];
+  const visibleMoods = S.moods.filter(m => !m.hidden);
+  const groups = visibleMoods.map(mood => ({
+    ids: tasks.filter(t => t.mood === mood.id),
+    label: mood.icon + ' ' + mood.label,
+    color: mood.color,
+    style: mood.id === 'top' ? {borderLeft:'3px solid #dc2626',background:'#fff8f7'} : mood.id === 'hero' ? {borderLeft:'3px solid #d97706',background:'#fffbf0'} : mood.id === 'share' ? {borderLeft:'3px solid #2196c4'} : {},
+    showClientStrong: mood.id === 'top',
+  }));
   if (groups.every(g=>!g.ids.length)) {
-    return <div style={{fontSize:12,color:'var(--t3)',padding:'8px 0'}}>No Top, Hero, Rapid or Follow-up tasks for this date.</div>;
+    return <div style={{fontSize:12,color:'var(--t3)',padding:'8px 0'}}>No tasks for this date.</div>;
   }
   return groups.filter(g=>g.ids.length).map(g => (
     <div key={g.label} className="spsec">
@@ -489,8 +460,7 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
   const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;
   const totalDisp = hm(allTasks.reduce((a,t)=>a+minsOf(t),0));
 
-  const SECONDARY = S.moods.filter(m=>!PRIMARY.includes(m.id)).map(m=>m.id);
-  const secTasks = visible.filter(t=>SECONDARY.includes(t.mood) && t.status!==standUpStatus);
+  const visibleMoods = S.moods.filter(m => !m.hidden);
   const suTasks = visible.filter(t=>t.status===standUpStatus);
 
   return (
@@ -503,9 +473,8 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
         </div>
       )}
 
-      {/* Primary moods */}
-      {PRIMARY.map(mid => {
-        const mood = sel.gmood(S, mid); if (!mood) return null;
+      {visibleMoods.map(mood => {
+        const mid = mood.id;
         const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
         if ((mid==='top'||mid==='creative') && !mt.length) return null;
         const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
@@ -533,28 +502,6 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
             <div className="msec-tasks" style={{maxHeight:isHero?160:isImp?120:80,overflowY:'auto'}}>
               {mt.length ? mt.map(t => <MobileTaskCard key={t.id} task={t} member={member} S={S} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)
                 : <div style={{fontSize:10,color:'var(--t3)',padding:'4px 4px',fontStyle:'italic'}}>No active {mood.label}</div>}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Secondary drawer (always expanded on mobile) */}
-      {secTasks.length>0 && SECONDARY.filter(mid=>visible.some(t=>t.mood===mid && t.status!==standUpStatus)).map(mid => {
-        const mood = sel.gmood(S, mid); if (!mood) return null;
-        const mt = visible.filter(t=>t.mood===mid && t.status!==standUpStatus);
-        return (
-          <div key={mid} className="msec other-sec" style={{marginBottom:2}}>
-            <div className="msec-head" style={{padding:'2px 4px'}}>
-              <span style={{fontSize:10}}>{mood.icon}</span>
-              <span className="msec-label" style={{color:mood.color,fontSize:9}}>{mood.label}</span>
-              <span className="msec-cnt" style={{background:mood.color+'22',color:mood.color,fontSize:9}}>{mt.length}</span>
-              <button onClick={(e)=>{e.stopPropagation();onOpenTask({ date, mood:mid, assignedTo:[member.id] });}}
-                style={{width:22,height:22,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
-                  color:mood.color,fontSize:14,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',
-                  flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:'auto'}}>+</button>
-            </div>
-            <div className="msec-tasks" style={{maxHeight:70,overflowY:'auto'}}>
-              {mt.map(t => <MobileTaskCard key={t.id} task={t} member={member} S={S} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)}
             </div>
           </div>
         );

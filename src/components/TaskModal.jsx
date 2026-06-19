@@ -294,7 +294,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
 
         <label className="fl">Mood *</label>
         <div className="mood-pick-row" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
-          {S.moods.map(m => {
+          {S.moods.filter(m => !m.hidden || m.id === mood).map(m => {
             const on = mood === m.id;
             return (
               <div key={m.id} className={`mood-opt-btn${on?' on':''}`}
