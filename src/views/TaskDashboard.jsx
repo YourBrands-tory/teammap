@@ -261,7 +261,16 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   const reviewVisible = reviewFilter ? baseVisible.filter(t=>t.status===reviewStatus) : baseVisible;
   const dailyActive = S.tasks.filter(t => t.assignedTo?.includes(member.id) && t.date === date && !t.deleted && t.status !== completeStatus && t.status !== passStatus).length;
   const dailyCap = member.capacity ?? 6;
+  const limitReached = dailyActive >= dailyCap;
   const capColor = dailyActive > dailyCap ? '#e76f51' : dailyActive === dailyCap ? '#d97706' : 'var(--t3)';
+  const setToast = useUIStore(s => s.setToast);
+  const handleAddTask = useCallback((moodId) => {
+    if (limitReached) {
+      setToast(`Task limit reached.\n\n${member.name} already has ${dailyActive}/${dailyCap} active tasks for today.\n\nComplete, pass, move, or reassign an existing task before creating another.`);
+      return;
+    }
+    onOpenTask({ date, mood: moodId, assignedTo: [member.id] });
+  }, [limitReached, dailyActive, dailyCap, member.name, date, onOpenTask, setToast]);
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
   const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;
   const barColor = pct===100?'#2d6a4f':pct>60?'#52b788':'#2196c4';
@@ -328,47 +337,6 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
       </div>
 
       <div className="tcolb">
-        {suTasks.length>0 && (
-          <div className="msec su-sec">
-            <div className="su-head">🗣 Stand Up <span style={{fontSize:9,background:'var(--warn)',color:'#fff',padding:'1px 5px',borderRadius:8,marginLeft:2}}>{suTasks.length}</span></div>
-            <div className="msec-tasks">{suTasks.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)}</div>
-          </div>
-        )}
-
-        {visibleMoods.filter(m => primaryMoodIds.includes(m.id)).map(mood => {
-          const mid = mood.id;
-          const mt = visibleTasks.filter(t=>t.mood===mid && t.status!==standUpStatus);
-          if ((mid==='top'||mid==='creative') && !mt.length) return null;
-          const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
-          const secClass = isHero?'hero-sec':isImp?'imp-sec':isTop?'top-sec':'other-sec';
-          const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
-          const totalMoodCount = allTasks.filter(t=>t.mood===mid).length;
-          const doneInMood = totalMoodCount - allTasks.filter(t=>t.mood===mid && t.status!==completeStatus).length;
-          const secStyle = isHero?{background:mood.bg,border:`2px solid ${mood.color}55`}
-            : isImp?{background:mood.bg+'88',border:`1.5px solid ${mood.color}44`} : {};
-          const headBg = isHero?mood.color+'15':isImp?mood.color+'10':'transparent';
-          return (
-            <div key={mid} className={`msec ${secClass}`} style={secStyle}>
-              <div className="msec-head" style={{background:headBg}}>
-                <span style={{fontSize:isHero?13:isImp?12:11}}>{mood.icon}</span>
-                <span className="msec-label" style={{color:mood.color,fontSize:isHero?11:isImp?10.5:10}}>{mood.label}</span>
-                <span className="msec-cnt" style={{background:mood.color+'22',color:mood.color}}>
-                  {mt.length}{mood.max?`/${mood.max}`:''}{doneInMood?<span style={{opacity:.55,fontSize:8}}> {doneInMood}✓</span>:null}
-                </span>
-                {hm(moodMins) && <span style={{fontSize:9,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
-                <button onClick={(e)=>{e.stopPropagation();onOpenTask({ date, mood:mid, assignedTo:[member.id] });}}
-                  style={{width:16,height:16,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
-                    color:mood.color,fontSize:11,lineHeight:1,cursor:'pointer',display:'flex',alignItems:'center',
-                    justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto'}}>+</button>
-              </div>
-              <div className="msec-tasks">
-                {mt.length ? mt.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)
-                  : <div style={{fontSize:10,color:'var(--t3)',padding:'5px 4px',fontStyle:'italic'}}>No active {mood.label}</div>}
-              </div>
-            </div>
-          );
-        })}
-
         {overflowTasks.length > 0 && (
           <div>
             <button
@@ -398,10 +366,12 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
                       {moodTasks.length}{doneInMood?<span style={{opacity:.55,fontSize:8}}> {doneInMood}✓</span>:null}
                     </span>
                     {hm(moodMins) && <span style={{fontSize:9,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
-                    <button onClick={(e)=>{e.stopPropagation();onOpenTask({ date, mood:mid, assignedTo:[member.id] });}}
+                    <button disabled={limitReached}
+                      onClick={(e)=>{e.stopPropagation();handleAddTask(mid);}}
+                      title={limitReached?`Daily task limit reached (${dailyActive}/${dailyCap})`:''}
                       style={{width:16,height:16,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
-                        color:mood.color,fontSize:11,lineHeight:1,cursor:'pointer',display:'flex',alignItems:'center',
-                        justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto'}}>+</button>
+                        color:mood.color,fontSize:11,lineHeight:1,cursor:limitReached?'not-allowed':'pointer',display:'flex',alignItems:'center',
+                        justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
                   </div>
                   <div className="msec-tasks">
                     {moodTasks.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)}
@@ -412,8 +382,53 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
           </div>
         )}
 
-        <button className="addbtn" style={{fontSize:11,flexShrink:0}}
-          onClick={()=>onOpenTask({ date, assignedTo:[member.id] })}>+ Task</button>
+        {suTasks.length>0 && (
+          <div className="msec su-sec">
+            <div className="su-head">🗣 Stand Up <span style={{fontSize:9,background:'var(--warn)',color:'#fff',padding:'1px 5px',borderRadius:8,marginLeft:2}}>{suTasks.length}</span></div>
+            <div className="msec-tasks">{suTasks.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)}</div>
+          </div>
+        )}
+
+        {visibleMoods.filter(m => primaryMoodIds.includes(m.id)).map(mood => {
+          const mid = mood.id;
+          const mt = visibleTasks.filter(t=>t.mood===mid && t.status!==standUpStatus);
+          if ((mid==='top'||mid==='creative') && !mt.length) return null;
+          const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
+          const secClass = isHero?'hero-sec':isImp?'imp-sec':isTop?'top-sec':'other-sec';
+          const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
+          const totalMoodCount = allTasks.filter(t=>t.mood===mid).length;
+          const doneInMood = totalMoodCount - allTasks.filter(t=>t.mood===mid && t.status!==completeStatus).length;
+          const secStyle = isHero?{background:mood.bg,border:`2px solid ${mood.color}55`}
+            : isImp?{background:mood.bg+'88',border:`1.5px solid ${mood.color}44`} : {};
+          const headBg = isHero?mood.color+'15':isImp?mood.color+'10':'transparent';
+          return (
+            <div key={mid} className={`msec ${secClass}`} style={secStyle}>
+              <div className="msec-head" style={{background:headBg}}>
+                <span style={{fontSize:isHero?13:isImp?12:11}}>{mood.icon}</span>
+                <span className="msec-label" style={{color:mood.color,fontSize:isHero?11:isImp?10.5:10}}>{mood.label}</span>
+                <span className="msec-cnt" style={{background:mood.color+'22',color:mood.color}}>
+                  {mt.length}{mood.max?`/${mood.max}`:''}{doneInMood?<span style={{opacity:.55,fontSize:8}}> {doneInMood}✓</span>:null}
+                </span>
+                {hm(moodMins) && <span style={{fontSize:9,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
+                <button disabled={limitReached}
+                  onClick={(e)=>{e.stopPropagation();handleAddTask(mid);}}
+                  title={limitReached?`Daily task limit reached (${dailyActive}/${dailyCap})`:''}
+                  style={{width:16,height:16,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
+                    color:mood.color,fontSize:11,lineHeight:1,cursor:limitReached?'not-allowed':'pointer',display:'flex',alignItems:'center',
+                    justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
+              </div>
+              <div className="msec-tasks">
+                {mt.length ? mt.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)
+                  : <div style={{fontSize:10,color:'var(--t3)',padding:'5px 4px',fontStyle:'italic'}}>No active {mood.label}</div>}
+              </div>
+            </div>
+          );
+        })}
+
+        <button className="addbtn" disabled={limitReached}
+          title={limitReached?`Daily task limit reached (${dailyActive}/${dailyCap})`:''}
+          style={{fontSize:11,flexShrink:0,opacity:limitReached?0.5:1,cursor:limitReached?'not-allowed':'pointer'}}
+          onClick={()=>handleAddTask()}>+ Task</button>
       </div>
     </div>
   );
@@ -550,6 +565,18 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
   const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;
   const totalDisp = hm(allTasks.reduce((a,t)=>a+minsOf(t),0));
   const [overflowOpen, setOverflowOpen] = useState(false);
+  const passStatus = getPassStatus(S.task_statuses);
+  const dailyActive = S.tasks.filter(t => t.assignedTo?.includes(member.id) && t.date === date && !t.deleted && t.status !== completeStatus && t.status !== passStatus).length;
+  const dailyCap = member.capacity ?? 6;
+  const limitReached = dailyActive >= dailyCap;
+  const setToast = useUIStore(s => s.setToast);
+  const handleAddTask = useCallback((moodId) => {
+    if (limitReached) {
+      setToast(`Task limit reached.\n\n${member.name} already has ${dailyActive}/${dailyCap} active tasks for today.\n\nComplete, pass, move, or reassign an existing task before creating another.`);
+      return;
+    }
+    onOpenTask({ date, mood: moodId, assignedTo: [member.id] });
+  }, [limitReached, dailyActive, dailyCap, member.name, date, onOpenTask, setToast]);
 
   const primaryMoodIds = ['hero', 'imp', 'top'];
   const visibleMoods = S.moods.filter(m => !m.hidden);
@@ -591,6 +618,48 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
 
   return (
     <div className="td-mob-col-inner">
+      {overflowTasks.length > 0 && (
+        <div style={{marginBottom:3}}>
+          <button
+            onClick={() => setOverflowOpen(o => !o)}
+            style={{
+              width:'100%',display:'flex',alignItems:'center',gap:6,padding:'5px 8px',
+              border:'1px dashed var(--border)',borderRadius:6,background:'transparent',
+              color:'var(--t2)',fontSize:11,fontWeight:600,cursor:'pointer',
+              fontFamily:'inherit',textAlign:'left',
+            }}>
+            {overflowOpen ? '▲ Hide' : `+${overflowTasks.length} more`}
+            {overflowMoodLabels ? <span style={{color:'var(--t3)',fontWeight:400}}>({overflowMoodLabels})</span> : null}
+          </button>
+          {overflowOpen && S.moods.filter(m => overflowMoodIds.has(m.id)).map(mood => {
+            const moodTasks = groupedOverflowTasks[mood.id] || [];
+            if (!moodTasks.length) return null;
+            const mid = mood.id;
+            const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
+            return (
+              <div key={mid} className="msec" style={{marginTop:4}}>
+                <div className="msec-head" style={{background:'transparent',padding:'2px 4px'}}>
+                  <span style={{fontSize:10}}>{mood.icon}</span>
+                  <span className="msec-label" style={{color:mood.color,fontSize:9}}>{mood.label}</span>
+                  <span className="msec-cnt" style={{background:mood.color+'22',color:mood.color,fontSize:9}}>
+                    {moodTasks.length}
+                  </span>
+                  {hm(moodMins) && <span style={{fontSize:8,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
+                  <button disabled={limitReached}
+                    onClick={(e)=>{e.stopPropagation();handleAddTask(mid);}}
+                    title={limitReached?`Daily task limit reached (${dailyActive}/${dailyCap})`:''}
+                    style={{width:22,height:22,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
+                      color:mood.color,fontSize:14,lineHeight:1,cursor:limitReached?'not-allowed':'pointer',display:'flex',alignItems:'center',
+                      justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
+                  </div>
+                  <div className="msec-tasks">
+                    {moodTasks.map(t => <MobileTaskCard key={t.id} task={t} member={member} S={S} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       {/* Stand Up */}
       {suTasks.length>0 && (
         <div className="msec su-sec" style={{marginBottom:6}}>
@@ -620,10 +689,12 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
                 {mt.length}{mood.max?`/${mood.max}`:''}
               </span>
               {hm(moodMins) && <span style={{fontSize:8,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
-              <button onClick={(e)=>{e.stopPropagation();onOpenTask({ date, mood:mid, assignedTo:[member.id] });}}
+              <button disabled={limitReached}
+                onClick={(e)=>{e.stopPropagation();handleAddTask(mid);}}
+                title={limitReached?`Daily task limit reached (${dailyActive}/${dailyCap})`:''}
                 style={{width:22,height:22,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
-                  color:mood.color,fontSize:14,lineHeight:1,cursor:'pointer',display:'flex',alignItems:'center',
-                  justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto'}}>+</button>
+                  color:mood.color,fontSize:14,lineHeight:1,cursor:limitReached?'not-allowed':'pointer',display:'flex',alignItems:'center',
+                  justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
             </div>
             <div className="msec-tasks" style={{maxHeight:isHero?160:isImp?120:80,overflowY:'auto'}}>
               {mt.length ? mt.map(t => <MobileTaskCard key={t.id} task={t} member={member} S={S} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)
@@ -633,49 +704,10 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
         );
       })}
 
-      {overflowTasks.length > 0 && (
-        <div>
-          <button
-            onClick={() => setOverflowOpen(o => !o)}
-            style={{
-              width:'100%',display:'flex',alignItems:'center',gap:6,padding:'5px 8px',
-              border:'1px dashed var(--border)',borderRadius:6,background:'transparent',
-              color:'var(--t2)',fontSize:11,fontWeight:600,cursor:'pointer',
-              fontFamily:'inherit',textAlign:'left',
-            }}>
-            {overflowOpen ? '▲ Hide' : `+${overflowTasks.length} more`}
-            {overflowMoodLabels ? <span style={{color:'var(--t3)',fontWeight:400}}>({overflowMoodLabels})</span> : null}
-          </button>
-          {overflowOpen && S.moods.filter(m => overflowMoodIds.has(m.id)).map(mood => {
-            const moodTasks = groupedOverflowTasks[mood.id] || [];
-            if (!moodTasks.length) return null;
-            const mid = mood.id;
-            const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
-            return (
-              <div key={mid} className="msec" style={{marginTop:4}}>
-                <div className="msec-head" style={{background:'transparent',padding:'2px 4px'}}>
-                  <span style={{fontSize:10}}>{mood.icon}</span>
-                  <span className="msec-label" style={{color:mood.color,fontSize:9}}>{mood.label}</span>
-                  <span className="msec-cnt" style={{background:mood.color+'22',color:mood.color,fontSize:9}}>
-                    {moodTasks.length}
-                  </span>
-                  {hm(moodMins) && <span style={{fontSize:8,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
-                  <button onClick={(e)=>{e.stopPropagation();onOpenTask({ date, mood:mid, assignedTo:[member.id] });}}
-                    style={{width:22,height:22,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
-                      color:mood.color,fontSize:14,lineHeight:1,cursor:'pointer',display:'flex',alignItems:'center',
-                      justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto'}}>+</button>
-                </div>
-                <div className="msec-tasks">
-                  {moodTasks.map(t => <MobileTaskCard key={t.id} task={t} member={member} S={S} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <button className="addbtn" style={{fontSize:11,marginTop:4,flexShrink:0}}
-        onClick={()=>onOpenTask({ date, assignedTo:[member.id] })}>+ Task</button>
+        <button className="addbtn" disabled={limitReached}
+          title={limitReached?`Daily task limit reached (${dailyActive}/${dailyCap})`:''}
+          style={{fontSize:11,marginTop:4,flexShrink:0,opacity:limitReached?0.5:1,cursor:limitReached?'not-allowed':'pointer'}}
+          onClick={()=>handleAddTask()}>+ Task</button>
     </div>
   );
 });
