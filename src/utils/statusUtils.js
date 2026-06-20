@@ -63,3 +63,9 @@ export function getStatusesForRole(taskStatuses, role) {
   const completeStatus = getCompleteStatus(taskStatuses);
   return STATS.filter(s => s !== completeStatus);
 }
+
+export function canDeleteTask(session, task) {
+  if (!session || !task) return false;
+  const isAdminOrManager = session.role === 'admin' || session.role === 'manager';
+  return isAdminOrManager || task.createdBy === session.memberId;
+}

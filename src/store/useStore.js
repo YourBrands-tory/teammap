@@ -383,6 +383,14 @@ export const useStore = create((set, get) => ({
   },
   softDeleteTask: async (taskId) => {
     const session = get().session;
+    const S = get().S;
+    const task = S.tasks.find(t => t.id === taskId);
+    if (!session || !task) return;
+    const isAdminOrManager = session.role === 'admin' || session.role === 'manager';
+    if (!isAdminOrManager && task.createdBy !== session.memberId) {
+      console.warn('[softDeleteTask] Permission denied: only admin/manager or task creator can delete.');
+      return;
+    }
     get()._patchS((S)=>{ S.tasks = S.tasks.map(t=>t.id===taskId?{...t,deleted:true,updatedAt:Date.now()}:t); });
     await supabase.from('tasks').update({ deleted:true, updated_by: session?.memberId || null, updated_at:Date.now() }).eq('id', taskId);
     get()._addActivity(taskId, [{ action: 'deleted', field: null, oldValue: null, newValue: null }]);

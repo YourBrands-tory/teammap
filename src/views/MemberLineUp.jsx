@@ -3,7 +3,7 @@ import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { today } from '../lib/constants';
 import { dayProgress } from '../utils/lineUpHelpers';
-import { getCompleteStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
+import { getCompleteStatus, getReviewStatus, getPassStatus, canDeleteTask } from '../utils/statusUtils';
 import LineUpHeader from '../components/lineup/LineUpHeader';
 import LineUpCard from '../components/lineup/LineUpCard';
 import HiddenTasksPanel from '../components/HiddenTasksPanel';
@@ -20,7 +20,7 @@ export default function MemberLineUp() {
   const [date, setDate] = useState(uiViewState.date || today());
   const [sortMode, setSortMode] = useState(uiViewState.sortMode || 'mood');
   const [filters, setFilters] = useState(uiViewState.filters || { client: '', mood: '', review: false, search: '' });
-  const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 240);
+  const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 380);
   const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);
   const [taskModal, setTaskModal] = useState(null);
 
@@ -169,26 +169,17 @@ export default function MemberLineUp() {
               <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>No tasks for this date</p>
             </div>
           ) : (
-            activeTasks.map(task => {
-              const creator = S.members.find(m => m.id === task.createdBy);
-              const isOwn = task.createdBy === memberId;
-              const isAdminOrManager = session?.role === 'admin' || session?.role === 'manager';
-              const isAssignedToMe = task.assignedTo?.includes(memberId);
-              const creatorIsNotMember = creator && creator.role !== 'member';
-              const canDelete = isOwn || isAdminOrManager || (isAssignedToMe && creatorIsNotMember);
-
-              return (
-                <LineUpCard
-                  key={task.id}
-                  task={task}
-                  S={S}
-                  onOpen={setTaskModal}
-                  onStatusChange={setStatus}
-                  onHide={hideTask}
-                  onDelete={canDelete ? handleDelete : undefined}
-                />
-              );
-            })
+            activeTasks.map(task => (
+              <LineUpCard
+                key={task.id}
+                task={task}
+                S={S}
+                onOpen={setTaskModal}
+                onStatusChange={setStatus}
+                onHide={hideTask}
+                onDelete={canDeleteTask(session, task) ? handleDelete : undefined}
+              />
+            ))
           )}
         </div>
 

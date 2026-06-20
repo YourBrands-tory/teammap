@@ -30,7 +30,7 @@ export default function HiddenTasksPanel({ hiddenTasks, moods, onRestore, panelW
       if (!container) return;
       const rect = container.getBoundingClientRect();
       let newWidth = rect.right - e.clientX;
-      newWidth = Math.max(160, Math.min(450, newWidth));
+      newWidth = Math.max(200, Math.min(600, newWidth));
       onResize(newWidth);
     };
     const handleMouseUp = () => {

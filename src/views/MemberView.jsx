@@ -3,12 +3,14 @@ import { useStore } from '../store/useStore';
 import MemberLineUp from './MemberLineUp';
 import MemberPlayground from './MemberPlayground';
 import MemberKanban from './MemberKanban';
+import MemberTasks from './MemberTasks';
 import Toast from '../components/Toast';
 
 const TABS = [
   { id: 'lu', label: 'Line Up', icon: '📋' },
   { id: 'pg', label: 'Playground', icon: '◢' },
   { id: 'kb', label: 'Kanban', icon: '📌' },
+  { id: 'tk', label: 'Tasks', icon: '🗂️' },
 ];
 
 export default function MemberView() {
@@ -99,6 +101,7 @@ export default function MemberView() {
       <div className="member-tab-content" style={{ display: tab === 'lu' ? '' : 'none' }}><MemberLineUp /></div>
       <div className="member-tab-content" style={{ display: tab === 'pg' ? '' : 'none' }}><MemberPlayground /></div>
       <div className="member-tab-content" style={{ display: tab === 'kb' ? '' : 'none' }}><MemberKanban /></div>
+      <div className="member-tab-content" style={{ display: tab === 'tk' ? '' : 'none' }}><MemberTasks /></div>
       <Toast />
     </div>
   );

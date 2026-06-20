@@ -22,7 +22,7 @@ export default function useLineUp() {
   const [date, setDate] = useState(uiViewState.date || today());
   const [sortMode, setSortMode] = useState<SortMode>((uiViewState.sortMode as SortMode) || 'mood');
   const [filters, setFilters] = useState<Filters>(uiViewState.filters || { member: '', client: '', mood: '', review: false, search: '' });
-  const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 240);
+  const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 380);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'standard' | 'compact'>(getStoredViewMode);

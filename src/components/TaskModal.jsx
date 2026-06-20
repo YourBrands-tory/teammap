@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { COLORS, today, uid } from '../lib/constants';
 import { useStore, sel } from '../store/useStore';
-import { getStatusMaps, getDefaultStatus, getCompleteStatus, getPassStatus } from '../utils/statusUtils';
+import { getStatusMaps, getDefaultStatus, getCompleteStatus, getPassStatus, canDeleteTask } from '../utils/statusUtils';
 import Avatar from './Avatar';
 
 const DRAFT_KEY = 'tm_task_draft';
@@ -23,7 +23,7 @@ function clearDraft() {
   try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
 }
 
-export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '', onSaveAsTemplate }) {
+export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '', onSaveAsTemplate, readonlyAssignee = false }) {
   const S = useStore(s => s.S);
   const session = useStore(s => s.session);
   const { STATS } = getStatusMaps(S.task_statuses);
@@ -338,14 +338,27 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         </div>
 
         <label className="fl">Assign to *</label>
-        <div className="ttag-row" style={err.assigned?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
-          {S.members.map(m => (
-            <div key={m.id} className={`ttagopt${assigned.includes(m.id)?' on':''}`}
-              onClick={()=>toggle(assigned,setAssigned,m.id)}>
-              <Avatar name={m.name} color={m.color} size={16} /> {m.name}
-            </div>
-          ))}
-        </div>
+        {readonlyAssignee ? (
+          <div className="ttag-row">
+            {assigned.map(id => {
+              const m = S.members.find(m => m.id === id);
+              return m ? (
+                <div key={id} className="ttagopt on" style={{cursor:'default',opacity:0.8}}>
+                  <Avatar name={m.name} color={m.color} size={16} /> {m.name}
+                </div>
+              ) : null;
+            })}
+          </div>
+        ) : (
+          <div className="ttag-row" style={err.assigned?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
+            {S.members.map(m => (
+              <div key={m.id} className={`ttagopt${assigned.includes(m.id)?' on':''}`}
+                onClick={()=>toggle(assigned,setAssigned,m.id)}>
+                <Avatar name={m.name} color={m.color} size={16} /> {m.name}
+              </div>
+            ))}
+          </div>
+        )}
 
         <label className="fl">Client / Project</label>
         <div className="ttag-row">
@@ -517,7 +530,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
           Save failed: {saveError}
         </div>}
         <div className="ma">
-          {isEdit && <button className="btn btn-d" onClick={del}>🗑 Delete</button>}
+          {isEdit && canDeleteTask(session, task) && <button className="btn btn-d" onClick={del}>🗑 Delete</button>}
           <button className="btn btn-g" onClick={handleClose}>Close</button>
           {onSaveAsTemplate && (
             <button className="btn" onClick={() => onSaveAsTemplate({
