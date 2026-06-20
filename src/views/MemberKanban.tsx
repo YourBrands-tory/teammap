@@ -1,6 +1,7 @@
 import { fmtD } from '../lib/constants';
 import { getStatusMaps, getStatusesForRole } from '../utils/statusUtils';
 import { useStore } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import useMemberKanban from '../hooks/useMemberKanban';
 import TaskModal from '../components/TaskModal';
 
@@ -91,6 +92,7 @@ export default function MemberKanban() {
         <TaskModal
           task={taskModal}
           onClose={() => setTaskModal(null)}
+          onSaveAsTemplate={(d: any) => { useUIStore.getState().triggerSaveAsTemplate(d); }}
         />
       )}
     </div>

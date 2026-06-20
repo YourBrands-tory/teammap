@@ -23,8 +23,9 @@ function clearDraft() {
   try { sessionStorage.removeItem(DRAFT_KEY); } catch {}
 }
 
-export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '' }) {
+export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '', onSaveAsTemplate }) {
   const S = useStore(s => s.S);
+  const session = useStore(s => s.session);
   const { STATS } = getStatusMaps(S.task_statuses);
   const upsertTask = useStore(s => s.upsertTask);
   const upsertTag = useStore(s => s.upsertTag);
@@ -518,6 +519,15 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         <div className="ma">
           {isEdit && <button className="btn btn-d" onClick={del}>🗑 Delete</button>}
           <button className="btn btn-g" onClick={handleClose}>Close</button>
+          {onSaveAsTemplate && (
+            <button className="btn" onClick={() => onSaveAsTemplate({
+              name, clientId, mood, assignedTo: [...assigned],
+              estH: parseInt(estH) || 0, estM: parseInt(estM) || 0,
+              notes, tags: [...tags],
+              subtasks: subtasks.map(s => ({ ...s })),
+              links: links.map(l => ({ ...l })),
+            })}>Save as Template</button>
+          )}
           <button className="btn btn-p" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save task'}</button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import useListView from '../hooks/useListView';
+import { useUIStore } from '../store/useUIStore';
 import ListToolbar from '../components/listview/ListToolbar';
 import TaskTable from '../components/listview/TaskTable';
 import TaskModal from '../components/TaskModal';
@@ -33,6 +34,7 @@ export default function ListView() {
         <TaskModal
           task={taskModal}
           onClose={() => setTaskModal(null)}
+          onSaveAsTemplate={(d: any) => { useUIStore.getState().triggerSaveAsTemplate(d); }}
         />
       )}
     </div>

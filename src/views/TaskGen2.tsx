@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore, sel } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import useTaskGen2 from '../hooks/useTaskGen2';
 import ProjectSidebar from '../components/taskgen2/ProjectSidebar';
 import TemplateCard from '../components/taskgen2/TemplateCard';
@@ -53,6 +54,9 @@ export default function TaskGen2() {
       estH: 0,
       estM: 0,
       notes: '',
+      tags: [],
+      subtasks: [],
+      links: [],
     });
   };
 
@@ -69,6 +73,9 @@ export default function TaskGen2() {
       estH: tmpl.estH || 0,
       estM: tmpl.estM || 0,
       notes: tmpl.notes || '',
+      tags: tmpl.tags ? [...tmpl.tags] : [],
+      subtasks: tmpl.subtasks ? tmpl.subtasks.map((s: any) => ({ ...s })) : [],
+      links: tmpl.links ? tmpl.links.map((l: any) => ({ ...l })) : [],
     });
   };
 
@@ -80,6 +87,119 @@ export default function TaskGen2() {
 
   const handleDeleteTmpl = async (id: string) => {
     await deleteTemplate(id);
+  };
+
+  const handleSaveAsTemplate = (taskData: any) => {
+    setTmplForm({
+      _mode: 'new',
+      clientId: taskData.clientId || '',
+      freqId: '',
+      freqIds: [],
+      name: taskData.name || '',
+      mood: taskData.mood || 'rapid',
+      assignedTo: taskData.assignedTo ? [...taskData.assignedTo] : [],
+      estH: taskData.estH || 0,
+      estM: taskData.estM || 0,
+      notes: taskData.notes || '',
+      tags: taskData.tags ? [...taskData.tags] : [],
+      subtasks: taskData.subtasks
+        ? taskData.subtasks.map((s: any, i: number) => ({ text: s.text, completed: s.done ?? false, order: i }))
+        : [],
+      links: taskData.links
+        ? taskData.links.map((l: any, i: number) => ({ title: l.label || l.title || '', url: l.url, order: i }))
+        : [],
+    });
+  };
+
+  const pendingTemplateData = useUIStore(s => s.pendingTemplateData);
+  const setPendingTemplateData = useUIStore(s => s.setPendingTemplateData);
+
+  useEffect(() => {
+    if (pendingTemplateData) {
+      handleSaveAsTemplate(pendingTemplateData);
+      setPendingTemplateData(null);
+    }
+  }, [pendingTemplateData]);
+
+  const [tmplTDetailTab, setTmplTDetailTab] = useState('sub');
+  const [tmplNewSubtask, setTmplNewSubtask] = useState('');
+  const [tmplNewLinkLabel, setTmplNewLinkLabel] = useState('');
+  const [tmplNewLinkUrl, setTmplNewLinkUrl] = useState('');
+
+  const addTmplSubtask = () => {
+    const text = tmplNewSubtask.trim();
+    if (!text) return;
+    setTmplForm((f: any) => ({
+      ...f,
+      subtasks: [...(f.subtasks || []), { text, completed: false, order: (f.subtasks || []).length }],
+    }));
+    setTmplNewSubtask('');
+  };
+
+  const toggleTmplSubtask = (i: number) => {
+    setTmplForm((f: any) => ({
+      ...f,
+      subtasks: (f.subtasks || []).map((s: any, idx: number) =>
+        idx === i ? { ...s, completed: !s.completed } : s
+      ),
+    }));
+  };
+
+  const editTmplSubtaskText = (i: number, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setTmplForm((f: any) => ({
+      ...f,
+      subtasks: (f.subtasks || []).map((s: any, idx: number) =>
+        idx === i ? { ...s, text: trimmed } : s
+      ),
+    }));
+  };
+
+  const delTmplSubtask = (i: number) => {
+    setTmplForm((f: any) => ({
+      ...f,
+      subtasks: (f.subtasks || []).filter((_: any, idx: number) => idx !== i),
+    }));
+  };
+
+  const moveTmplSubtask = (i: number, dir: number) => {
+    setTmplForm((f: any) => {
+      const arr = [...(f.subtasks || [])];
+      const t = i + dir;
+      if (t < 0 || t >= arr.length) return f;
+      [arr[i], arr[t]] = [arr[t], arr[i]];
+      return { ...f, subtasks: arr };
+    });
+  };
+
+  const addTmplLink = () => {
+    const url = tmplNewLinkUrl.trim();
+    if (!url) return;
+    const title = tmplNewLinkLabel.trim();
+    setTmplForm((f: any) => ({
+      ...f,
+      links: [...(f.links || []), { title, url, order: (f.links || []).length }],
+    }));
+    setTmplNewLinkLabel('');
+    setTmplNewLinkUrl('');
+  };
+
+  const delTmplLink = (i: number) => {
+    setTmplForm((f: any) => ({
+      ...f,
+      links: (f.links || []).filter((_: any, idx: number) => idx !== i),
+    }));
+  };
+
+  const moveTmplLink = (i: number, dir: number) => {
+    setTmplForm((f: any) => {
+      const arr = [...(f.links || [])];
+      const t = i + dir;
+      if (t < 0 || t >= arr.length) return f;
+      [arr[i], arr[t]] = [arr[t], arr[i]];
+      return { ...f, links: arr };
+    });
   };
 
   const tmplFormClient = tmplForm ? (sel.gc(S, tmplForm.clientId) || sel.scl(S)[0]) : null;
@@ -388,6 +508,79 @@ export default function TaskGen2() {
             </div>
           </div>
 
+          {/* ── Subtasks & Links tabs ── */}
+          <div className="tdetail-tabs">
+            <div className={`tdetail-tab${tmplTDetailTab === 'sub' ? ' active' : ''}`} onClick={() => setTmplTDetailTab('sub')}>
+              ☑ Subtasks {(tmplForm.subtasks || []).length ? `(${(tmplForm.subtasks || []).filter((s: any) => s.completed).length}/${(tmplForm.subtasks || []).length})` : ''}
+            </div>
+            <div className={`tdetail-tab${tmplTDetailTab === 'links' ? ' active' : ''}`} onClick={() => setTmplTDetailTab('links')}>
+              🔗 Links {(tmplForm.links || []).length ? `(${(tmplForm.links || []).length})` : ''}
+            </div>
+          </div>
+
+          {/* ── Subtasks tab content ── */}
+          <div className={`tdetail-tab-content${tmplTDetailTab === 'sub' ? ' active' : ''}`}>
+            {(tmplForm.subtasks || []).length > 0 && (
+              <div className="subtask-progress-mini">
+                <div className="subtask-bar-track">
+                  <div className="subtask-bar-fill" style={{ width: `${Math.round((tmplForm.subtasks || []).filter((s: any) => s.completed).length / (tmplForm.subtasks || []).length * 100)}%` }} />
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--t2)', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  {(tmplForm.subtasks || []).filter((s: any) => s.completed).length}/{(tmplForm.subtasks || []).length}
+                </span>
+              </div>
+            )}
+            <div>
+              {(tmplForm.subtasks || []).map((s: any, i: number) => (
+                <div key={i} className={`subtask-row${s.completed ? ' done' : ''}`}>
+                  <div className={`subtask-check${s.completed ? ' checked' : ''}`} onClick={() => toggleTmplSubtask(i)}>
+                    {s.completed ? '✓' : ''}
+                  </div>
+                  <span className="subtask-text"
+                    contentEditable suppressContentEditableWarning
+                    onBlur={(e) => editTmplSubtaskText(i, e.currentTarget.textContent)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}>
+                    {s.text}
+                  </span>
+                  <button className="subtask-del" onClick={() => delTmplSubtask(i)}>✕</button>
+                </div>
+              ))}
+            </div>
+            <div className="subtask-add-row">
+              <input type="text" placeholder="Add a subtask + Enter" value={tmplNewSubtask}
+                onChange={e => setTmplNewSubtask(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTmplSubtask(); } }}
+                style={{ flex: 1, fontSize: 13 }} />
+              <button className="btn btn-sm" onClick={addTmplSubtask}>+ Add</button>
+            </div>
+          </div>
+
+          {/* ── Links tab content ── */}
+          <div className={`tdetail-tab-content${tmplTDetailTab === 'links' ? ' active' : ''}`}>
+            <div>
+              {(tmplForm.links || []).map((l: any, i: number) => {
+                let safeUrl = l.url;
+                if (!/^https?:\/\//i.test(safeUrl)) safeUrl = 'https://' + safeUrl;
+                return (
+                  <div key={i} className="link-row">
+                    <span style={{ flexShrink: 0 }}>🔗</span>
+                    <a href={safeUrl} target="_blank" rel="noopener noreferrer">{l.title || l.url}</a>
+                    <button className="link-del" onClick={() => delTmplLink(i)}>✕</button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="link-add-row">
+              <input type="text" placeholder="Label (optional)" value={tmplNewLinkLabel}
+                onChange={e => setTmplNewLinkLabel(e.target.value)} style={{ width: 140, fontSize: 12 }} />
+              <input type="text" placeholder="https://\u2026" value={tmplNewLinkUrl}
+                onChange={e => setTmplNewLinkUrl(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTmplLink(); } }}
+                style={{ flex: 1, fontSize: 12 }} />
+              <button className="btn btn-sm" onClick={addTmplLink}>+ Add</button>
+            </div>
+          </div>
+
           <label className="fl">Frequency tags (select all that apply)</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
             {freqTags.map((f: any) => {
@@ -489,6 +682,7 @@ export default function TaskGen2() {
         <TaskModal
           task={taskModal}
           onClose={() => setTaskModal(null)}
+          onSaveAsTemplate={handleSaveAsTemplate}
         />
       )}
     </div>

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { DndContext, DragOverlay, pointerWithin } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useStore } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import useLineUp from '../hooks/useLineUp';
 import LineUpHeader from '../components/lineup/LineUpHeader';
 import LineUpCard from '../components/lineup/LineUpCard';
@@ -92,7 +93,7 @@ export default function LineUp() {
         </div>
       )}
 
-      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} />}
+      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} onSaveAsTemplate={(d: any) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
     </div>
   );
 }

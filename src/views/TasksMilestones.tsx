@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { today, fmtD, taskTimeStr } from '../lib/constants';
 import { getStatusMaps } from '../utils/statusUtils';
 import { useStore } from '../store/useStore';
+import { useUIStore } from '../store/useUIStore';
 import useTasksMilestones from '../hooks/useTasksMilestones';
 import TaskGenerator from '../components/tasks/TaskGenerator';
 import Milestones from '../components/tasks/Milestones';
@@ -208,6 +209,7 @@ export default function TasksMilestones() {
         <TaskModal
           task={taskModal}
           onClose={() => setTaskModal(null)}
+          onSaveAsTemplate={(d: any) => { useUIStore.getState().triggerSaveAsTemplate(d); }}
         />
       )}
 

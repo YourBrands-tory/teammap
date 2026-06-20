@@ -244,7 +244,7 @@ export default function TaskDashboard() {
         </button>
       </div>
 
-      {modal && <TaskModal task={modal} onClose={closeModal} />}
+      {modal && <TaskModal task={modal} onClose={closeModal} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
       {stPop && <StatusPopup taskId={stPop.taskId} anchorRect={stPop.rect} onClose={closeStatus} />}
     </div>
   );

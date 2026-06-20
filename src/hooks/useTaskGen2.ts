@@ -88,6 +88,13 @@ export default function useTaskGen2() {
       estH: formData.estH || 0,
       estM: formData.estM || 0,
       notes: formData.notes || '',
+      tags: formData.tags || [],
+      subtasks: (formData.subtasks || []).map((s: any, i: number) => ({
+        text: s.text, completed: s.completed ?? false, order: s.order ?? i,
+      })),
+      links: (formData.links || []).map((l: any, i: number) => ({
+        title: l.title || l.label || '', url: l.url, order: l.order ?? i,
+      })),
       updatedAt: Date.now(),
     };
     let updated: Template[];
@@ -137,12 +144,12 @@ export default function useTaskGen2() {
       mood: tmpl.mood || 'rapid',
       status: getDefaultStatus(S.task_statuses) as string,
       assignedTo: [...assignedTo],
-      tags: [],
+      tags: tmpl.tags ? [...tmpl.tags] : [],
       estH: tmpl.estH || 0,
       estM: tmpl.estM || 0,
       notes: tmpl.notes || '',
-      subtasks: [],
-      links: [],
+      subtasks: (tmpl.subtasks || []).map((s: any) => ({ text: s.text, done: false })),
+      links: (tmpl.links || []).map((l: any) => ({ label: l.title || l.label, url: l.url })),
       isMilestone: false,
       milestoneId: null,
     };

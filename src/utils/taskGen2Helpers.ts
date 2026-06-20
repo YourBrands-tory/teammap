@@ -1,3 +1,15 @@
+export interface TemplateSubtask {
+  text: string;
+  completed: boolean;
+  order: number;
+}
+
+export interface TemplateLink {
+  title: string;
+  url: string;
+  order: number;
+}
+
 export interface Template {
   id: string;
   clientId: string;
@@ -9,6 +21,9 @@ export interface Template {
   estH: number;
   estM: number;
   notes: string;
+  tags?: string[];
+  subtasks?: TemplateSubtask[];
+  links?: TemplateLink[];
   createdAt: number;
   updatedAt: number;
 }
@@ -120,6 +135,9 @@ export function getTemplateFormData(existing?: Template): any {
       estH: existing.estH || 0,
       estM: existing.estM || 0,
       notes: existing.notes || '',
+      tags: existing.tags ? [...existing.tags] : [],
+      subtasks: existing.subtasks ? existing.subtasks.map(s => ({ ...s })) : [],
+      links: existing.links ? existing.links.map(l => ({ ...l })) : [],
     };
   }
   return {
@@ -131,5 +149,8 @@ export function getTemplateFormData(existing?: Template): any {
     estH: 0,
     estM: 0,
     notes: '',
+    tags: [],
+    subtasks: [],
+    links: [],
   };
 }

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import useMemberPlayground from '../hooks/useMemberPlayground';
+import { useUIStore } from '../store/useUIStore';
 import PlaygroundToolbar from '../components/playground/PlaygroundToolbar';
 import SpreadsheetGrid from '../components/playground/SpreadsheetGrid';
 import ClientSidebar from '../components/playground/ClientSidebar';
@@ -61,6 +62,7 @@ export default function MemberPlayground() {
           fromCellText={fromCellText}
           onClose={() => { setTaskModal(null); setPendingCell(null); setFromCellText(''); }}
           onSave={pendingCell ? handleTaskSaved : undefined}
+          onSaveAsTemplate={(d: any) => { useUIStore.getState().triggerSaveAsTemplate(d); }}
         />
       )}
 

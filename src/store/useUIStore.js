@@ -40,6 +40,8 @@ export const useUIStore = create(
       toast: null,
       _toastTimer: null,
 
+      pendingTemplateData: null,
+
       setToast: (msg, duration = 4000) => {
         const timer = get()._toastTimer;
         if (timer) clearTimeout(timer);
@@ -57,6 +59,10 @@ export const useUIStore = create(
       setView: (v) => set({ view: v }),
 
       setOpenModal: (modal) => set({ openModal: modal }),
+
+      setPendingTemplateData: (data) => set({ pendingTemplateData: data }),
+
+      triggerSaveAsTemplate: (data) => set({ pendingTemplateData: data, view: 'tg2' }),
 
       setViewState: (viewKey, patch) =>
         set((s) => ({
@@ -79,6 +85,11 @@ export const useUIStore = create(
         openModal: state.openModal,
         viewStates: state.viewStates,
         scrollPositions: state.scrollPositions,
+      }),
+      merge: (persisted, current) => ({
+        ...current,
+        ...persisted,
+        pendingTemplateData: null,
       }),
       version: 1,
     }

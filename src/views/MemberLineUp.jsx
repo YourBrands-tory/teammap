@@ -215,7 +215,7 @@ export default function MemberLineUp() {
         </div>
       )}
 
-      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} />}
+      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
     </div>
   );
 }
