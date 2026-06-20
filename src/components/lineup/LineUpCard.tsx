@@ -26,9 +26,10 @@ interface Props {
   onHide: (id: string) => void;
   onDelete?: (id: string) => void;
   isOverlay?: boolean;
+  compact?: boolean;
 }
 
-export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, onDelete, isOverlay }: Props) {
+export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, onDelete, isOverlay, compact }: Props) {
   const [linkPop, setLinkPop] = useState(false);
   const session = useStore(ss => ss.session);
   const role = session?.role || 'member';
@@ -64,7 +65,7 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
 
   return (
     <div ref={sortable.ref} style={sortable.style}
-      className={`lu-card size-${cardSize}`}
+      className={`lu-card size-${cardSize}${compact ? ' compact' : ''}`}
       onClick={() => onOpen(task)}>
       <div className="lu-mood-bar" style={{ background: moodColor }} />
       {!isOverlay && (
@@ -73,34 +74,36 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
         </span>
       )}
       <div className="lu-mood-chip" style={{ background: moodBg }}>
-        <span style={{ fontSize: isBig ? 26 : isNarrow ? 14 : 20 }}>{mood?.icon || '?'}</span>
-        {!isNarrow && <span className="lu-mood-name" style={{ color: moodColor }}>{mood?.label || ''}</span>}
+        <span style={{ fontSize: compact ? 16 : isBig ? 26 : isNarrow ? 14 : 20 }}>{mood?.icon || '?'}</span>
+        {!isNarrow && !compact && <span className="lu-mood-name" style={{ color: moodColor }}>{mood?.label || ''}</span>}
       </div>
       <div className="lu-info">
-        <div className="lu-title">{task.isMilestone ? '\u{1F3C1} ' : ''}{task.name}</div>
+        <div className={`lu-title${compact ? ' lu-title--compact' : ''}`}>{task.isMilestone ? '\u{1F3C1} ' : ''}{task.name}</div>
         {!isNarrow && (
           <div className="lu-meta-row">
             {client && <span className="lu-meta-chip" style={{ background: `${client.color}15`, color: client.color }}>{client.name}</span>}
             {assignees.map(m => (
               <span key={m.id} className="lu-meta-chip" style={{ background: `${m.color}12`, color: m.color }}>{m.name}</span>
             ))}
-            <select className="lu-status-sel"
-              style={{ background: STB[task.status], color: STC[task.status], borderColor: `${STC[task.status]}33` }}
-              onClick={e => e.stopPropagation()}
-              onChange={e => { e.stopPropagation(); onStatusChange(task.id, e.target.value); }}
-              value={task.status}>
-              {roleStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            {!compact && (
+              <select className="lu-status-sel"
+                style={{ background: STB[task.status], color: STC[task.status], borderColor: `${STC[task.status]}33` }}
+                onClick={e => e.stopPropagation()}
+                onChange={e => { e.stopPropagation(); onStatusChange(task.id, e.target.value); }}
+                value={task.status}>
+                {roleStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            )}
             {timeStr && <span className="lu-time-chip">{timeStr}</span>}
           </div>
         )}
-        {isBig && task.notes && (
+        {!compact && isBig && task.notes && (
           <div style={{
             fontSize: 12, color: 'var(--t2)', marginTop: 4, lineHeight: 1.5,
             overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', opacity: 0.7
           }}>{task.notes}</div>
         )}
-        {!isNarrow && (hasLinks || hasSubtasks) && (
+        {!compact && !isNarrow && (hasLinks || hasSubtasks) && (
           <div className="card-icon-row" style={{ marginTop: 4, gap: 4 }}>
             {hasLinks && (
               <span className="card-icon-pill link-pill" aria-label={`${task.links!.length} link(s)`}
@@ -134,7 +137,7 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
         )}
       </div>
       <div className="lu-actions">
-        {!isNarrow && <button className="lu-open-btn" onClick={e => { e.stopPropagation(); onOpen(task); }}>Open</button>}
+        {(!isNarrow || compact) && <button className="lu-open-btn" onClick={e => { e.stopPropagation(); onOpen(task); }}>Open</button>}
         {onDelete && <button className="lu-del-btn" onClick={e => { e.stopPropagation(); onDelete(task.id); }} title="Delete">&#128465;</button>}
         <button className="lu-hide-btn" onClick={e => { e.stopPropagation(); onHide(task.id); }} title="Hide">&#10005;</button>
       </div>

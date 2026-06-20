@@ -8,6 +8,10 @@ import type { DragEndEvent } from '@dnd-kit/core';
 type SortMode = 'mood' | 'team' | 'client' | null;
 type Filters = { member: string; client: string; mood: string; review: boolean; search: string };
 
+function getStoredViewMode(): 'standard' | 'compact' {
+  try { return localStorage.getItem('lineupViewMode') === 'compact' ? 'compact' : 'standard'; } catch { return 'standard'; }
+}
+
 export default function useLineUp() {
   const S = useStore(s => s.S);
   const upsertTask = useStore(s => s.upsertTask);
@@ -16,11 +20,17 @@ export default function useLineUp() {
   const setViewState = useUIStore(s => s.setViewState);
 
   const [date, setDate] = useState(uiViewState.date || today());
-  const [sortMode, setSortMode] = useState<SortMode>((uiViewState.sortMode as SortMode) || null);
+  const [sortMode, setSortMode] = useState<SortMode>((uiViewState.sortMode as SortMode) || 'mood');
   const [filters, setFilters] = useState<Filters>(uiViewState.filters || { member: '', client: '', mood: '', review: false, search: '' });
   const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 240);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'standard' | 'compact'>(getStoredViewMode);
+
+  const handleSetViewMode = useCallback((mode: 'standard' | 'compact') => {
+    setViewMode(mode);
+    try { localStorage.setItem('lineupViewMode', mode); } catch {}
+  }, []);
 
   // Persist UI state on change
   useEffect(() => {
@@ -85,9 +95,9 @@ export default function useLineUp() {
 
   return {
     S, date, sortMode, filters, tasks, allOnDate, prog, totalMins,
-    panelWidth, activeId, taskModal,
+    panelWidth, activeId, taskModal, viewMode,
     setDate, shift, goToday, setSortMode: handleSetSortMode, setFilter,
     setStatus, hideTask, restoreTask,
-    handleDragEnd, setActiveId, setTaskModal, setPanelWidth,
+    handleDragEnd, setActiveId, setTaskModal, setPanelWidth, setViewMode: handleSetViewMode,
   };
 }

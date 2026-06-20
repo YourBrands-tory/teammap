@@ -18,7 +18,7 @@ export default function MemberLineUp() {
   const setViewState = useUIStore(s => s.setViewState);
 
   const [date, setDate] = useState(uiViewState.date || today());
-  const [sortMode, setSortMode] = useState(uiViewState.sortMode || null);
+  const [sortMode, setSortMode] = useState(uiViewState.sortMode || 'mood');
   const [filters, setFilters] = useState(uiViewState.filters || { client: '', mood: '', review: false, search: '' });
   const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 240);
   const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);

@@ -14,10 +14,10 @@ export default function LineUp() {
   const isManager = session?.role === 'admin' || session?.role === 'manager';
   const {
     S, date, sortMode, filters, tasks, allOnDate, prog, totalMins,
-    panelWidth, activeId, taskModal,
+    panelWidth, activeId, taskModal, viewMode,
     setDate, shift, goToday, setSortMode, setFilter,
     setStatus, hideTask, restoreTask,
-    handleDragEnd, setActiveId, setTaskModal, setPanelWidth,
+    handleDragEnd, setActiveId, setTaskModal, setPanelWidth, setViewMode,
   } = useLineUp();
 
   const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);
@@ -37,10 +37,10 @@ export default function LineUp() {
     <div className="lu-app">
       <LineUpHeader
         date={date} prog={prog} totalMins={totalMins} sortMode={sortMode}
-        S={S} filters={filters} isManager={isManager}
+        S={S} filters={filters} isManager={isManager} viewMode={viewMode}
         onShift={handleShift} onGoToday={goToday}
         onSetSortMode={setSortMode} onSetFilter={setFilter}
-        onNewTask={() => setTaskModal({ date })} />
+        onNewTask={() => setTaskModal({ date })} onSetViewMode={setViewMode} />
 
       <div className="lu-body">
         <div className="lu-main">
@@ -60,11 +60,12 @@ export default function LineUp() {
                   <LineUpCard key={t.id} task={t} S={S}
                     onOpen={setTaskModal}
                     onStatusChange={setStatus}
-                    onHide={hideTask} />
+                    onHide={hideTask}
+                    compact={viewMode === 'compact'} />
                 ))}
               </SortableContext>
               <DragOverlay>
-                {activeTask ? <LineUpCard task={activeTask} S={S} isOverlay /> : null}
+                {activeTask ? <LineUpCard task={activeTask} S={S} isOverlay compact={viewMode === 'compact'} /> : null}
               </DragOverlay>
             </DndContext>
           )}

@@ -19,15 +19,17 @@ interface Props {
   S: S;
   filters: Filters;
   isManager: boolean;
+  viewMode: 'standard' | 'compact';
   onShift: (dir: number, val?: string) => void;
   onGoToday: () => void;
   onSetSortMode: (m: SortMode) => void;
   onSetFilter: (k: keyof Filters, v: string | boolean) => void;
   onNewTask: () => void;
+  onSetViewMode: (mode: 'standard' | 'compact') => void;
 }
 
-export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filters, isManager,
-  onShift, onGoToday, onSetSortMode, onSetFilter, onNewTask }: Props) {
+export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filters, isManager, viewMode,
+  onShift, onGoToday, onSetSortMode, onSetFilter, onNewTask, onSetViewMode }: Props) {
   const totalStr = totalMins
     ? `${Math.floor(totalMins / 60)}h${totalMins % 60 ? ' ' + totalMins % 60 + 'm' : ''}`
     : '0h';
@@ -117,6 +119,12 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
         onChange={e => onSetFilter('search', e.target.value)}
         style={{ minWidth: 140, flexShrink: 0 }}
       />
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: 'var(--t3)' }}>View</span>
+        <button className={`btn btn-xs${viewMode === 'standard' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('standard')}>Standard</button>
+        <button className={`btn btn-xs${viewMode === 'compact' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('compact')}>Compact</button>
+      </div>
 
       {isManager && (
         <button className="btn btn-sm btn-p" onClick={onNewTask}>+ New task</button>
