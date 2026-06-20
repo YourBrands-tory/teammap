@@ -25,7 +25,7 @@ export default function TaskGen2() {
     setTg2Tab, setTg2SelProject, setProjectSort, projectSortMode,
     openAddTemplate, openEditTemplate, saveTemplate, deleteTemplate,
     createTaskFromTemplate,
-    handleToggleMulti, clearAllMulti,
+    handleToggleMulti, handleSetMulti, clearAllMulti,
     handleSaveView, handleLoadView, handleDeleteView, handleSetAllSort,
     toggleMSLink,
     setDragId, reorderProjects, setTaskModal, setCreateConfirm,
@@ -233,6 +233,7 @@ export default function TaskGen2() {
               moods={S.moods.filter((m: any) => !m.hidden)}
               multi={tg2AllMulti}
               onToggle={handleToggleMulti}
+              onSelect={handleSetMulti}
               onClearAll={clearAllMulti}
               hasFilters={hasAllFilters}
             />

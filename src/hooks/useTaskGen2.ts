@@ -157,6 +157,11 @@ export default function useTaskGen2() {
     setTg2ActiveView(null);
   }, []);
 
+  const handleSetMulti = useCallback((key: keyof TG2AllMulti, ids: string[]) => {
+    setTg2AllMulti(prev => ({ ...prev, [key]: ids }));
+    setTg2ActiveView(null);
+  }, []);
+
   const clearAllMulti = useCallback(() => {
     setTg2AllMulti({ freqs: [], clients: [], members: [], moods: [] });
     setTg2ActiveView(null);
@@ -222,7 +227,7 @@ export default function useTaskGen2() {
     setTg2Tab, setTg2SelProject, setProjectSort,
     openAddTemplate, openEditTemplate, saveTemplate, deleteTemplate,
     createTaskFromTemplate,
-    handleToggleMulti, clearAllMulti,
+    handleToggleMulti, handleSetMulti, clearAllMulti,
     handleSaveView, handleLoadView, handleDeleteView, handleSetAllSort,
     toggleMSLink,
     setDragId, reorderProjects, setTaskModal, setCreateConfirm,

@@ -14,6 +14,7 @@ interface Props {
   moods: any[];
   multi: TG2AllMulti;
   onToggle: (key: keyof TG2AllMulti, id: string) => void;
+  onSelect: (key: keyof TG2AllMulti, ids: string[]) => void;
   onClearAll: () => void;
   hasFilters: boolean;
 }
@@ -27,7 +28,7 @@ function ChipRow({
   onToggle: (id: string) => void;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: '6px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)', whiteSpace: 'nowrap' }}>{label}</span>
       {items.map(item => {
         const on = selectedIds.includes(item.id);
@@ -44,50 +45,94 @@ function ChipRow({
               cursor: 'pointer', whiteSpace: 'nowrap', transition: '.15s',
             }}
           >
-            {item.icon ? item.icon + ' ' : ''}{item.label || item.name}
+            {item.icon ? item.icon + ' ' : ''}{item.label}
           </div>
         );
       })}
       {selectedIds.length ? (
-        <button className="btn btn-xs" onClick={() => onToggle('__clear')}>&#10005; Clear</button>
+        <button className="btn btn-xs" onClick={() => onToggle('__clear')}>&#10005;</button>
       ) : null}
     </div>
   );
 }
 
-export default function FilterPanel({ freqTags, clients, members, moods, multi, onToggle, onClearAll, hasFilters }: Props) {
+function SelectFilter({
+  label, value, options, onChange,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--t3)' }}>{label}</span>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          padding: '4px 8px', borderRadius: 6, border: '1.5px solid var(--border)',
+          background: 'var(--s2)', color: 'var(--text)', fontSize: 12,
+          cursor: 'pointer',
+        }}
+      >
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+export default function FilterPanel({ freqTags, clients, members, moods, multi, onToggle, onSelect, onClearAll, hasFilters }: Props) {
   if (!freqTags.length && !clients.length && !members.length && !moods.length) return null;
+
+  const clientVal = multi.clients.length ? multi.clients[0] : '';
+  const memberVal = multi.members.length ? multi.members[0] : '';
+  const moodVal = multi.moods.length ? multi.moods[0] : '';
 
   return (
     <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0 }}>
-      <ChipRow
-        label="Frequency"
-        items={freqTags.map((f: any) => ({ id: f.id, label: f.label, color: 'var(--accent)' }))}
-        selectedIds={multi.freqs}
-        onToggle={(id) => onToggle('freqs', id)}
-      />
-      <ChipRow
-        label="Project"
-        items={clients.map((c: any) => ({ id: c.id, label: c.name, color: c.color }))}
-        selectedIds={multi.clients}
-        onToggle={(id) => onToggle('clients', id)}
-      />
-      <ChipRow
-        label="Member"
-        items={members.map((m: any) => ({ id: m.id, label: m.name, color: m.color }))}
-        selectedIds={multi.members}
-        onToggle={(id) => onToggle('members', id)}
-      />
-      <ChipRow
-        label="Mood"
-        items={moods.map((m: any) => ({ id: m.id, label: m.label, icon: m.icon, color: m.color }))}
-        selectedIds={multi.moods}
-        onToggle={(id) => onToggle('moods', id)}
-      />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 8, borderTop: '1px solid var(--border)', marginTop: 4, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, color: 'var(--t2)' }}>{/* count rendered by parent */}</span>
-        {hasFilters ? <button className="btn btn-xs" onClick={onClearAll}>&#10005; Clear all</button> : null}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <ChipRow
+          label="Frequency"
+          items={freqTags.map((f: any) => ({ id: f.id, label: f.label, color: 'var(--accent)' }))}
+          selectedIds={multi.freqs}
+          onToggle={(id) => onToggle('freqs', id)}
+        />
+        <SelectFilter
+          label="Project"
+          value={clientVal}
+          onChange={(val) => onSelect('clients', val ? [val] : [])}
+          options={[
+            { value: '', label: 'All projects' },
+            ...clients.map((c: any) => ({ value: c.id, label: c.name })),
+          ]}
+        />
+        <SelectFilter
+          label="Member"
+          value={memberVal}
+          onChange={(val) => onSelect('members', val ? [val] : [])}
+          options={[
+            { value: '', label: 'All members' },
+            ...members.map((m: any) => ({ value: m.id, label: m.name })),
+          ]}
+        />
+        <SelectFilter
+          label="Mood"
+          value={moodVal}
+          onChange={(val) => onSelect('moods', val ? [val] : [])}
+          options={[
+            { value: '', label: 'All moods' },
+            ...moods.map((m: any) => ({ value: m.id, label: m.icon ? m.icon + ' ' + m.label : m.label })),
+          ]}
+        />
       </div>
+      {hasFilters ? (
+        <div style={{ marginTop: 8 }}>
+          <button className="btn btn-xs" onClick={onClearAll}>&#10005; Clear all</button>
+        </div>
+      ) : null}
     </div>
   );
 }
