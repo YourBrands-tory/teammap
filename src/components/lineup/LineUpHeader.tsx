@@ -2,7 +2,7 @@ import { fmtD } from '../../lib/constants';
 import { getCompleteStatus, getPassStatus } from '../../utils/statusUtils';
 
 type SortMode = 'mood' | 'team' | 'client' | null;
-type Filters = { member: string; client: string; mood: string; review: boolean; search: string };
+type Filters = { member: string; client: string; mood: string; review: boolean; search: string; status: string };
 
 interface Member { id: string; name: string; capacity?: number; }
 interface Client { id: string; name: string; }
@@ -101,6 +101,13 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
       <select className="fsel" value={filters.mood} onChange={e => onSetFilter('mood', e.target.value)}>
         <option value="">All moods</option>
         {S.moods.filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
+      </select>
+
+      <select className="fsel" value={filters.status} onChange={e => onSetFilter('status', e.target.value)}>
+        <option value="">All statuses</option>
+        {(S.task_statuses || []).sort((a: any, b: any) => a.order - b.order).map((s: any) => (
+          <option key={s.id} value={s.label}>{s.label}</option>
+        ))}
       </select>
 
       <button

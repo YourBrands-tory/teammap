@@ -140,16 +140,43 @@ export default function TaskDashboard() {
           <button className="td-mob-add-btn" onClick={()=>setModal({ date:dashDate })}>+</button>
         </div>
 
+        {/* Day progress */}
+        <div className="td-mob-day-progress">
+          <span className="td-mob-day-progress-date">{fmtD(dashDate)}</span>
+          <span className="td-mob-day-progress-stats">{done}/{total} &middot; {dayPct}%</span>
+          <div className="td-mob-day-progress-track">
+            <div className="td-mob-day-progress-fill" style={{
+              width:`${dayPct}%`,
+              background:dayPct===100?'var(--accent)':dayPct>60?'var(--a2)':'var(--info)'
+            }} />
+          </div>
+        </div>
+
         {/* Member selector strip */}
         <div className="td-mob-member-strip">
-          {visibleMembers.map((m, i) => (
-            <button key={m.id}
-              className={`td-mob-member-chip${i === mobileMemberIdx ? ' active' : ''}`}
-              onClick={() => { setMobileMemberIdx(i); setExpandedCards({}); }}>
-              <Avatar name={m.name} color={m.color} size={28} />
-              <span className="td-mob-member-name">{m.name.split(' ')[0]}</span>
-            </button>
-          ))}
+          {visibleMembers.map((m, i) => {
+            const memberTasks = sel.tasksForMD(S, m.id, dashDate);
+            const memberActive = S.tasks.filter(t =>
+              t.assignedTo?.includes(m.id) && t.date === dashDate && !t.deleted &&
+              t.status !== completeStatus && t.status !== passStatus
+            ).length;
+            const memberDone = memberTasks.filter(t => t.status === completeStatus).length;
+            const memberTotal = memberTasks.length;
+            const memberPct = memberTotal ? Math.round(memberDone / memberTotal * 100) : 0;
+            const memberReview = memberTasks.filter(t => t.status === reviewStatus).length;
+            return (
+              <button key={m.id}
+                className={`td-mob-member-chip${i === mobileMemberIdx ? ' active' : ''}`}
+                onClick={() => { setMobileMemberIdx(i); setExpandedCards({}); }}>
+                <Avatar name={m.name} color={m.color} size={24} />
+                <span className="td-mob-member-name">{m.name.split(' ')[0]}</span>
+                <span className="td-mob-member-meta">
+                  {memberActive} active{memberReview ? ` · ${memberReview} review` : ''}
+                </span>
+                <span className="td-mob-member-pct">{memberPct}%</span>
+              </button>
+            );
+          })}
           {showMoreMembers && (
             <button className="td-mob-member-chip td-mob-member-more" onClick={() => setMobileSheet('members')}>
               <span style={{fontSize:14,fontWeight:800}}>+{S.members.length - VISIBLE_MEMBER_LIMIT}</span>

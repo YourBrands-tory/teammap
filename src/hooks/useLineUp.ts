@@ -6,7 +6,7 @@ import { getFilteredAndSortedTasks, dayProgress } from '../utils/lineUpHelpers';
 import type { DragEndEvent } from '@dnd-kit/core';
 
 type SortMode = 'mood' | 'team' | 'client' | null;
-type Filters = { member: string; client: string; mood: string; review: boolean; search: string };
+type Filters = { member: string; client: string; mood: string; review: boolean; search: string; status: string };
 
 function getStoredViewMode(): 'standard' | 'compact' {
   try { return localStorage.getItem('lineupViewMode') === 'compact' ? 'compact' : 'standard'; } catch { return 'standard'; }
@@ -21,7 +21,7 @@ export default function useLineUp() {
 
   const [date, setDate] = useState(uiViewState.date || today());
   const [sortMode, setSortMode] = useState<SortMode>((uiViewState.sortMode as SortMode) || 'mood');
-  const [filters, setFilters] = useState<Filters>(uiViewState.filters || { member: '', client: '', mood: '', review: false, search: '' });
+  const [filters, setFilters] = useState<Filters>(uiViewState.filters || { member: '', client: '', mood: '', review: false, search: '', status: '' });
   const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 380);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<any>(null);

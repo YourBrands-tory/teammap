@@ -317,6 +317,21 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
 .tdetail-tab-content{display:none}
 .tdetail-tab-content.active{display:block}
 
+/* ── TASK MODAL SECTION TABS ──────────────────────────────── */
+.modal-section-tabs{display:flex;border-bottom:1px solid var(--border);margin:14px 0 0;gap:0}
+.modal-section-tab{flex:1;padding:10px 0;font-size:12px;font-weight:600;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:.15s;text-align:center;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.modal-section-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.modal-section-tab .badge-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-left:5px;vertical-align:middle}
+.modal-section{display:none}
+.modal-section.active{display:block}
+.modal-footer{display:flex;align-items:center;margin-top:20px;border-top:1px solid var(--border);padding-top:16px}
+.modal-footer-left{display:flex;align-items:center;gap:8px}
+.modal-footer-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.modal-close-text{background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;padding:6px 0;font-family:inherit}
+.modal-close-text:hover{color:var(--text)}
+.btn-outline{background:var(--surface);border:1.5px solid var(--border);color:var(--t2)}
+.btn-outline:hover{background:var(--s2);border-color:var(--a2);color:var(--accent)}
+
 /* ── Client picker horizontal scroll ──────────────────────── */
 .client-scroll-row{display:flex;gap:6px;overflow-x:auto;flex-wrap:nowrap;padding:4px 2px 8px;margin-top:6px}
 .client-scroll-row::-webkit-scrollbar{height:4px}
@@ -781,6 +796,34 @@ td:hover .pg-cell-actions{display:flex}
   .mopt{padding:7px 14px}
   .stopt{padding:7px 14px}
 
+  /* TaskModal — mobile overrides */
+  .modal.modal-lg{padding:16px;width:calc(100vw - 24px);max-height:90vh}
+  .modal.modal-lg h2{font-size:22px}
+  .modal.modal-lg .fl{font-size:12px;margin-bottom:6px;margin-top:12px}
+  .modal.modal-lg input[type=text],
+  .modal.modal-lg input[type=number],
+  .modal.modal-lg input[type=date],
+  .modal.modal-lg select,
+  .modal.modal-lg textarea{font-size:15px;min-height:44px;padding:8px 11px}
+  .modal.modal-lg textarea{min-height:90px}
+  .modal.modal-lg .mood-opt-btn,
+  .modal.modal-lg .ttagopt{padding:8px 12px;min-height:36px;font-size:12px;gap:6px;border-radius:18px}
+  .modal.modal-lg .ttagopt .av{width:20px;height:20px;font-size:11px}
+  .modal.modal-lg .tcp{font-size:12px;min-height:auto;padding:3px 9px}
+  .modal.modal-lg .modal-section-tab{font-size:13px;padding-bottom:8px}
+  .modal.modal-lg .modal-section-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .modal.modal-lg .modal-section-tabs::-webkit-scrollbar{display:none}
+  .modal.modal-lg .btn,
+  .modal.modal-lg .btn-p,
+  .modal.modal-lg .btn-outline,
+  .modal.modal-lg .btn-d{height:44px;font-size:14px;padding:0 16px;white-space:nowrap}
+  .modal.modal-lg .modal-footer{gap:8px}
+  .modal.modal-lg .modal-close-text{font-size:14px;white-space:nowrap}
+  .modal.modal-lg .tdetail-tab{font-size:12px;padding:6px 10px}
+  .modal.modal-lg .subtask-text{font-size:12px}
+  .modal.modal-lg .link-row{font-size:11px}
+  .modal.modal-lg .link-row a{font-size:12px}
+
   /* Nav reorder panel on mobile */
   .nav-item-drag input[type=text]{width:80px}
   .nav-item-drag{min-height:44px}
@@ -789,9 +832,27 @@ td:hover .pg-cell-actions{display:flex}
   .lu-hide-btn,.lu-restore-btn,.lu-del-btn{width:28px;height:28px;font-size:14px}
   .td-mob-card{min-height:44px}
   .td-mob-card-name{font-size:13px}
-  .td-mob-date-btn{min-height:38px;min-width:38px}
-  .td-mob-today-btn{min-height:38px}
   .td-mob-add-btn{width:44px;height:44px;font-size:24px}
+
+  /* Task Dashboard — mobile date controls compact */
+  .td-mob-date-row{gap:8px}
+  .td-mob-date-btn{width:40px;height:40px;font-size:16px}
+  .td-mob-date-input{width:120px;font-size:15px;max-width:120px;padding:4px 8px}
+  .td-mob-today-btn{height:40px;font-size:14px;padding:0 12px}
+
+  /* Task Dashboard — mobile day progress */
+  .td-mob-day-progress{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--surface)}
+  .td-mob-day-progress-date{font-size:13px;font-weight:700;color:var(--t2);white-space:nowrap;flex-shrink:0}
+  .td-mob-day-progress-stats{font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap;flex-shrink:0}
+  .td-mob-day-progress-track{flex:1;height:6px;background:var(--s3);border-radius:999px;overflow:hidden;min-width:40px}
+  .td-mob-day-progress-fill{height:100%;border-radius:999px;transition:.4s}
+
+  /* Task Dashboard — mobile member chips with progress */
+  .td-mob-member-chip{gap:2px;padding:6px 8px;min-width:64px}
+  .td-mob-member-chip .av{width:24px;height:24px;font-size:12px}
+  .td-mob-member-name{font-size:13px;font-weight:700}
+  .td-mob-member-meta{font-size:10px;color:var(--t3);white-space:nowrap;line-height:1.2;text-align:center}
+  .td-mob-member-pct{font-size:11px;font-weight:700;color:var(--accent);line-height:1.2}
 
   /* Prevent horizontal overflow */
   .view.active{overflow-x:hidden!important}

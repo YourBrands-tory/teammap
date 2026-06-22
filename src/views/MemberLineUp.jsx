@@ -19,10 +19,13 @@ export default function MemberLineUp() {
 
   const [date, setDate] = useState(uiViewState.date || today());
   const [sortMode, setSortMode] = useState(uiViewState.sortMode || 'mood');
-  const [filters, setFilters] = useState(uiViewState.filters || { client: '', mood: '', review: false, search: '' });
+  const [filters, setFilters] = useState(uiViewState.filters || { client: '', mood: '', review: false, search: '', status: '' });
   const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 380);
   const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);
   const [taskModal, setTaskModal] = useState(null);
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('lineupViewMode') === 'compact' ? 'compact' : 'standard'; } catch { return 'standard'; }
+  });
 
   // Persist UI state on change
   useEffect(() => {
@@ -59,6 +62,7 @@ export default function MemberLineUp() {
     let tasks = myTasksOnDate.filter(t => t.status !== completeStatus && !t.hidden);
     if (filters.client) tasks = tasks.filter(t => t.clientId === filters.client);
     if (filters.mood) tasks = tasks.filter(t => t.mood === filters.mood);
+    if (filters.status) tasks = tasks.filter(t => t.status === filters.status);
     if (filters.review) {
       const reviewLabel = getReviewStatus(S.task_statuses);
       tasks = tasks.filter(t => t.status === reviewLabel);
@@ -137,6 +141,11 @@ export default function MemberLineUp() {
     setSortMode(prev => prev === m ? null : m);
   }, []);
 
+  const handleSetViewMode = useCallback((mode) => {
+    setViewMode(mode);
+    try { localStorage.setItem('lineupViewMode', mode); } catch {}
+  }, []);
+
   return (
     <div className="lu-app">
       <LineUpHeader
@@ -144,7 +153,7 @@ export default function MemberLineUp() {
         S={S} filters={{ ...filters, member: '' }} isManager={false}
         onShift={shift} onGoToday={goToday}
         onSetSortMode={handleSetSortMode} onSetFilter={setFilter}
-        onNewTask={() => {}} />
+        onNewTask={() => {}} viewMode={viewMode} onSetViewMode={handleSetViewMode} />
 
       {/* Daily task limit indicator */}
       {(() => {
@@ -178,6 +187,7 @@ export default function MemberLineUp() {
                 onStatusChange={setStatus}
                 onHide={hideTask}
                 onDelete={canDeleteTask(session, task) ? handleDelete : undefined}
+                compact={viewMode === 'compact'}
               />
             ))
           )}

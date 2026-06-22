@@ -16,7 +16,7 @@ interface AppState {
 }
 
 type SortMode = 'mood' | 'team' | 'client' | null;
-type Filters = { member: string; client: string; mood: string; review: boolean; search: string };
+type Filters = { member: string; client: string; mood: string; review: boolean; search: string; status: string };
 
 export const CARD_SIZES: Record<string, CardSize> = { top:'narrow', rapid:'narrow', share:'narrow', creative:'mid', hero:'big', imp:'big' };
 
@@ -36,6 +36,7 @@ export function getFilteredAndSortedTasks(S: AppState, date: string, filters: Fi
     const reviewLabel = getReviewStatus(taskStatuses);
     tasks = tasks.filter(t => t.status === reviewLabel);
   }
+  if (filters.status) tasks = tasks.filter(t => t.status === filters.status);
   if (filters.search) {
     const q = filters.search.toLowerCase();
     tasks = tasks.filter(t => t.name.toLowerCase().includes(q));
