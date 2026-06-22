@@ -3,7 +3,8 @@ import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { today } from '../lib/constants';
 import { dayProgress } from '../utils/lineUpHelpers';
-import { getCompleteStatus, getReviewStatus, getPassStatus, canDeleteTask } from '../utils/statusUtils';
+import { getCompleteStatus, getReviewStatus, canDeleteTask } from '../utils/statusUtils';
+import { canCreateTask, getDailyActiveCount, getDailyLimit } from '../utils/taskLimits';
 import LineUpHeader from '../components/lineup/LineUpHeader';
 import LineUpCard from '../components/lineup/LineUpCard';
 import HiddenTasksPanel from '../components/HiddenTasksPanel';
@@ -92,6 +93,11 @@ export default function MemberLineUp() {
     return myTasksOnDate.reduce((a, t) => a + ((t.estH || 0) * 60 + (t.estM || 0)), 0);
   }, [myTasksOnDate]);
 
+  // Daily task limit
+  const canCreateTaskBool = canCreateTask(S, memberId, date);
+  const dailyActiveCount = getDailyActiveCount(S, memberId, date);
+  const dailyLimit = getDailyLimit(S, memberId);
+
   // Only hidden tasks assigned to this member
   const myHiddenTasks = useMemo(() => {
     return myTasksOnDate.filter(t => t.hidden);
@@ -153,19 +159,15 @@ export default function MemberLineUp() {
         S={S} filters={{ ...filters, member: '' }} isManager={false}
         onShift={shift} onGoToday={goToday}
         onSetSortMode={handleSetSortMode} onSetFilter={setFilter}
-        onNewTask={() => {}} viewMode={viewMode} onSetViewMode={handleSetViewMode} />
+        onNewTask={() => setTaskModal({ date, assignedTo: [memberId] })} viewMode={viewMode} onSetViewMode={handleSetViewMode} disableNewTask={!canCreateTaskBool} />
 
       {/* Daily task limit indicator */}
       {(() => {
-        const pStatus = getPassStatus(S.task_statuses);
-        const dailyCount = myTasksOnDate.filter(t => t.status !== completeStatus && t.status !== pStatus && !t.hidden).length;
-        const member = S.members.find(m => m.id === memberId);
-        const lim = member?.capacity ?? 6;
-        const capColor = dailyCount > lim ? '#e76f51' : dailyCount === lim ? '#d97706' : 'var(--t2)';
+        const capColor = dailyActiveCount > dailyLimit ? '#e76f51' : dailyActiveCount === dailyLimit ? '#d97706' : 'var(--t2)';
         return (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 16px', fontSize: 12, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
             <span style={{ color: 'var(--t3)' }}>Your daily limit:</span>
-            <span style={{ fontWeight: 700, color: capColor }}>{dailyCount}/{lim}</span>
+            <span style={{ fontWeight: 700, color: capColor }}>{dailyActiveCount}/{dailyLimit}</span>
           </div>
         );
       })()}
@@ -227,7 +229,7 @@ export default function MemberLineUp() {
         )}
       </div>
 
-      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
+      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} readonlyAssignee={true} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
     </div>
   );
 }

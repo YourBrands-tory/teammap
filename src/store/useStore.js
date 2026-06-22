@@ -5,6 +5,7 @@ import {
   DMOODS, DEFAULT_NAV_ORDER, DEFAULT_NAV_LABELS, DEFAULT_TASK_STATUSES, uid,
 } from '../lib/constants';
 import { getCompleteStatus, getReviewStatus } from '../utils/statusUtils';
+import { validateTaskCreation } from '../utils/taskLimits';
 
 const taskFromRow = (r) => {
   const t = {
@@ -303,7 +304,13 @@ export const useStore = create((set, get) => ({
       subtasks:[], links:[], isMilestone:false, milestoneId:null, deleted:false,
       ...(existing || {}), ...task };
     const isNew = !t.id;
-    if (isNew) { t.id = uid(); t.createdAt = now; t.createdBy = session?.memberId || null; }
+    if (isNew) {
+      t.id = uid(); t.createdAt = now; t.createdBy = session?.memberId || null;
+      for (const mid of (t.assignedTo || [])) {
+        const result = validateTaskCreation(get().S, mid, t.mood, t.date, t.id);
+        if (!result.valid) throw new Error(result.error);
+      }
+    }
     if (session?.role === 'member' && t.status === getCompleteStatus(get().S.task_statuses)) {
       t.status = getReviewStatus(get().S.task_statuses);
     }

@@ -26,10 +26,11 @@ interface Props {
   onSetFilter: (k: keyof Filters, v: string | boolean) => void;
   onNewTask: () => void;
   onSetViewMode: (mode: 'standard' | 'compact') => void;
+  disableNewTask?: boolean;
 }
 
 export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filters, isManager, viewMode,
-  onShift, onGoToday, onSetSortMode, onSetFilter, onNewTask, onSetViewMode }: Props) {
+  onShift, onGoToday, onSetSortMode, onSetFilter, onNewTask, onSetViewMode, disableNewTask }: Props) {
   const totalStr = totalMins
     ? `${Math.floor(totalMins / 60)}h${totalMins % 60 ? ' ' + totalMins % 60 + 'm' : ''}`
     : '0h';
@@ -60,90 +61,94 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
     <div className="lu-hdr">
       {/* ── DESKTOP ── */}
       <div className="lu-desk-wrap">
-        <div className="layout-header">
-          <div className="layout-left">
-            <div className="lu-hdr-row lu-hdr-row-top">
-              <span className="stl" style={{ whiteSpace: 'nowrap' }}>Line Up</span>
-              <div className="lu-hdr-date-nav">
-                <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => onShift(-1)}>&#8592;</button>
-                <input type="date" value={date} onChange={e => onShift(0, e.target.value)} style={{ width: 140, fontSize: 12 }} />
-                <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => onShift(1)}>&#8594;</button>
-              </div>
-              <div className="lu-hdr-view-toggle">
-                <button className={`btn btn-xs${viewMode === 'standard' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('standard')}>Standard</button>
-                <button className={`btn btn-xs${viewMode === 'compact' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('compact')}>Compact</button>
-              </div>
+        {/* ROW 1 — Navigation | Progress | Sort | Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24, width: '100%', flexWrap: 'nowrap' }}>
+          {/* Navigation group */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            <div className="lu-hdr-date-nav">
+              <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => onShift(-1)}>&#8592;</button>
+              <input type="date" value={date} onChange={e => onShift(0, e.target.value)} style={{ width: 140, fontSize: 12 }} />
+              <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => onShift(1)}>&#8594;</button>
             </div>
+            <button className="btn btn-sm" onClick={onGoToday} style={{ fontWeight: 700 }}>Today</button>
+            <div className="lu-hdr-view-toggle">
+              <button className={`btn btn-xs${viewMode === 'standard' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('standard')}>Standard</button>
+              <button className={`btn btn-xs${viewMode === 'compact' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('compact')}>Compact</button>
+            </div>
+            <button className="btn btn-sm btn-p" onClick={onNewTask} disabled={disableNewTask} title={disableNewTask ? 'Daily task limit reached' : ''}>+ New task</button>
           </div>
 
-          <div className="layout-center">
-            <div className="lu-hdr-row lu-hdr-row-today">
-              <button className="btn btn-sm" onClick={onGoToday} style={{ fontWeight: 700 }}>Today</button>
-              <span className="lu-hdr-date-text" style={{ fontSize: 12, color: 'var(--t2)' }}>{fmtD(date)}</span>
-              <div className="lu-hdr-spacer" />
-              {isManager && (
-                <button className="btn btn-sm btn-p" onClick={onNewTask}>+ New task</button>
-              )}
+          {/* Progress group */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            <span style={{ fontSize: 12, color: 'var(--t2)', whiteSpace: 'nowrap' }}>{fmtD(date)}</span>
+            <div style={{ width: 140 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--t3)', marginBottom: 2 }}>
+                <span style={{ fontWeight: 700, color: prog.pct === 100 ? 'var(--accent)' : 'var(--t2)' }}>
+                  {prog.done}/{prog.total} &middot; {prog.pct}%
+                </span>
+              </div>
+              <div style={{ height: 6, background: 'var(--s3)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 3,
+                  background: prog.pct === 100 ? 'var(--accent)' : prog.pct > 60 ? 'var(--a2)' : 'var(--info)',
+                  width: `${prog.pct}%`, transition: '.4s'
+                }} />
+              </div>
             </div>
-
-            <div className="lu-hdr-row lu-hdr-row-progress">
-              {progressContent}
-              <span className="lu-time-chip" style={{ fontSize: 12 }}>&#9201; {totalStr}</span>
-            </div>
+            <span className="lu-time-chip" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>&#9201; {totalStr}</span>
           </div>
 
-          <div className="toolbar-right">
-            <div className="sort-group">
-              <span className="sort-label" style={{ fontSize: 11, color: 'var(--t3)', flexShrink: 0 }}>Sort:</span>
-              <div className="sort-chips">
-                {sortModes.map(m => (
-                  <button key={m} className={`btn btn-xs${sortMode === m ? ' btn-p' : ''}`} onClick={() => onSetSortMode(m)}>
-                    {m.charAt(0).toUpperCase() + m.slice(1)}
-                  </button>
-                ))}
-              </div>
-              {isManager && (
-                <select className="fsel lu-hdr-member-filter" value={filters.member} onChange={e => onSetFilter('member', e.target.value)}>
-                  <option value="">All members</option>
-                  {S.members.map(m => {
-                    const dailyCount = (S.tasks || []).filter(t =>
-                      t.assignedTo?.includes(m.id) &&
-                      t.date === date &&
-                      !t.deleted &&
-                      t.status !== cStatus &&
-                      t.status !== pStatus
-                    ).length;
-                    const lim = m.capacity ?? 6;
-                    return <option key={m.id} value={m.id}>{m.name} ({dailyCount}/{lim})</option>;
-                  })}
-                </select>
-              )}
-            </div>
+          {/* Sort group */}
+          <div className="sort-group" style={{ flexShrink: 0 }}>
+            <span className="sort-label" style={{ fontSize: 11, color: 'var(--t3)' }}>Sort:</span>
+            {sortModes.map(m => (
+              <button key={m} className={`btn btn-xs${sortMode === m ? ' btn-p' : ''}`} onClick={() => onSetSortMode(m)}>
+                {m.charAt(0).toUpperCase() + m.slice(1)}
+              </button>
+            ))}
+          </div>
 
-            <div className="filter-group">
-              <select className="fsel" value={filters.client} onChange={e => onSetFilter('client', e.target.value)}>
-                <option value="">All clients</option>
-                {S.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {/* Filter group */}
+          <div className="filter-group" style={{ flex: 1, minWidth: 0 }}>
+            {isManager && (
+              <select className="fsel" value={filters.member} onChange={e => onSetFilter('member', e.target.value)}>
+                <option value="">All members</option>
+                {S.members.map(m => {
+                  const dailyCount = (S.tasks || []).filter(t =>
+                    t.assignedTo?.includes(m.id) &&
+                    t.date === date &&
+                    !t.deleted &&
+                    t.status !== cStatus &&
+                    t.status !== pStatus
+                  ).length;
+                  const lim = m.capacity ?? 6;
+                  return <option key={m.id} value={m.id}>{m.name} ({dailyCount}/{lim})</option>;
+                })}
               </select>
-              <select className="fsel" value={filters.mood} onChange={e => onSetFilter('mood', e.target.value)}>
-                <option value="">All moods</option>
-                {S.moods.filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
-              </select>
-              <select className="fsel" value={filters.status} onChange={e => onSetFilter('status', e.target.value)}>
-                <option value="">All statuses</option>
-                {(S.task_statuses || []).sort((a: any, b: any) => a.order - b.order).map((s: any) => (
-                  <option key={s.id} value={s.label}>{s.label}</option>
-                ))}
-              </select>
-            </div>
+            )}
+            <select className="fsel" value={filters.client} onChange={e => onSetFilter('client', e.target.value)}>
+              <option value="">All clients</option>
+              {S.clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <select className="fsel" value={filters.mood} onChange={e => onSetFilter('mood', e.target.value)}>
+              <option value="">All moods</option>
+              {S.moods.filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
+            </select>
+            <select className="fsel" value={filters.status} onChange={e => onSetFilter('status', e.target.value)}>
+              <option value="">All statuses</option>
+              {(S.task_statuses || []).sort((a: any, b: any) => a.order - b.order).map((s: any) => (
+                <option key={s.id} value={s.label}>{s.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        <div className="lu-hdr-row lu-hdr-row-review">
+        {/* ROW 2 — Review & Search */}
+        <div className="search-row" style={{ display: 'flex', gap: 12, alignItems: 'center', width: '100%' }}>
           <button
             className={`btn btn-sm${filters.review ? ' btn-p' : ''}`}
             onClick={() => onSetFilter('review', !filters.review)}
-            style={{ flexShrink: 0 }}
+            style={{ width: 110, flexShrink: 0 }}
           >
             Review{filters.review ? ' ✕' : ''}
           </button>
@@ -153,6 +158,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
             placeholder="Search tasks..."
             value={filters.search}
             onChange={e => onSetFilter('search', e.target.value)}
+            style={{ flex: 1, minWidth: 300 }}
           />
         </div>
       </div>
@@ -177,9 +183,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
               {m.charAt(0).toUpperCase() + m.slice(1)}
             </button>
           ))}
-          {isManager && (
-            <button className="btn btn-sm btn-p new-task-btn" onClick={onNewTask} style={{ flexShrink: 0 }}>+ New task</button>
-          )}
+          <button className="btn btn-sm btn-p new-task-btn" onClick={onNewTask} disabled={disableNewTask} title={disableNewTask ? 'Daily task limit reached' : ''} style={{ flexShrink: 0 }}>+ New task</button>
         </div>
 
         <div className="lu-mob-info-row">

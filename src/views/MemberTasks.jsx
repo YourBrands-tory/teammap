@@ -3,8 +3,9 @@ import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { today, fmtD, taskTimeStr } from '../lib/constants';
 import { getStatusMaps, getCompleteStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
+import { canCreateTask, getDailyActiveCount, getDailyLimit } from '../utils/taskLimits';
 import TaskModal from '../components/TaskModal';
-import HiddenTasksPanel from '../components/HiddenTasksPanel';
+import TaskSidePanel from '../components/TaskSidePanel';
 import CircProg from '../components/CircProg';
 
 export default function MemberTasks() {
@@ -16,8 +17,7 @@ export default function MemberTasks() {
   const reviewStatus = getReviewStatus(S.task_statuses);
   const [dashDate, setDashDate] = useState(today());
   const [modal, setModal] = useState(null);
-  const [panelWidth, setPanelWidth] = useState(380);
-  const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);
+  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
 
   const openTask = useCallback((t) => setModal(t), []);
   const closeModal = useCallback(() => setModal(null), []);
@@ -130,7 +130,7 @@ export default function MemberTasks() {
 
       {/* ── BODY ── */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-        <div className="task-dash-main" style={{ overflow: 'auto', padding: 12 }}>
+        <div className="task-dash-main" style={{ flex: 1, overflow: 'auto', padding: 12 }}>
           {!visibleTasks.length ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 8, color: 'var(--t3)' }}>
               <div style={{ fontSize: 36 }}>📋</div>
@@ -145,35 +145,26 @@ export default function MemberTasks() {
           )}
         </div>
 
-        <HiddenTasksPanel
-          hiddenTasks={hiddenTasks} moods={S.moods}
-          panelWidth={panelWidth} onResize={setPanelWidth} onRestore={restoreTask} />
+        <TaskSidePanel
+          memberId={memberId} date={dashDate} S={S} onOpenTask={openTask}
+          hiddenTasks={hiddenTasks} onRestoreTask={restoreTask} />
       </div>
 
       <div className="lu-mobile-hidden">
-        <button className="lu-mobile-hidden-toggle" onClick={() => setMobileHiddenOpen(o => !o)}>
-          &#128065; Hidden ({hiddenTasks.length})
+        <button className="lu-mobile-hidden-toggle" onClick={() => setMobilePanelOpen(o => !o)}>
+          👁 Tasks ({hiddenTasks.length} hidden)
         </button>
 
-        {mobileHiddenOpen && (
-          <div className="lu-mobile-drawer" onClick={() => setMobileHiddenOpen(false)}>
+        {mobilePanelOpen && (
+          <div className="lu-mobile-drawer" onClick={() => setMobilePanelOpen(false)}>
             <div className="lu-mobile-drawer-content" onClick={e => e.stopPropagation()}>
               <div className="lu-mobile-drawer-head">
-                <span>&#128065; Hidden</span>
-                <button className="btn btn-sm" onClick={() => setMobileHiddenOpen(false)}>Close</button>
+                <span>{S.members.find(m => m.id === memberId)?.name || 'My Tasks'}</span>
+                <button className="btn btn-sm" onClick={() => setMobilePanelOpen(false)}>Close</button>
               </div>
-              {!hiddenTasks.length ? (
-                <div style={{ fontSize: 12, color: 'var(--t3)', padding: '12px 6px', textAlign: 'center' }}>No hidden tasks</div>
-              ) : hiddenTasks.map(t => {
-                const mood = S.moods.find(m => m.id === t.mood);
-                return (
-                  <div key={t.id} className="lu-hidden-card">
-                    <span style={{ fontSize: 13 }}>{mood?.icon || '?'}</span>
-                    <span className="lu-title" style={{ flex: 1 }}>{t.name}</span>
-                    <button className="lu-restore-btn" onClick={() => { restoreTask(t.id); setMobileHiddenOpen(false); }} title="Bring back to line up">&#8630;</button>
-                  </div>
-                );
-              })}
+              <TaskSidePanel
+                memberId={memberId} date={dashDate} S={S} onOpenTask={(t) => { openTask(t); setMobilePanelOpen(false); }}
+                hiddenTasks={hiddenTasks} onRestoreTask={restoreTask} />
             </div>
           </div>
         )}
@@ -185,13 +176,9 @@ export default function MemberTasks() {
 }
 
 function MemberTaskCol({ memberId, date, S, tasks, completeStatus, onOpenTask, onStatus, onHide }) {
-  const passStatus = getPassStatus(S.task_statuses);
-  const dailyActive = S.tasks.filter(t =>
-    t.assignedTo?.includes(memberId) && t.date === date && !t.deleted &&
-    t.status !== completeStatus && t.status !== passStatus
-  ).length;
+  const dailyActive = getDailyActiveCount(S, memberId, date);
+  const dailyCap = getDailyLimit(S, memberId);
   const member = S.members.find(m => m.id === memberId);
-  const dailyCap = member?.capacity ?? 6;
   const capColor = dailyActive > dailyCap ? '#e76f51' : dailyActive === dailyCap ? '#d97706' : 'var(--t2)';
   const limitReached = dailyActive >= dailyCap;
 

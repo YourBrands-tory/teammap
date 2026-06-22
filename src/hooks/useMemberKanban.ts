@@ -51,8 +51,7 @@ export default function useMemberKanban() {
         const mood = moodMap[mid];
         const tasks = myTasks.filter((t: any) => t.mood === mid);
         return { ...mood, tasks };
-      })
-      .filter(section => section.tasks.length > 0);
+      });
   }, [S.moods, myTasks]);
 
   const setStatus = useCallback(async (taskId: string, status: string) => {

@@ -7,14 +7,14 @@ import MemberTasks from './MemberTasks';
 import Toast from '../components/Toast';
 
 const TABS = [
+  { id: 'tk', label: 'Tasks', icon: '🗂️' },
   { id: 'lu', label: 'Line Up', icon: '📋' },
   { id: 'pg', label: 'Playground', icon: '◢' },
   { id: 'kb', label: 'Kanban', icon: '📌' },
-  { id: 'tk', label: 'Tasks', icon: '🗂️' },
 ];
 
 export default function MemberView() {
-  const [tab, setTab] = useState('lu');
+  const [tab, setTab] = useState('tk');
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const memberSession = useStore(s => s.session);

@@ -407,6 +407,8 @@ select.fsel{padding:4px 8px;border-radius:var(--r);font-size:12px;border:1px sol
 .filter-group{display:flex;align-items:center;gap:12px;min-width:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
 .filter-group::-webkit-scrollbar{display:none}
 .filter-group .fsel{min-width:140px}
+.search-row{display:flex;gap:12px;align-items:center;width:100%}
+.search-row .fsel{flex:1;min-width:300px}
 .lu-body{flex:1;display:flex;overflow:hidden}
 .lu-main{flex:1;overflow-y:auto;padding:12px;min-width:0}
 .lu-hidden-panel{border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;position:relative}
@@ -444,6 +446,17 @@ select.fsel{padding:4px 8px;border-radius:var(--r);font-size:12px;border:1px sol
 .lu-hidden-card{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;border:1px solid var(--border);background:var(--s2);margin-bottom:5px;font-size:12px}
 .lu-hidden-card .lu-title{font-size:12px;font-weight:600}
 .lu-restore-btn{width:22px;height:22px;border-radius:50%;border:1px solid var(--accent);background:var(--al);color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+
+/* compact cards */
+.lu-card.compact{height:76px;min-height:76px;max-height:76px;padding:0 16px;overflow:hidden}
+.lu-card.size-narrow.compact,.lu-card.size-mid.compact,.lu-card.size-big.compact{padding:0 16px}
+.lu-card.compact .lu-info{display:flex;align-items:center;height:100%;overflow:hidden}
+.lu-card.compact .lu-title{margin-bottom:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lu-card.compact .lu-meta-row{display:none!important}
+.lu-card.compact .lu-mood-chip{width:28px;height:28px}
+.lu-card.compact .lu-mood-chip span{font-size:14px!important}
+.lu-card.compact .lu-drag-handle{font-size:18px}
+.lu-card.compact .lu-actions{gap:6px}
 
 /* ── PLAYGROUND ───────────────────────────────────────────── */
 .pg-app{flex:1;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;background:var(--bg)}

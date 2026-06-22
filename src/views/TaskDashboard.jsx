@@ -7,6 +7,7 @@ import Avatar from '../components/Avatar';
 import TaskModal from '../components/TaskModal';
 import StatusPopup from '../components/StatusPopup';
 import CircProg from '../components/CircProg';
+import TaskSidePanel from '../components/TaskSidePanel';
 
 const minsOf = (t) => (t.estH||0)*60 + (t.estM||0);
 const hm = (m) => m ? `${Math.floor(m/60)}h${m%60?' '+m%60+'m':''}` : null;
@@ -138,7 +139,7 @@ export default function TaskDashboard() {
             <h4>{spM ? spM.name : 'Quick View'}</h4>
             <div style={{fontSize:10,color:'var(--t3)'}}>{fmtD(dashDate)}</div>
           </div>
-          <div className="spb"><SidePanel member={spM} date={dashDate} S={S} onOpenTask={openTask} /></div>
+          <div className="spb"><TaskSidePanel memberId={spM?.id} date={dashDate} S={S} onOpenTask={openTask} /></div>
         </div>
       </div>
 
@@ -260,7 +261,7 @@ export default function TaskDashboard() {
 
                   {/* Side panel content */}
                   <div className="td-mob-sheet-section" style={{flex:1,overflowY:'auto'}}>
-                    <SidePanel member={spM} date={dashDate} S={S} onOpenTask={(t) => { openTask(t); setMobileSheet(null); }} />
+                    <TaskSidePanel memberId={spM?.id} date={dashDate} S={S} onOpenTask={(t) => { openTask(t); setMobileSheet(null); }} />
                   </div>
                 </>
               )}
@@ -533,37 +534,6 @@ const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
       )}
     </div>
   );
-});
-
-/* ── SIDE PANEL ── */
-const SidePanel = memo(function SidePanel({ member, date, S, onOpenTask }) {
-  if (!member) return <div style={{fontSize:12,color:'var(--t3)'}}>No member selected</div>;
-  const tasks = sel.tasksForMD(S, member.id, date);
-  const visibleMoods = S.moods.filter(m => !m.hidden);
-  const groups = visibleMoods.map(mood => ({
-    ids: tasks.filter(t => t.mood === mood.id),
-    label: mood.icon + ' ' + mood.label,
-    color: mood.color,
-    style: mood.id === 'top' ? {borderLeft:'3px solid #dc2626',background:'#fff8f7'} : mood.id === 'hero' ? {borderLeft:'3px solid #d97706',background:'#fffbf0'} : mood.id === 'share' ? {borderLeft:'3px solid #2196c4'} : {},
-    showClientStrong: mood.id === 'top',
-  }));
-  if (groups.every(g=>!g.ids.length)) {
-    return <div style={{fontSize:12,color:'var(--t3)',padding:'8px 0'}}>No tasks for this date.</div>;
-  }
-  return groups.filter(g=>g.ids.length).map(g => (
-    <div key={g.label} className="spsec">
-      <div className="spst" style={{color:g.color}}>{g.label}</div>
-      {g.ids.map(t => { const c = sel.gc(S, t.clientId); return (
-        <div key={t.id} className="spt" style={g.style} onClick={()=>onOpenTask(t)}>
-          <div className="sptn">{t.name}</div>
-          <div className="sptm">
-            {c ? (g.showClientStrong ? <span style={{color:'#dc2626',fontWeight:600}}>{c.name}</span> : c.name) : ''}
-            {c?' · ':''}{t.status}{taskTimeStr(t)?' · '+taskTimeStr(t):''}
-          </div>
-        </div>
-      ); })}
-    </div>
-  ));
 });
 
 /* ── MOBILE TEAM COL ── */

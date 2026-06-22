@@ -80,7 +80,7 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
       </div>
       <div className="lu-info">
         <div className={`lu-title${compact ? ' lu-title--compact' : ''}`}>{task.isMilestone ? '\u{1F3C1} ' : ''}{task.name}</div>
-        {!isNarrow && (
+        {!isNarrow && !compact && (
           <div className="lu-meta-row">
             {client && <span className="lu-meta-chip" style={{ background: `${client.color}15`, color: client.color }}>{client.name}</span>}
             {assignees.map(m => (

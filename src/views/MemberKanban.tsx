@@ -2,6 +2,7 @@ import { fmtD } from '../lib/constants';
 import { getStatusMaps, getStatusesForRole } from '../utils/statusUtils';
 import { useStore } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
+import { canCreateTask, canAddTaskToMood } from '../utils/taskLimits';
 import useMemberKanban from '../hooks/useMemberKanban';
 import TaskModal from '../components/TaskModal';
 
@@ -72,17 +73,63 @@ export default function MemberKanban() {
                 flex: 1, overflowY: 'auto', padding: 8,
                 display: 'flex', flexDirection: 'column', gap: 6,
               }}>
-                {section.tasks.map((task: any) => (
-                  <KanbanCard
-                    key={task.id}
-                    task={task}
-                    client={S.clients.find((c: any) => c.id === task.clientId)}
-                    assignees={(task.assignedTo || []).map((id: string) => S.members.find((m: any) => m.id === id)).filter(Boolean)}
-                    onOpen={() => setTaskModal(task)}
-                    onStatusChange={(s: string) => setStatus(task.id, s)}
-                  />
-                ))}
+                {section.tasks.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--t3)', textAlign: 'center', padding: '20px 0' }}>
+                    No {section.label.toLowerCase()} tasks
+                  </div>
+                ) : (
+                  section.tasks.map((task: any) => (
+                    <KanbanCard
+                      key={task.id}
+                      task={task}
+                      client={S.clients.find((c: any) => c.id === task.clientId)}
+                      assignees={(task.assignedTo || []).map((id: string) => S.members.find((m: any) => m.id === id)).filter(Boolean)}
+                      onOpen={() => setTaskModal(task)}
+                      onStatusChange={(s: string) => setStatus(task.id, s)}
+                    />
+                  ))
+                )}
               </div>
+
+              {/* Add task button */}
+              {(() => {
+                const dailyOk = canCreateTask(S, memberId, date);
+                const moodOk = canAddTaskToMood(S, section.id, date, memberId);
+                const disabled = !dailyOk || !moodOk;
+                let label = '+ Task';
+                let title = '';
+                if (!dailyOk && !moodOk) {
+                  label = 'Daily limit reached';
+                  title = 'Daily task limit reached';
+                } else if (!moodOk) {
+                  label = 'Limit reached';
+                  title = `${section.label} limit reached`;
+                } else if (!dailyOk) {
+                  label = 'Daily limit reached';
+                  title = 'Daily task limit reached';
+                }
+                return (
+                  <button
+                    disabled={disabled}
+                    onClick={() => { if (!disabled) setTaskModal({ date, mood: section.id, assignedTo: [memberId] }); }}
+                    title={title}
+                    style={{
+                      width: '100%', minHeight: 44, border: `1px dashed ${disabled ? 'var(--border)' : 'var(--border)'}`,
+                      borderRadius: 10, background: disabled ? 'var(--s2)' : 'transparent',
+                      color: disabled ? 'var(--t3)' : 'var(--t3)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                      fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                      transition: 'all .15s', flexShrink: 0, padding: '4px 12px', marginTop: 0,
+                      opacity: disabled ? 0.5 : 1,
+                    }}
+                    onMouseEnter={e => { if (!disabled) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--al)'; } }}
+                    onMouseLeave={e => { if (!disabled) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--t3)'; e.currentTarget.style.background = 'transparent'; } }}
+                  >
+                    {label}
+                  </button>
+                );
+              })()}
             </div>
           ))
         )}

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { COLORS, today, uid } from '../lib/constants';
 import { useStore, sel } from '../store/useStore';
 import { getStatusMaps, getDefaultStatus, getCompleteStatus, getPassStatus, getStatusesForRole, canDeleteTask } from '../utils/statusUtils';
+import { validateTaskCreation, getMoodLimit } from '../utils/taskLimits';
 import Avatar from './Avatar';
 
 const DRAFT_KEY = 'tm_task_draft';
@@ -65,6 +66,17 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [activity, setActivity] = useState([]);
   const notesRef = useRef(null);
   const taskNameRef = useRef(null);
+
+  // Reactive limit check
+  const limitError = (() => {
+    if (!assigned.length || !mood) return null;
+    const d = date || today();
+    for (const mid of assigned) {
+      const r = validateTaskCreation(S, mid, mood, d, task.id);
+      if (!r.valid) return r.error;
+    }
+    return null;
+  })();
 
   const [tab, setTab] = useState('essentials');
   const hasDetailContent = isEdit && (task.notes || (task.tags?.length > 0) || (task.subtasks?.length > 0) || (task.links?.length > 0));
@@ -238,19 +250,9 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     const pStatus = getPassStatus(S.task_statuses);
     const taskDate = date || today();
     for (const mid of assigned) {
-      const member = S.members.find(m => m.id === mid);
-      if (!member) continue;
-      const limit = member.capacity ?? 6;
-      const dailyCount = S.tasks.filter(t =>
-        t.assignedTo?.includes(mid) &&
-        t.date === taskDate &&
-        !t.deleted &&
-        t.status !== cStatus &&
-        t.status !== pStatus &&
-        t.id !== task.id
-      ).length;
-      if (dailyCount >= limit) {
-        setSaveError(`${member.name} already has ${dailyCount}/${limit} tasks for ${new Date(taskDate + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.\n\nComplete, move, or unassign another task before adding a new one.`);
+      const result = validateTaskCreation(S, mid, mood, taskDate, task.id);
+      if (!result.valid) {
+        setSaveError(result.error);
         return;
       }
     }
@@ -333,11 +335,27 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
           <div className="mood-pick-row horizontal-scroll" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
             {S.moods.filter(m => !m.hidden || m.id === mood).map(m => {
               const on = mood === m.id;
+              const moodLimit = m.max;
+              const moodFull = moodLimit !== null && assigned.length > 0 && (() => {
+                const d = date || today();
+                const c = S.tasks.filter(t =>
+                  t.assignedTo?.some(a => assigned.includes(a)) &&
+                  t.date === d && !t.deleted &&
+                  t.status !== getCompleteStatus(S.task_statuses) &&
+                  t.status !== getPassStatus(S.task_statuses) &&
+                  t.mood === m.id && t.id !== task.id
+                ).length;
+                return c >= moodLimit;
+              })();
               return (
                 <div key={m.id} className={`mood-opt-btn${on?' on':''}`}
-                  style={on?{background:m.bg,color:m.color,borderColor:m.color,borderWidth:2}:{}}
-                  onClick={()=>setMood(m.id)}>
-                  {m.icon} {m.label}{m.max?<span style={{fontSize:9,opacity:.6}}> max{m.max}</span>:null}
+                  style={{
+                    ...(on?{background:m.bg,color:m.color,borderColor:m.color,borderWidth:2}:{}),
+                    ...(moodFull && !on ? {opacity:0.4,cursor:'not-allowed'} : {}),
+                  }}
+                  onClick={() => { if (!moodFull) setMood(m.id); }}>
+                  {m.icon} {m.label}{moodLimit !== null ? <span style={{fontSize:9,opacity:.6}}> max{moodLimit}</span> : null}
+                  {moodFull ? <span style={{fontSize:9,marginLeft:4,color:'var(--warn)'}}>full</span> : null}
                 </div>
               );
             })}
@@ -535,6 +553,9 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
           )}
         </div>
 
+        {limitError && <div style={{marginTop:10,padding:'8px 12px',background:'#d32f2f22',border:'1px solid #d32f2f',borderRadius:6,color:'#d32f2f',fontSize:13,fontWeight:600}}>
+          {limitError}
+        </div>}
         {saveError && <div style={{marginTop:10,padding:'8px 12px',background:'#d32f2f22',border:'1px solid #d32f2f',borderRadius:6,color:'#d32f2f',fontSize:13,fontWeight:600}}>
           Save failed: {saveError}
         </div>}
@@ -553,7 +574,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
                 links: links.map(l => ({ ...l })),
               })}>Save as Template</button>
             )}
-            <button className="btn btn-p" onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save task'}</button>
+            <button className="btn btn-p" onClick={save} disabled={saving || !!limitError}>{saving ? 'Saving…' : 'Save task'}</button>
           </div>
         </div>
       </div>
