@@ -454,7 +454,7 @@ export default function TaskGen2() {
             value={tmplForm.name} onChange={e => setTmplForm({ ...tmplForm, name: e.target.value })} autoFocus />
 
           <label className="fl">Mood</label>
-          <div className="mood-pick-row">
+          <div className="mood-pick-row horizontal-scroll">
             {S.moods.filter((m: any) => !m.hidden || m.id === tmplForm.mood).map((m: any) => {
               const on = tmplForm.mood === m.id;
               return (
@@ -468,7 +468,7 @@ export default function TaskGen2() {
           </div>
 
           <label className="fl">Default assign to</label>
-          <div className="ttag-row">
+          <div className="ttag-row horizontal-scroll">
             {S.members.map((m: any) => {
               const on = tmplForm.assignedTo.includes(m.id);
               return (
@@ -644,7 +644,7 @@ export default function TaskGen2() {
           <textarea placeholder="What does this milestone represent?"
             value={msModal.description || ''} onChange={e => setMsModal({ ...msModal, description: e.target.value })} />
           <label className="fl">Assign to</label>
-          <div className="ttag-row">
+          <div className="ttag-row horizontal-scroll">
             {S.members.map((m: any) => {
               const on = (msModal.assignedTo || []).includes(m.id);
               return (

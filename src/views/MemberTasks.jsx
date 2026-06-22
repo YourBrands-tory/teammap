@@ -5,6 +5,7 @@ import { today, fmtD, taskTimeStr } from '../lib/constants';
 import { getStatusMaps, getCompleteStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
 import TaskModal from '../components/TaskModal';
 import HiddenTasksPanel from '../components/HiddenTasksPanel';
+import CircProg from '../components/CircProg';
 
 export default function MemberTasks() {
   const S = useStore(s => s.S);
@@ -149,23 +150,34 @@ export default function MemberTasks() {
           panelWidth={panelWidth} onResize={setPanelWidth} onRestore={restoreTask} />
       </div>
 
-      <button className="lu-mobile-hidden-toggle" onClick={() => setMobileHiddenOpen(o => !o)}>
-        &#128065; Hidden ({hiddenTasks.length})
-      </button>
+      <div className="lu-mobile-hidden">
+        <button className="lu-mobile-hidden-toggle" onClick={() => setMobileHiddenOpen(o => !o)}>
+          &#128065; Hidden ({hiddenTasks.length})
+        </button>
 
-      {mobileHiddenOpen && hiddenTasks.length > 0 && (
-        <div className="lu-mobile-drawer" onClick={() => setMobileHiddenOpen(false)}>
-          <div className="lu-mobile-drawer-content" onClick={e => e.stopPropagation()}>
-            <div className="lu-mobile-drawer-head">
-              <span>&#128065; Hidden</span>
-              <button className="btn btn-sm" onClick={() => setMobileHiddenOpen(false)}>Close</button>
+        {mobileHiddenOpen && (
+          <div className="lu-mobile-drawer" onClick={() => setMobileHiddenOpen(false)}>
+            <div className="lu-mobile-drawer-content" onClick={e => e.stopPropagation()}>
+              <div className="lu-mobile-drawer-head">
+                <span>&#128065; Hidden</span>
+                <button className="btn btn-sm" onClick={() => setMobileHiddenOpen(false)}>Close</button>
+              </div>
+              {!hiddenTasks.length ? (
+                <div style={{ fontSize: 12, color: 'var(--t3)', padding: '12px 6px', textAlign: 'center' }}>No hidden tasks</div>
+              ) : hiddenTasks.map(t => {
+                const mood = S.moods.find(m => m.id === t.mood);
+                return (
+                  <div key={t.id} className="lu-hidden-card">
+                    <span style={{ fontSize: 13 }}>{mood?.icon || '?'}</span>
+                    <span className="lu-title" style={{ flex: 1 }}>{t.name}</span>
+                    <button className="lu-restore-btn" onClick={() => { restoreTask(t.id); setMobileHiddenOpen(false); }} title="Bring back to line up">&#8630;</button>
+                  </div>
+                );
+              })}
             </div>
-            <HiddenTasksPanel
-              hiddenTasks={hiddenTasks} moods={S.moods} panelWidth={300}
-              onRestore={(id) => { restoreTask(id); setMobileHiddenOpen(false); }} />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {modal && <TaskModal task={modal} onClose={closeModal} readonlyAssignee={true} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
     </div>
@@ -355,17 +367,7 @@ const MTaskCard = ({ task, S, onOpenTask, onStatus, onHide }) => {
             </span>
           )}
           {hasSubtasks && (
-            <span className="card-circ-prog" title={`${subDone} of ${subTotal} subtasks completed`}
-              role="progressbar" aria-valuenow={subDone} aria-valuemin={0} aria-valuemax={subTotal}>
-              <svg width="20" height="20" viewBox="0 0 30 30">
-                <circle cx="15" cy="15" r="13" fill="none" stroke="var(--s2)" strokeWidth="3.5" />
-                <circle cx="15" cy="15" r="13" fill="none" stroke="var(--accent)" strokeWidth="3.5"
-                  strokeDasharray={2 * Math.PI * 13}
-                  strokeDashoffset={2 * Math.PI * 13 - (subDone / subTotal) * 2 * Math.PI * 13}
-                  strokeLinecap="round" transform="rotate(-90 15 15)" style={{ transition: 'stroke-dashoffset .3s' }} />
-              </svg>
-              <span className="card-circ-text" style={{ fontSize: 8 }}>{subDone}/{subTotal}</span>
-            </span>
+            <CircProg done={subDone} total={subTotal} />
           )}
         </div>
       )}

@@ -51,9 +51,9 @@ export default function Nav({ current, onSwitch }) {
 
   return (
     <div className="nav">
-      <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} onTouchStart={() => setMenuOpen(o => !o)} aria-label="Menu">
-        <span className={`nav-hamburger-line${menuOpen ? ' open' : ''}`} />
-      </button>
+        <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
+          {menuOpen ? '✕' : '☰'}
+        </button>
       <div className="nav-brand">Team<span>Map</span></div>
       <div className="nav-desktop-items" style={{display:'flex',alignItems:'center',gap:0}}>
         {order.map(v => (

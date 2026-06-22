@@ -305,7 +305,7 @@ export const useStore = create((set, get) => ({
     const isNew = !t.id;
     if (isNew) { t.id = uid(); t.createdAt = now; t.createdBy = session?.memberId || null; }
     if (session?.role === 'member' && t.status === getCompleteStatus(get().S.task_statuses)) {
-      throw new Error('Members cannot set status to Complete');
+      t.status = getReviewStatus(get().S.task_statuses);
     }
     t.updatedBy = session?.memberId || null;
     t.updatedAt = now;
@@ -365,7 +365,7 @@ export const useStore = create((set, get) => ({
   setTaskStatus: async (taskId, status) => {
     const session = get().session;
     if (session?.role === 'member' && status === getCompleteStatus(get().S.task_statuses)) {
-      throw new Error('Members cannot set status to Complete');
+      return;
     }
     let updated=null;
     get()._patchS((S) => {

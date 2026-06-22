@@ -76,23 +76,34 @@ export default function LineUp() {
           onResize={setPanelWidth} onRestore={restoreTask} />
       </div>
 
-      <button className="lu-mobile-hidden-toggle" onClick={() => setMobileHiddenOpen(o => !o)}>
-        &#128065; Hidden ({hiddenTasks.length})
-      </button>
+      <div className="lu-mobile-hidden">
+        <button className="lu-mobile-hidden-toggle" onClick={() => setMobileHiddenOpen(o => !o)}>
+          &#128065; Hidden ({hiddenTasks.length})
+        </button>
 
-      {mobileHiddenOpen && (
-        <div className="lu-mobile-drawer" onClick={() => setMobileHiddenOpen(false)}>
-          <div className="lu-mobile-drawer-content" onClick={e => e.stopPropagation()}>
+        {mobileHiddenOpen && (
+          <div className="lu-mobile-drawer">
             <div className="lu-mobile-drawer-head">
               <span>&#128065; Hidden</span>
               <button className="btn btn-sm" onClick={() => setMobileHiddenOpen(false)}>Close</button>
             </div>
-            <HiddenTasksPanel
-              hiddenTasks={hiddenTasks} moods={S.moods} panelWidth={300}
-              onRestore={(id) => { restoreTask(id); setMobileHiddenOpen(false); }} />
+            <div className="lu-mobile-drawer-content">
+              {!hiddenTasks.length ? (
+                <div style={{ fontSize: 12, color: 'var(--t3)', padding: '12px 6px', textAlign: 'center' }}>No hidden tasks</div>
+              ) : hiddenTasks.map((t: any) => {
+                const mood = S.moods.find((m: any) => m.id === t.mood);
+                return (
+                  <div key={t.id} className="lu-hidden-card">
+                    <span style={{ fontSize: 13 }}>{mood?.icon || '?'}</span>
+                    <span className="lu-title" style={{ flex: 1 }}>{t.name}</span>
+                    <button className="lu-restore-btn" onClick={() => { restoreTask(t.id); setMobileHiddenOpen(false); }} title="Bring back to line up">&#8630;</button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} onSaveAsTemplate={(d: any) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { COLORS, today, uid } from '../lib/constants';
 import { useStore, sel } from '../store/useStore';
-import { getStatusMaps, getDefaultStatus, getCompleteStatus, getPassStatus, canDeleteTask } from '../utils/statusUtils';
+import { getStatusMaps, getDefaultStatus, getCompleteStatus, getPassStatus, getStatusesForRole, canDeleteTask } from '../utils/statusUtils';
 import Avatar from './Avatar';
 
 const DRAFT_KEY = 'tm_task_draft';
@@ -27,6 +27,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const S = useStore(s => s.S);
   const session = useStore(s => s.session);
   const { STATS } = getStatusMaps(S.task_statuses);
+  const roleStatuses = getStatusesForRole(S.task_statuses, session?.role);
   const upsertTask = useStore(s => s.upsertTask);
   const upsertTag = useStore(s => s.upsertTag);
   const upsertMilestone = useStore(s => s.upsertMilestone);
@@ -68,14 +69,6 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [tab, setTab] = useState('essentials');
   const hasDetailContent = isEdit && (task.notes || (task.tags?.length > 0) || (task.subtasks?.length > 0) || (task.links?.length > 0));
 
-  const resizeNotes = () => {
-    const el = notesRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = el.scrollHeight + 'px';
-    }
-  };
-
   const handleClose = useCallback(() => {
     clearDraft();
     onClose();
@@ -98,8 +91,6 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
       document.removeEventListener('keydown', onEsc);
     };
   }, [handleClose]);
-
-  useEffect(() => { resizeNotes(); }, [notes]);
 
   useEffect(() => { taskNameRef.current?.focus(); }, []);
 
@@ -192,7 +183,8 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const toggleSubtask = (i) => {
     const next = subtasks.map((s, idx) => idx === i ? { ...s, done: !s.done } : s);
     setSubtasks(next);
-    const newStatus = next.length && next.every(s => s.done) ? (S.task_statuses?.find(s => s.label === 'Complete' || s.label.toLowerCase().includes('complete'))?.label || 'Complete') : status;
+    const isManager = session?.role === 'admin' || session?.role === 'manager';
+    const newStatus = next.length && next.every(s => s.done) && isManager ? (S.task_statuses?.find(s => s.label === 'Complete' || s.label.toLowerCase().includes('complete'))?.label || 'Complete') : status;
     if (task.id) {
       upsertTask({
         id: task.id, createdAt: task.createdAt,
@@ -338,7 +330,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         {/* ── Section 1 — Essentials ── */}
         <div className={`modal-section${tab==='essentials'?' active':''}`}>
           <label className="fl">Mood *</label>
-          <div className="mood-pick-row" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
+          <div className="mood-pick-row horizontal-scroll" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
             {S.moods.filter(m => !m.hidden || m.id === mood).map(m => {
               const on = mood === m.id;
               return (
@@ -353,7 +345,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
 
           <label className="fl">Assign to *</label>
           {readonlyAssignee ? (
-            <div className="ttag-row">
+            <div className="ttag-row horizontal-scroll">
               {assigned.map(id => {
                 const m = S.members.find(m => m.id === id);
                 return m ? (
@@ -364,7 +356,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
               })}
             </div>
           ) : (
-            <div className="ttag-row" style={err.assigned?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
+            <div className="ttag-row horizontal-scroll" style={err.assigned?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
               {S.members.map(m => (
                 <div key={m.id} className={`ttagopt${assigned.includes(m.id)?' on':''}`}
                   onClick={()=>toggle(assigned,setAssigned,m.id)}>
@@ -375,7 +367,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
           )}
 
           <label className="fl">Client / Project</label>
-          <div className="ttag-row">
+          <div className="ttag-row horizontal-scroll">
             {sel.scl(S).map(c => {
               const on = clientId === c.id;
               return (
@@ -403,7 +395,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
                 setStatus(e.target.value);
                 if (task.id) upsertTask({ ...task, status: e.target.value }).catch(err => console.error('[TaskModal] status upsertTask failed:', err));
               }} style={{width:'100%',maxWidth:200}}>
-                {STATS.map(s => <option key={s} value={s}>{s}</option>)}
+                {roleStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div style={{flexShrink:0}}>
@@ -421,12 +413,11 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         {/* ── Section 2 — Details ── */}
         <div className={`modal-section${tab==='details'?' active':''}`}>
           <label className="fl">Notes</label>
-          <textarea ref={notesRef} placeholder="Notes…" value={notes}
-            onChange={e=>setNotes(e.target.value)} onInput={resizeNotes}
-            style={{minHeight:60,marginTop:6,overflow:'hidden',resize:'none'}} />
+          <textarea ref={notesRef} className="task-notes" placeholder="Notes…" value={notes}
+            onChange={e=>setNotes(e.target.value)} />
 
           <label className="fl">Tags</label>
-          <div className="tag-chip-pick">
+          <div className="tag-chip-pick horizontal-scroll">
             {(S.tags||[]).map(tg => (
               <div key={tg.id} className={`tcp${tags.includes(tg.id)?' on':''}`}
                 onClick={()=>toggle(tags,setTags,tg.id)}>{tg.label}</div>

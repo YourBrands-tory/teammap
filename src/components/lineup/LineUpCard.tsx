@@ -5,6 +5,7 @@ import { taskTimeStr } from '../../lib/constants';
 import { getCardSize } from '../../utils/lineUpHelpers';
 import { getStatusMaps, getStatusesForRole } from '../../utils/statusUtils';
 import { useStore } from '../../store/useStore';
+import CircProg from '../CircProg';
 
 interface Task {
   id: string; name: string; mood: string; status: string; clientId?: string;
@@ -121,17 +122,7 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
               </span>
             )}
             {hasSubtasks && subTotal > 0 && (
-              <span className="card-circ-prog" title={`${subDone} of ${subTotal} subtasks completed`}
-                role="progressbar" aria-valuenow={subDone} aria-valuemin={0} aria-valuemax={subTotal}>
-                <svg width="20" height="20" viewBox="0 0 30 30">
-                  <circle cx="15" cy="15" r="13" fill="none" stroke="var(--s2)" strokeWidth="3.5" />
-                  <circle cx="15" cy="15" r="13" fill="none" stroke="var(--accent)" strokeWidth="3.5"
-                    strokeDasharray={2 * Math.PI * 13}
-                    strokeDashoffset={2 * Math.PI * 13 - (subDone / subTotal) * 2 * Math.PI * 13}
-                    strokeLinecap="round" transform="rotate(-90 15 15)" style={{ transition: 'stroke-dashoffset .3s' }} />
-                </svg>
-                <span className="card-circ-text" style={{ fontSize: 8 }}>{subDone}/{subTotal}</span>
-              </span>
+              <CircProg done={subDone} total={subTotal} />
             )}
           </div>
         )}

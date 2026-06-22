@@ -6,9 +6,24 @@ import { getStatusMaps, getCompleteStatus, getStandUpStatus, getReviewStatus, ge
 import Avatar from '../components/Avatar';
 import TaskModal from '../components/TaskModal';
 import StatusPopup from '../components/StatusPopup';
+import CircProg from '../components/CircProg';
 
 const minsOf = (t) => (t.estH||0)*60 + (t.estM||0);
 const hm = (m) => m ? `${Math.floor(m/60)}h${m%60?' '+m%60+'m':''}` : null;
+
+function getMemberStats(S, memberId, date, completeStatus, passStatus, reviewStatus) {
+  const allTasks = sel.tasksForMD(S, memberId, date);
+  const activeCount = S.tasks.filter(t =>
+    t.assignedTo?.includes(memberId) && t.date === date && !t.deleted &&
+    t.status !== completeStatus && t.status !== passStatus
+  ).length;
+  const reviewPendingCount = allTasks.filter(t => t.status === reviewStatus).length;
+  const doneCount = allTasks.filter(t => t.status === completeStatus).length;
+  const total = allTasks.length;
+  const completionPercent = total ? Math.round(doneCount / total * 100) : 0;
+  const estimatedTime = hm(allTasks.reduce((a, t) => a + minsOf(t), 0));
+  return { activeCount, reviewPendingCount, completionPercent, estimatedTime, doneCount };
+}
 
 export default function TaskDashboard() {
   const S = useStore(s => s.S);
@@ -155,25 +170,16 @@ export default function TaskDashboard() {
         {/* Member selector strip */}
         <div className="td-mob-member-strip">
           {visibleMembers.map((m, i) => {
-            const memberTasks = sel.tasksForMD(S, m.id, dashDate);
-            const memberActive = S.tasks.filter(t =>
-              t.assignedTo?.includes(m.id) && t.date === dashDate && !t.deleted &&
-              t.status !== completeStatus && t.status !== passStatus
-            ).length;
-            const memberDone = memberTasks.filter(t => t.status === completeStatus).length;
-            const memberTotal = memberTasks.length;
-            const memberPct = memberTotal ? Math.round(memberDone / memberTotal * 100) : 0;
-            const memberReview = memberTasks.filter(t => t.status === reviewStatus).length;
+            const stats = getMemberStats(S, m.id, dashDate, completeStatus, passStatus, reviewStatus);
             return (
               <button key={m.id}
                 className={`td-mob-member-chip${i === mobileMemberIdx ? ' active' : ''}`}
                 onClick={() => { setMobileMemberIdx(i); setExpandedCards({}); }}>
                 <Avatar name={m.name} color={m.color} size={24} />
                 <span className="td-mob-member-name">{m.name.split(' ')[0]}</span>
-                <span className="td-mob-member-meta">
-                  {memberActive} active{memberReview ? ` · ${memberReview} review` : ''}
-                </span>
-                <span className="td-mob-member-pct">{memberPct}%</span>
+                <div className="member-summary">
+                  {stats.activeCount} active{stats.doneCount ? ` · ${stats.doneCount}✓` : ''}
+                </div>
               </button>
             );
           })}
@@ -213,16 +219,16 @@ export default function TaskDashboard() {
               {mobileSheet === 'members' ? (
                 /* Full member list */
                 S.members.map((m, i) => {
-                  const mdaily = S.tasks.filter(t => t.assignedTo?.includes(m.id) && t.date === dashDate && !t.deleted && t.status !== completeStatus && t.status !== passStatus).length;
+                  const stats = getMemberStats(S, m.id, dashDate, completeStatus, passStatus, reviewStatus);
                   const mcap = m.capacity ?? 6;
-                  const mc = mdaily > mcap ? '#e76f51' : mdaily === mcap ? '#d97706' : 'var(--t3)';
+                  const mc = stats.activeCount > mcap ? '#e76f51' : stats.activeCount === mcap ? '#d97706' : 'var(--t3)';
                   return (
                     <button key={m.id}
                       className={`td-mob-member-row${i === mobileMemberIdx ? ' active' : ''}`}
                       onClick={() => { setMobileMemberIdx(i); setMobileSheet(null); setExpandedCards({}); }}>
                       <Avatar name={m.name} color={m.color} size={32} />
                       <span style={{fontWeight:600}}>{m.name}</span>
-                      <span style={{fontSize:11,color:mc,fontWeight:700,marginLeft:'auto'}}>{mdaily}/{mcap}</span>
+                      <span style={{fontSize:11,color:mc,fontWeight:700,marginLeft:'auto'}}>{stats.activeCount}/{mcap}</span>
                       <span style={{fontSize:12,color:'var(--t3)',marginLeft:8}}>{m.role}</span>
                     </button>
                   );
@@ -283,25 +289,21 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   const passStatus = getPassStatus(S.task_statuses);
   const standUpStatus = getStandUpStatus(S.task_statuses);
   const allTasks = sel.tasksForMD(S, member.id, date);
-  const memberReviewCount = allTasks.filter(t=>t.status===reviewStatus).length;
+  const stats = getMemberStats(S, member.id, date, completeStatus, passStatus, reviewStatus);
   const baseVisible = allTasks.filter(t=>t.status!==completeStatus);
   const reviewVisible = reviewFilter ? baseVisible.filter(t=>t.status===reviewStatus) : baseVisible;
-  const dailyActive = S.tasks.filter(t => t.assignedTo?.includes(member.id) && t.date === date && !t.deleted && t.status !== completeStatus && t.status !== passStatus).length;
   const dailyCap = member.capacity ?? 6;
-  const limitReached = dailyActive >= dailyCap;
-  const capColor = dailyActive > dailyCap ? '#e76f51' : dailyActive === dailyCap ? '#d97706' : 'var(--t3)';
+  const limitReached = stats.activeCount >= dailyCap;
+  const capColor = stats.activeCount > dailyCap ? '#e76f51' : stats.activeCount === dailyCap ? '#d97706' : 'var(--t3)';
   const setToast = useUIStore(s => s.setToast);
   const handleAddTask = useCallback((moodId) => {
     if (limitReached) {
-      setToast(`Task limit reached.\n\n${member.name} already has ${dailyActive}/${dailyCap} active tasks for today.\n\nComplete, pass, move, or reassign an existing task before creating another.`);
+      setToast(`Task limit reached.\n\n${member.name} already has ${stats.activeCount}/${dailyCap} active tasks for today.\n\nComplete, pass, move, or reassign an existing task before creating another.`);
       return;
     }
     onOpenTask({ date, mood: moodId, assignedTo: [member.id] });
-  }, [limitReached, dailyActive, dailyCap, member.name, date, onOpenTask, setToast]);
+  }, [limitReached, stats.activeCount, dailyCap, member.name, date, onOpenTask, setToast]);
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
-  const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;
-  const barColor = pct===100?'#2d6a4f':pct>60?'#52b788':'#2196c4';
-  const totalDisp = hm(allTasks.reduce((a,t)=>a+minsOf(t),0));
 
   const primaryMoodIds = ['hero', 'imp', 'top'];
   const visibleMoods = S.moods.filter(m => !m.hidden);
@@ -347,19 +349,19 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
         <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
           <Avatar name={member.name} color={member.color} size={22} />
           <span style={{fontSize:12,fontWeight:800,flex:1}}>{member.name}</span>
-          <span style={{fontSize:10,fontWeight:600,color:capColor}}>{dailyActive}/{dailyCap}</span>
-          <span style={{fontSize:10,color:'var(--t3)',marginLeft:4}}>{totalDisp||''}</span>
+          <span style={{fontSize:10,fontWeight:600,color:capColor}}>{stats.activeCount}/{dailyCap}</span>
+          <span style={{fontSize:10,color:'var(--t3)',marginLeft:4}}>{stats.estimatedTime||''}</span>
         </div>
         <div style={{display:'flex',justifyContent:'space-between',fontSize:10,marginBottom:3}}>
           <span style={{color:'var(--t3)'}}>
             {reviewVisible.length} active{doneCount?` · ${doneCount}✓`:''}
-            {memberReviewCount > 0 && !reviewFilter ? <span style={{color:'var(--warn)',fontWeight:700,marginLeft:4}}>· {memberReviewCount} review{memberReviewCount>1?'s':''} pending</span> : ''}
-            {reviewFilter && memberReviewCount === 0 ? <span style={{color:'var(--t2)',marginLeft:4}}>— no reviews</span> : ''}
+            {stats.reviewPendingCount > 0 && !reviewFilter ? <span style={{color:'var(--warn)',fontWeight:700,marginLeft:4}}>· {stats.reviewPendingCount} review{stats.reviewPendingCount>1?'s':''} pending</span> : ''}
+            {reviewFilter && stats.reviewPendingCount === 0 ? <span style={{color:'var(--t2)',marginLeft:4}}>— no reviews</span> : ''}
           </span>
-          <span style={{fontWeight:700,color:pct===100?'var(--accent)':'var(--t2)'}}>{pct}%</span>
+          <span style={{fontWeight:700,color:stats.completionPercent===100?'var(--accent)':'var(--t2)'}}>{stats.completionPercent}%</span>
         </div>
         <div style={{height:5,background:'var(--s3)',borderRadius:3,overflow:'hidden',marginBottom:4}}>
-          <div style={{height:'100%',borderRadius:3,background:barColor,width:`${pct}%`,transition:'.5s'}} />
+          <div style={{height:'100%',borderRadius:3,background:stats.completionPercent===100?'#2d6a4f':stats.completionPercent>60?'#52b788':'#2196c4',width:`${stats.completionPercent}%`,transition:'.5s'}} />
         </div>
       </div>
 
@@ -395,7 +397,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
                     {hm(moodMins) && <span style={{fontSize:9,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
                     <button disabled={limitReached}
                       onClick={(e)=>{e.stopPropagation();handleAddTask(mid);}}
-                      title={limitReached?`Daily task limit reached (${dailyActive}/${dailyCap})`:''}
+                      title={limitReached?`Daily task limit reached (${stats.activeCount}/${dailyCap})`:''}
                       style={{width:16,height:16,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
                         color:mood.color,fontSize:11,lineHeight:1,cursor:limitReached?'not-allowed':'pointer',display:'flex',alignItems:'center',
                         justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
@@ -439,7 +441,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
                 {hm(moodMins) && <span style={{fontSize:9,color:mood.color,marginLeft:'auto',fontWeight:700,opacity:.7}}>{hm(moodMins)}</span>}
                 <button disabled={limitReached}
                   onClick={(e)=>{e.stopPropagation();handleAddTask(mid);}}
-                  title={limitReached?`Daily task limit reached (${dailyActive}/${dailyCap})`:''}
+                  title={limitReached?`Daily task limit reached (${stats.activeCount}/${dailyCap})`:''}
                   style={{width:16,height:16,borderRadius:'50%',background:mood.color+'22',border:`1px solid ${mood.color}44`,
                     color:mood.color,fontSize:11,lineHeight:1,cursor:limitReached?'not-allowed':'pointer',display:'flex',alignItems:'center',
                     justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
@@ -453,7 +455,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
         })}
 
         <button className="addbtn" disabled={limitReached}
-          title={limitReached?`Daily task limit reached (${dailyActive}/${dailyCap})`:''}
+          title={limitReached?`Daily task limit reached (${stats.activeCount}/${dailyCap})`:''}
           style={{fontSize:11,flexShrink:0,opacity:limitReached?0.5:1,cursor:limitReached?'not-allowed':'pointer'}}
           onClick={()=>handleAddTask()}>+ Task</button>
       </div>
@@ -462,24 +464,6 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
 });
 
 /* ── CIRCULAR SUBTASK PROGRESS ── */
-function CircProg({ done, total }) {
-  const pct = total > 0 ? (done / total) * 100 : 0;
-  const r = 13;
-  const circ = 2 * Math.PI * r;
-  const off = circ - (pct / 100) * circ;
-  return (
-    <span className="card-circ-prog" title={`${done} of ${total} subtasks completed`}
-      role="progressbar" aria-valuenow={done} aria-valuemin={0} aria-valuemax={total}>
-      <svg width="30" height="30" viewBox="0 0 30 30">
-        <circle cx="15" cy="15" r={r} fill="none" stroke="var(--s2)" strokeWidth="3.5" />
-        <circle cx="15" cy="15" r={r} fill="none" stroke="var(--accent)" strokeWidth="3.5"
-          strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"
-          transform="rotate(-90 15 15)" style={{transition:'stroke-dashoffset .3s'}} />
-      </svg>
-      <span className="card-circ-text">{done}/{total}</span>
-    </span>
-  );
-}
 
 /* ── DESKTOP TASK CARD ── */
 const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {

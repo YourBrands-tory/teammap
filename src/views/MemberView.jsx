@@ -55,8 +55,8 @@ export default function MemberView() {
     <div className="app member-app">
       {/* ── Member nav bar ── */}
       <div className="nav" style={{display:'flex',alignItems:'center'}}>
-        <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} onTouchStart={() => setMenuOpen(o => !o)} aria-label="Menu">
-          <span className={`nav-hamburger-line${menuOpen ? ' open' : ''}`} />
+        <button className="nav-hamburger" onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
+          {menuOpen ? '✕' : '☰'}
         </button>
         <div className="nav-brand" style={{fontSize:16}}>Team<span>Map</span></div>
         <div className="nav-desktop-items" style={{display:'flex',alignItems:'center',gap:0,marginLeft:16}}>

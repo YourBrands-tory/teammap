@@ -242,7 +242,7 @@ export default function TasksMilestones() {
             value={msModal.description || ''} onChange={e => setMsModal({ ...msModal, description: e.target.value })} />
 
           <label className="fl">Assign to</label>
-          <div className="ttag-row">
+          <div className="ttag-row horizontal-scroll">
             {S.members.map((m: any) => {
               const on = (msModal.assignedTo || []).includes(m.id);
               return (
