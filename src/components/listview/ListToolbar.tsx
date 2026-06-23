@@ -52,6 +52,15 @@ export default function ListToolbar({
         </div>
       </div>
 
+      <FilterSelect label="Date Range" value={lvFilters.dateRange} onChange={v => onSetFilter('dateRange', v)}>
+        <option value="all">All Tasks</option>
+        <option value="today">Today</option>
+        <option value="last3">Last 3 Days</option>
+        <option value="last7">Last 7 Days</option>
+        <option value="last30">Last 30 Days</option>
+        <option value="older30">Older Than 30 Days</option>
+      </FilterSelect>
+
       <FilterSelect label="Member" value={lvFilters.member} onChange={v => onSetFilter('member', v)}>
         <option value="">All members</option>
         {S.members.map((m: any) => (

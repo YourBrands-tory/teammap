@@ -42,7 +42,7 @@ export default function useListView() {
 
   const clearFilters = useCallback(() => {
     setLvFilters(prev => ({
-      search: '', member: '', client: '', mood: '', status: '', tag: '',
+      search: '', dateRange: 'all', member: '', client: '', mood: '', status: '', tag: '',
       hideCompleted: prev.hideCompleted,
     }));
   }, []);

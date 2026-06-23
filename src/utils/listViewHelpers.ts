@@ -3,6 +3,7 @@ import { getStatusMaps } from './statusUtils';
 
 export interface LVFilters {
   search: string;
+  dateRange: string;
   member: string;
   client: string;
   mood: string;
@@ -34,6 +35,21 @@ export function filterAndSortTasks(
   const completeLabel = taskStatuses?.find((s: any) => s.label === 'Complete' || s.label.toLowerCase().includes('complete'))?.label || 'Complete';
   const { STATS } = getStatusMaps(taskStatuses);
   if (filters.hideCompleted) result = result.filter((t: any) => t.status !== completeLabel);
+  if (filters.dateRange && filters.dateRange !== 'all') {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    result = result.filter((t: any) => {
+      if (!t.date) return false;
+      const taskDate = new Date(t.date + 'T12:00:00');
+      const today = new Date(todayStr + 'T12:00:00');
+      const diffDays = Math.floor((today.getTime() - taskDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (filters.dateRange === 'today') return t.date === todayStr;
+      if (filters.dateRange === 'last3') return diffDays >= 1 && diffDays <= 3;
+      if (filters.dateRange === 'last7') return diffDays >= 1 && diffDays <= 7;
+      if (filters.dateRange === 'last30') return diffDays >= 1 && diffDays <= 30;
+      if (filters.dateRange === 'older30') return diffDays > 30;
+      return true;
+    });
+  }
   if (filters.member) result = result.filter((t: any) => t.assignedTo && t.assignedTo.includes(filters.member));
   if (filters.client) result = result.filter((t: any) => t.clientId === filters.client);
   if (filters.mood) result = result.filter((t: any) => t.mood === filters.mood);
@@ -75,7 +91,7 @@ export function toggleSort(prev: LVSort, col: string): LVSort {
 }
 
 export const DEFAULT_FILTERS: LVFilters = {
-  search: '', member: '', client: '', mood: '', status: '', tag: '', hideCompleted: true,
+  search: '', dateRange: 'all', member: '', client: '', mood: '', status: '', tag: '', hideCompleted: true,
 };
 
 export const DEFAULT_SORT: LVSort = { col: 'date', dir: 'desc' };
