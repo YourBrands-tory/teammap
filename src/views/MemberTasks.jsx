@@ -41,7 +41,7 @@ export default function MemberTasks() {
 
   const moodSections = useMemo(() => {
     const primaryIds = ['hero', 'imp', 'top'];
-    const moods = S.moods.filter(m => !m.hidden);
+    const moods = S.moods.filter(m => m.visible);
     const primaryMoods = moods.filter(m => primaryIds.includes(m.id));
     const overflowMoods = moods.filter(m => !primaryIds.includes(m.id));
     const sections = [];
@@ -83,18 +83,6 @@ export default function MemberTasks() {
         await upsertTask({ ...task, hidden: true });
       } catch {
         useUIStore.getState().setToast('Failed to hide task.');
-      }
-    }
-  }, [S.tasks]);
-
-  const restoreTask = useCallback(async (taskId) => {
-    const task = S.tasks.find(t => t.id === taskId);
-    if (task) {
-      try {
-        const { upsertTask } = useStore.getState();
-        await upsertTask({ ...task, hidden: false });
-      } catch {
-        useUIStore.getState().setToast('Failed to restore task.');
       }
     }
   }, [S.tasks]);
@@ -146,8 +134,7 @@ export default function MemberTasks() {
         </div>
 
         <TaskSidePanel
-          memberId={memberId} date={dashDate} S={S} onOpenTask={openTask}
-          hiddenTasks={hiddenTasks} onRestoreTask={restoreTask} />
+          memberId={memberId} date={dashDate} S={S} onOpenTask={openTask} />
       </div>
 
       <div className="lu-mobile-hidden">
@@ -163,8 +150,7 @@ export default function MemberTasks() {
                 <button className="btn btn-sm" onClick={() => setMobilePanelOpen(false)}>Close</button>
               </div>
               <TaskSidePanel
-                memberId={memberId} date={dashDate} S={S} onOpenTask={(t) => { openTask(t); setMobilePanelOpen(false); }}
-                hiddenTasks={hiddenTasks} onRestoreTask={restoreTask} />
+                memberId={memberId} date={dashDate} S={S} onOpenTask={(t) => { openTask(t); setMobilePanelOpen(false); }} />
             </div>
           </div>
         )}
@@ -183,7 +169,7 @@ function MemberTaskCol({ memberId, date, S, tasks, completeStatus, onOpenTask, o
   const limitReached = dailyActive >= dailyCap;
 
   const primaryIds = ['hero', 'imp', 'top'];
-  const moods = S.moods.filter(m => !m.hidden);
+  const moods = S.moods.filter(m => m.visible);
   const primaryMoods = moods.filter(m => primaryIds.includes(m.id));
   const overflowMoods = moods.filter(m => !primaryIds.includes(m.id));
 

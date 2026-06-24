@@ -206,6 +206,10 @@ export const useStore = create((set, get) => ({
     const tasksWithLinks = S.tasks.filter(t => t.links?.length > 0).length;
     console.log('[loadAll] done', { tasks: S.tasks.length, tasksWithSubtasks, tasksWithLinks, subtasks: subtaskCount, links: linkCount });
     if (!S.moods || !S.moods.length) S.moods = JSON.parse(JSON.stringify(DMOODS));
+    if (S.moods && S.moods.length) {
+      const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.visible; });
+      S.moods = S.moods.map(m => ({ ...m, visible: m.visible !== undefined ? m.visible : (dflt[m.id] !== undefined ? dflt[m.id] : true) }));
+    }
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members[0]?.id || null };
     if (S.settings.spMember == null) S.settings.spMember = S.members[0]?.id || null;
     if (!S.task_statuses || !S.task_statuses.length) {
@@ -369,6 +373,16 @@ export const useStore = create((set, get) => ({
     if (error) throw error;
     return t;
   },
+  // Lightweight subtask-only update — no _patchS, no activity log, no re-render cascade
+  patchTaskSubtasks: async (taskId, subtasks) => {
+    const now = Date.now();
+    const session = get().session;
+    const { error } = await supabase.from('tasks')
+      .update({ subtasks, updated_by: session?.memberId || null, updated_at: now })
+      .eq('id', taskId);
+    if (error) console.error('[patchTaskSubtasks] failed:', error);
+  },
+
   setTaskStatus: async (taskId, status) => {
     const session = get().session;
     if (session?.role === 'member' && status === getCompleteStatus(get().S.task_statuses)) {
@@ -507,6 +521,10 @@ export const useStore = create((set, get) => ({
     const S = JSON.parse(JSON.stringify(EMPTY_S));
     Object.assign(S, raw);
     if (!S.moods || !S.moods.length) S.moods = JSON.parse(JSON.stringify(DMOODS));
+    if (S.moods && S.moods.length) {
+      const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.visible; });
+      S.moods = S.moods.map(m => ({ ...m, visible: m.visible !== undefined ? m.visible : (dflt[m.id] !== undefined ? dflt[m.id] : true) }));
+    }
     if (!S.tags) S.tags = [];
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members?.[0]?.id||null };
 

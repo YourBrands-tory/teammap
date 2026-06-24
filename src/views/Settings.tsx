@@ -30,7 +30,7 @@ export default function Settings() {
 
   const {
     stDrag, ftDragId, setStDrag, setFtDragId,
-    delMember, delClient, toggleMoodHidden,
+    delMember, delClient, toggleMoodVisibility,
     delTag, delFreqTag,
     addStatus, saveStatus, delStatus, reorderStatuses,
     reorderMembers, reorderClientsFn, reorderMoods, reorderTags,
@@ -112,7 +112,7 @@ export default function Settings() {
           onDrop={handleStDrop}
           onEdit={(i) => setMoodModal({ index: i, mood: S.moods[i] })}
           onAdd={() => setMoodModal({ index: -1 })}
-          onToggleHidden={toggleMoodHidden}
+          onToggleVisibility={toggleMoodVisibility}
         />
 
         <TagsPanel

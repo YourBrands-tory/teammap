@@ -1,5 +1,5 @@
 interface Mood {
-  id: string; icon: string; label: string; cardSize?: string; hidden?: boolean;
+  id: string; icon: string; label: string; cardSize?: string; visible?: boolean;
 }
 
 interface Props {
@@ -10,11 +10,11 @@ interface Props {
   onDrop: (type: string, targetId: string) => void;
   onEdit: (index: number) => void;
   onAdd: () => void;
-  onToggleHidden: (id: string) => void;
+  onToggleVisibility: (id: string) => void;
 }
 
 export default function MoodsPanel({
-  moods, stDrag, onDragStart, onDragEnd, onDrop, onEdit, onAdd, onToggleHidden,
+  moods, stDrag, onDragStart, onDragEnd, onDrop, onEdit, onAdd, onToggleVisibility,
 }: Props) {
   return (
     <div className="st-panel">
@@ -36,10 +36,12 @@ export default function MoodsPanel({
             <span className="st-li-sub">{m.cardSize || 'narrow'}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
               <button className="btn btn-xs"
-                style={m.hidden ? { background: 'var(--wl)', color: 'var(--warn)' } : {}}
-                onClick={() => onToggleHidden(m.id)}
-                title={m.hidden ? 'Hidden from dashboard' : 'Visible on dashboard'}>
-                {m.hidden ? 'Hidden' : 'Visible'}
+                style={m.visible
+                  ? { background: '#dcfce7', color: '#16a34a', border: '1px solid #bbf7d0' }
+                  : { background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca' }}
+                onClick={() => onToggleVisibility(m.id)}
+                title={m.visible ? 'Click to hide from all dashboards' : 'Click to show on all dashboards'}>
+                {m.visible ? 'Visible' : 'Hidden'}
               </button>
               <button className="btn btn-xs" onClick={() => onEdit(i)}>Edit</button>
             </div>

@@ -350,7 +350,7 @@ export default function TaskGen2() {
               freqTags={freqTags}
               clients={sortedClients}
               members={S.members}
-              moods={S.moods.filter((m: any) => !m.hidden)}
+              moods={S.moods.filter((m: any) => m.visible)}
               multi={tg2AllMulti}
               onToggle={handleToggleMulti}
               onSelect={handleSetMulti}
@@ -455,7 +455,7 @@ export default function TaskGen2() {
 
           <label className="fl">Mood</label>
           <div className="mood-pick-row horizontal-scroll">
-            {S.moods.filter((m: any) => !m.hidden || m.id === tmplForm.mood).map((m: any) => {
+            {S.moods.filter((m: any) => m.visible || m.id === tmplForm.mood).map((m: any) => {
               const on = tmplForm.mood === m.id;
               return (
                 <div key={m.id} className={`mood-opt-btn${on ? ' on' : ''}`}

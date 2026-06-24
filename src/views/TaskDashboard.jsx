@@ -307,8 +307,8 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
 
   const primaryMoodIds = ['hero', 'imp', 'top'];
-  const visibleMoods = S.moods.filter(m => !m.hidden);
-  const hiddenMoodIds = useMemo(() => S.moods.filter(m => m.hidden).map(m => m.id), [S.moods]);
+  const visibleMoods = S.moods.filter(m => m.visible);
+  const hiddenMoodIds = useMemo(() => S.moods.filter(m => !m.visible).map(m => m.id), [S.moods]);
   const visibleTasks = reviewVisible.filter(t => !hiddenMoodIds.includes(t.mood));
   const suTasks = visibleTasks.filter(t=>t.status===standUpStatus);
 
@@ -560,8 +560,8 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
   }, [limitReached, dailyActive, dailyCap, member.name, date, onOpenTask, setToast]);
 
   const primaryMoodIds = ['hero', 'imp', 'top'];
-  const visibleMoods = S.moods.filter(m => !m.hidden);
-  const hiddenMoodIds = useMemo(() => S.moods.filter(m => m.hidden).map(m => m.id), [S.moods]);
+  const visibleMoods = S.moods.filter(m => m.visible);
+  const hiddenMoodIds = useMemo(() => S.moods.filter(m => !m.visible).map(m => m.id), [S.moods]);
   const visibleTasks = visible.filter(t => !hiddenMoodIds.includes(t.mood));
   const suTasks = visibleTasks.filter(t=>t.status===standUpStatus);
 

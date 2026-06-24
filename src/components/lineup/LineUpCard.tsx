@@ -6,6 +6,7 @@ import { getCardSize } from '../../utils/lineUpHelpers';
 import { getStatusMaps, getStatusesForRole } from '../../utils/statusUtils';
 import { useStore } from '../../store/useStore';
 import CircProg from '../CircProg';
+import CompactTaskCard from './CompactTaskCard';
 
 interface Task {
   id: string; name: string; mood: string; status: string; clientId?: string;
@@ -64,9 +65,27 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
     };
   }
 
+  if (compact) {
+    return (
+      <CompactTaskCard
+        task={task}
+        mood={mood}
+        moodColor={moodColor}
+        moodBg={moodBg}
+        onOpen={onOpen}
+        onHide={onHide}
+        onDelete={onDelete}
+        sortableRef={sortable.ref}
+        sortableStyle={sortable.style}
+        sortableHandleProps={sortable.handleProps}
+        isOverlay={isOverlay}
+      />
+    );
+  }
+
   return (
     <div ref={sortable.ref} style={sortable.style}
-      className={`lu-card size-${cardSize}${compact ? ' compact' : ''}`}
+      className={`lu-card size-${cardSize}`}
       onClick={() => onOpen(task)}>
       <div className="lu-mood-bar" style={{ background: moodColor }} />
       {!isOverlay && (
@@ -75,12 +94,12 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
         </span>
       )}
       <div className="lu-mood-chip" style={{ background: moodBg }}>
-        <span style={{ fontSize: compact ? 16 : isBig ? 26 : isNarrow ? 14 : 20 }}>{mood?.icon || '?'}</span>
-        {!isNarrow && !compact && <span className="lu-mood-name" style={{ color: moodColor }}>{mood?.label || ''}</span>}
+        <span style={{ fontSize: isBig ? 26 : isNarrow ? 14 : 20 }}>{mood?.icon || '?'}</span>
+        {!isNarrow && <span className="lu-mood-name" style={{ color: moodColor }}>{mood?.label || ''}</span>}
       </div>
       <div className="lu-info">
-        <div className={`lu-title${compact ? ' lu-title--compact' : ''}`}>{task.isMilestone ? '\u{1F3C1} ' : ''}{task.name}</div>
-        {!isNarrow && !compact && (
+        <div className="lu-title">{task.isMilestone ? '\u{1F3C1} ' : ''}{task.name}</div>
+        {!isNarrow && (
           <div className="lu-meta-row">
             {client && <span className="lu-meta-chip" style={{ background: `${client.color}15`, color: client.color }}>{client.name}</span>}
             {assignees.map(m => (

@@ -1,4 +1,7 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, memo } from 'react';
+import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { COLORS, today, uid } from '../lib/constants';
 import { useStore, sel } from '../store/useStore';
 import { getStatusMaps, getDefaultStatus, getCompleteStatus, getPassStatus, getStatusesForRole, canDeleteTask } from '../utils/statusUtils';
@@ -6,6 +9,10 @@ import { validateTaskCreation, getMoodLimit } from '../utils/taskLimits';
 import Avatar from './Avatar';
 
 const DRAFT_KEY = 'tm_task_draft';
+
+function ensureSubtaskIds(raw) {
+  return (raw || []).map((s, i) => ({ ...s, id: s.id || uid(), order: s.order ?? i }));
+}
 
 function loadDraft(taskId) {
   try {
@@ -30,6 +37,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const { STATS } = getStatusMaps(S.task_statuses);
   const roleStatuses = getStatusesForRole(S.task_statuses, session?.role);
   const upsertTask = useStore(s => s.upsertTask);
+  const patchTaskSubtasks = useStore(s => s.patchTaskSubtasks);
   const upsertTag = useStore(s => s.upsertTag);
   const upsertMilestone = useStore(s => s.upsertMilestone);
   const softDeleteTask = useStore(s => s.softDeleteTask);
@@ -54,7 +62,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [isMs, setIsMs] = useState(initVal('isMs', !!task.isMilestone));
   const [msId, setMsId] = useState(initVal('msId', task.milestoneId || ''));
   const [err, setErr] = useState({});
-  const [subtasks, setSubtasks] = useState(initVal('subtasks', task.subtasks ? task.subtasks.map(s => ({ ...s })) : []));
+  const [subtasks, setSubtasks] = useState(ensureSubtaskIds(initVal('subtasks', task.subtasks ? task.subtasks.map(s => ({ ...s })) : [])));
   const [links, setLinks] = useState(initVal('links', task.links ? task.links.map(l => ({ ...l })) : []));
   const [newSubtask, setNewSubtask] = useState('');
   const [newLinkLabel, setNewLinkLabel] = useState('');
@@ -188,39 +196,60 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const addSubtaskInline = () => {
     const text = newSubtask.trim();
     if (!text) return;
-    setSubtasks([...subtasks, { text, done: false }]);
+    setSubtasks([...subtasks, { text, done: false, id: uid(), order: subtasks.length }]);
     setNewSubtask('');
   };
 
-  const toggleSubtask = (i) => {
-    const next = subtasks.map((s, idx) => idx === i ? { ...s, done: !s.done } : s);
-    setSubtasks(next);
-    const isManager = session?.role === 'admin' || session?.role === 'manager';
-    const newStatus = next.length && next.every(s => s.done) && isManager ? (S.task_statuses?.find(s => s.label === 'Complete' || s.label.toLowerCase().includes('complete'))?.label || 'Complete') : status;
-    if (task.id) {
-      upsertTask({
-        id: task.id, createdAt: task.createdAt,
-        name: name.trim(), clientId: clientId || null, date: date || today(),
-        mood, assignedTo: [...assigned], tags: [...tags],
-        estH: parseInt(estH) || 0, estM: parseInt(estM) || 0, notes: notes.trim(),
-        subtasks: next,
-        links: links.map(l => ({ ...l })),
-        status: newStatus,
-        isMilestone: isMs, milestoneId,
-      }).catch(err => console.error('[TaskModal.toggleSubtask] upsertTask failed:', err));
-    }
-    if (newStatus !== status) setStatus(newStatus);
-  };
+  const toggleSubtask = useCallback((i) => {
+    setSubtasks((prev) => {
+      const next = prev.map((s, idx) => idx === i ? { ...s, done: !s.done } : s);
+      if (task.id) {
+        patchTaskSubtasks(task.id, next)
+          .catch(err => console.error('[TaskModal.toggleSubtask] save failed:', err));
+        const isManager = session?.role === 'admin' || session?.role === 'manager';
+        const allDone = next.length && next.every(s => s.done);
+        if (allDone && isManager) {
+          const completeStatus = S.task_statuses?.find(s => s.label === 'Complete' || s.label.toLowerCase().includes('complete'))?.label || 'Complete';
+          if (completeStatus !== status) {
+            upsertTask({ id: task.id, status: completeStatus })
+              .catch(err => console.error('[TaskModal.toggleSubtask] status update failed:', err));
+          }
+        }
+      }
+      return next;
+    });
+  }, [task.id, session?.role, S.task_statuses, status, upsertTask, patchTaskSubtasks]);
 
-  const editSubtaskText = (i, text) => {
+  const editSubtaskText = useCallback((i, text) => {
     text = text.trim();
     if (text) {
-      setSubtasks(subtasks.map((s, idx) => idx === i ? { ...s, text } : s));
+      setSubtasks(prev => prev.map((s, idx) => idx === i ? { ...s, text } : s));
     }
-  };
+  }, []);
 
-  const delSubtask = (i) => {
-    setSubtasks(subtasks.filter((_, idx) => idx !== i));
+  const delSubtask = useCallback((i) => {
+    setSubtasks(prev => prev.filter((_, idx) => idx !== i));
+  }, []);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 5 } }),
+  );
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!active || !over || active.id === over.id) return;
+    setSubtasks((prev) => {
+      const oldIdx = prev.findIndex(s => s.id === active.id);
+      const newIdx = prev.findIndex(s => s.id === over.id);
+      if (oldIdx === -1 || newIdx === -1) return prev;
+      const reordered = arrayMove(prev, oldIdx, newIdx).map((s, i) => ({ ...s, order: i }));
+      if (task.id) {
+        patchTaskSubtasks(task.id, reordered)
+          .catch(err => console.error('[TaskModal.dragEnd] patchTaskSubtasks failed:', err));
+      }
+      return reordered;
+    });
   };
 
   const addLinkInline = () => {
@@ -333,7 +362,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         <div className={`modal-section${tab==='essentials'?' active':''}`}>
           <label className="fl">Mood *</label>
           <div className="mood-pick-row horizontal-scroll" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
-            {S.moods.filter(m => !m.hidden || m.id === mood).map(m => {
+            {S.moods.filter(m => m.visible || m.id === mood).map(m => {
               const on = mood === m.id;
               const moodLimit = m.max;
               const moodFull = moodLimit !== null && assigned.length > 0 && (() => {
@@ -474,21 +503,21 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
                 </span>
               </div>
             )}
-            <div>
-              {subtasks.map((s, i) => (
-                <div key={i} className={`subtask-row${s.done?' done':''}`}>
-                  <div className={`subtask-check${s.done?' checked':''}`} onClick={()=>toggleSubtask(i)}>
-                    {s.done ? '✓' : ''}
-                  </div>
-                  <span className="subtask-text"
-                    contentEditable suppressContentEditableWarning
-                    onBlur={(e) => editSubtaskText(i, e.currentTarget.textContent)}
-                    onKeyDown={(e) => { if(e.key==='Enter'){ e.preventDefault(); e.currentTarget.blur(); } }}>
-                    {s.text}
-                  </span>
-                  <button className="subtask-del" onClick={()=>delSubtask(i)}>✕</button>
-                </div>
-              ))}
+            <div className="subtask-dnd-wrap">
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={subtasks.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                  {subtasks.map((s, i) => (
+                    <SortableSubtaskRow
+                      key={s.id}
+                      subtask={s}
+                      index={i}
+                      onToggle={toggleSubtask}
+                      onEdit={editSubtaskText}
+                      onDelete={delSubtask}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
             </div>
             <div className="subtask-add-row">
               <input type="text" placeholder="Add a subtask + Enter" value={newSubtask}
@@ -581,3 +610,31 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     </div>
   );
 }
+
+const SortableSubtaskRow = memo(function SortableSubtaskRow({ subtask, index, onToggle, onEdit, onDelete }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: subtask.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    ...(isDragging ? { boxShadow: '0 4px 12px rgba(0,0,0,0.15)' } : {}),
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className={`subtask-row${subtask.done ? ' done' : ''}${isDragging ? ' dragging' : ''}`}>
+      <span className="subtask-drag-handle" {...attributes} {...listeners} onClick={e => e.stopPropagation()}>
+        ⋮⋮
+      </span>
+      <div className={`subtask-check${subtask.done ? ' checked' : ''}`} onClick={(e) => { e.stopPropagation(); onToggle(index); }}>
+        {subtask.done ? '✓' : ''}
+      </div>
+      <span className="subtask-text"
+        contentEditable suppressContentEditableWarning
+        onBlur={(e) => onEdit(index, e.currentTarget.textContent)}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}>
+        {subtask.text}
+      </span>
+      <button className="subtask-del" onClick={(e) => { e.stopPropagation(); onDelete(index); }}>✕</button>
+    </div>
+  );
+});

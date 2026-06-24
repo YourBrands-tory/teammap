@@ -14,7 +14,7 @@ export default function MoodModal({ mood, index, onSave, onClose }: Props) {
   const [desc, setDesc] = useState(mood?.desc || '');
   const [max, setMax] = useState(mood?.max ?? '');
   const [cardSize, setCardSize] = useState(mood?.cardSize || 'narrow');
-  const [visible, setVisible] = useState(!mood?.hidden);
+  const [visible, setVisible] = useState(mood?.visible ?? true);
 
   const save = () => {
     if (!label.trim()) return;
@@ -24,7 +24,7 @@ export default function MoodModal({ mood, index, onSave, onClose }: Props) {
       desc: desc.trim(),
       max: max === '' ? null : parseInt(max),
       cardSize,
-      hidden: !visible,
+      visible,
     });
     onClose();
   };
@@ -58,12 +58,12 @@ export default function MoodModal({ mood, index, onSave, onClose }: Props) {
             <option value="big">big</option>
           </select>
 
-          <label className="fl">Show on Task Dashboard</label>
+          <label className="fl">Dashboard visibility</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>
             <input type="checkbox" id="moodvis" checked={visible}
               onChange={e => setVisible(e.target.checked)}
               style={{ width: 16, height: 16 }} />
-            <label htmlFor="moodvis" style={{ fontSize: 13, cursor: 'pointer' }}>Visible on dashboard</label>
+            <label htmlFor="moodvis" style={{ fontSize: 13, cursor: 'pointer' }}>Visible on all dashboards</label>
           </div>
         </>
       )}

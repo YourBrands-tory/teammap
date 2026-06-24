@@ -10,7 +10,7 @@ export default memo(function TaskSidePanel({ memberId, date, S, onOpenTask, hidd
     return sel.tasksForMD(S, memberId, date);
   }, [S, memberId, date]);
 
-  const visibleMoods = S.moods.filter(m => !m.hidden);
+  const visibleMoods = S.moods.filter(m => m.visible);
 
   const groups = useMemo(() => {
     return visibleMoods.map(mood => {

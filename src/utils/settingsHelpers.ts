@@ -28,7 +28,7 @@ export function randomColor(): string {
 export function makeMood(label: string, icon: string, desc: string, max: number | null): any {
   return {
     id: uid(), label, icon: icon || '📌', desc: desc || '',
-    max, cardSize: 'narrow', hidden: false,
+    max, cardSize: 'narrow', visible: true,
     color: randomColor(), bg: '#f2f0ec',
   };
 }

@@ -57,15 +57,15 @@ export default function useSettings() {
       const newMood = {
         id: uid(), label: data.label, icon: data.icon || '📌', desc: data.desc || '',
         max: data.max ?? null, cardSize: data.cardSize || 'narrow',
-        hidden: data.hidden ?? false, color: COLORS[Math.floor(Math.random() * COLORS.length)], bg: '#f2f0ec',
+        visible: data.visible ?? true, color: COLORS[Math.floor(Math.random() * COLORS.length)], bg: '#f2f0ec',
       };
       moods.push(newMood);
     }
     await setMoods(moods);
   }, [S.moods, setMoods]);
 
-  const toggleMoodHidden = useCallback(async (moodId: string) => {
-    const moods = S.moods.map(m => m.id === moodId ? { ...m, hidden: !m.hidden } : m);
+  const toggleMoodVisibility = useCallback(async (moodId: string) => {
+    const moods = S.moods.map(m => m.id === moodId ? { ...m, visible: !m.visible } : m);
     await setMoods(moods);
   }, [S.moods, setMoods]);
 
@@ -237,7 +237,7 @@ export default function useSettings() {
     setStDrag, setNavDragId, setFtDragId,
     saveMember, delMember,
     saveClient, delClient,
-    saveMood, toggleMoodHidden,
+    saveMood, toggleMoodVisibility,
     addTag, saveTag, delTag,
     addFreqTag, saveFreqTag, delFreqTag,
     addStatus, saveStatus, delStatus, reorderStatuses,
