@@ -1,7 +1,7 @@
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import SpreadsheetCell from './SpreadsheetCell';
 import { PG_COLS, getCellData } from '../../utils/playgroundHelpers';
-import type { TabData } from '../../utils/playgroundHelpers';
+import type { CellData, TabData } from '../../utils/playgroundHelpers';
 
 interface Task { id: string; deleted?: boolean; name?: string; }
 interface Client { id: string; name: string; color: string; industry: string; order?: number; }
@@ -35,6 +35,16 @@ export default function SpreadsheetGrid({
   const gridRef = useRef<HTMLDivElement>(null);
   const wasEditing = useRef(false);
   const isDragging = useRef(false);
+  const clipboardRef = useRef<{ text: string; taskId?: string } | null>(null);
+
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => { setToast(null); toastTimer.current = null; }, 1500);
+  }, []);
 
   const sortedClients = [...clients].sort((a, b) => (a.order || 0) - (b.order || 0));
   const rowIndices = sortedClients.length > 0
@@ -101,6 +111,36 @@ export default function SpreadsheetGrid({
     setEditValue(cell.text);
     setIsEditing(true);
   }, [tab]);
+
+  const getActiveCellData = useCallback((): CellData => {
+    return getCellData(tab, selectedRow, selectedCol);
+  }, [tab, selectedRow, selectedCol]);
+
+  const handleCopy = useCallback(() => {
+    const cell = getActiveCellData();
+    clipboardRef.current = { text: cell.text || '', taskId: cell.taskId };
+    try { navigator.clipboard.writeText(cell.text || ''); } catch { /* fallback */ }
+    showToast('Copied');
+  }, [getActiveCellData, showToast]);
+
+  const handleCut = useCallback(() => {
+    const cell = getActiveCellData();
+    clipboardRef.current = { text: cell.text || '', taskId: cell.taskId };
+    try { navigator.clipboard.writeText(cell.text || ''); } catch { /* fallback */ }
+    onUpdateCellText(selectedRow, selectedCol, '');
+    showToast('Cut');
+  }, [getActiveCellData, selectedRow, selectedCol, onUpdateCellText, showToast]);
+
+  const handlePaste = useCallback(async () => {
+    let text = clipboardRef.current?.text ?? null;
+    if (text === null) {
+      try { text = await navigator.clipboard.readText(); } catch { return; }
+    }
+    if (text != null) {
+      onUpdateCellText(selectedRow, selectedCol, text);
+      showToast('Pasted');
+    }
+  }, [selectedRow, selectedCol, onUpdateCellText, showToast]);
 
   const clearSelectedCells = useCallback(() => {
     if (selectedCells.length === 0) return;
@@ -310,6 +350,12 @@ export default function SpreadsheetGrid({
         setSelectedCol(0);
         break;
       default:
+        if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+          const k = e.key.toLowerCase();
+          if (k === 'c') { e.preventDefault(); handleCopy(); return; }
+          if (k === 'x') { e.preventDefault(); handleCut(); return; }
+          if (k === 'v') { e.preventDefault(); handlePaste(); return; }
+        }
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
           e.preventDefault();
           setEditValue(e.key);
@@ -317,7 +363,7 @@ export default function SpreadsheetGrid({
         }
         break;
     }
-  }, [isEditing, selectedRow, selectedCol, totalRows, tab, saveEdit, cancelEdit, moveTo, startEdit, clearSelectedCells]);
+  }, [isEditing, selectedRow, selectedCol, totalRows, tab, saveEdit, cancelEdit, moveTo, startEdit, clearSelectedCells, handleCopy, handleCut, handlePaste]);
 
   useEffect(() => {
     gridRef.current?.focus();
@@ -384,6 +430,9 @@ export default function SpreadsheetGrid({
           onOpenTask={onOpenTask}
           onUnlink={onUnlink}
           onClearSelectedCells={clearSelectedCells}
+          onCopy={handleCopy}
+          onCut={handleCut}
+          onPaste={handlePaste}
         />,
       );
     }
@@ -407,6 +456,15 @@ export default function SpreadsheetGrid({
         </colgroup>
         <tbody>{rows}</tbody>
       </table>
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: '#323232', color: '#fff', padding: '8px 20px', borderRadius: 6,
+          fontSize: 13, zIndex: 9999, pointerEvents: 'none', transition: 'opacity 0.2s',
+        }}>
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

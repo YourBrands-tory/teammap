@@ -29,7 +29,7 @@ function debouncedLocalStorage(ms) {
 export const useUIStore = create(
   persist(
     (set, get) => ({
-      view: 'lu',
+      view: 'tkd',
 
       openModal: null,
 
@@ -54,7 +54,7 @@ export const useUIStore = create(
         set({ toast: null, _toastTimer: null });
       },
 
-      clearUIState: () => set({ view: 'lu', openModal: null, viewStates: {}, scrollPositions: {} }),
+      clearUIState: () => set({ view: 'tkd', openModal: null, viewStates: {}, scrollPositions: {} }),
 
       setView: (v) => set({ view: v }),
 

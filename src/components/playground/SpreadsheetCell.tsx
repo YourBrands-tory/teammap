@@ -22,6 +22,9 @@ interface Props {
   onOpenTask: (taskId: string) => void;
   onUnlink: (r: number, c: number, taskId?: string) => void;
   onClearSelectedCells: () => void;
+  onCopy: () => void;
+  onCut: () => void;
+  onPaste: () => void;
 }
 
 export default function SpreadsheetCell({
@@ -30,6 +33,7 @@ export default function SpreadsheetCell({
   onEditValueChange,
   onSelect, onStartEdit, onSaveEdit, onCancelEdit,
   onConvertToTask, onOpenTask, onUnlink, onClearSelectedCells,
+  onCopy, onCut, onPaste,
 }: Props) {
   const linked = hasLinkedTask(tasks, cell);
   const linkedTask = linked && cell?.taskId ? tasks.find(t => t.id === cell.taskId && !t.deleted) : null;
@@ -205,6 +209,16 @@ export default function SpreadsheetCell({
 
       {contextMenu && (
         <div className="pg-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+          <button className="pg-context-item" onClick={() => { onCopy(); setContextMenu(null); }}>
+            Copy
+          </button>
+          <button className="pg-context-item" onClick={() => { onCut(); setContextMenu(null); }}>
+            Cut
+          </button>
+          <button className="pg-context-item" onClick={() => { onPaste(); setContextMenu(null); }}>
+            Paste
+          </button>
+          <div className="pg-context-separator" />
           <button className="pg-context-item pg-context-item-danger" onClick={handleClearCell}>
             Clear selected cells
           </button>

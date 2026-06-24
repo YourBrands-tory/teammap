@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { taskTimeStr } from '../../lib/constants';
 import { getCardSize } from '../../utils/lineUpHelpers';
 import { getStatusMaps, getStatusesForRole } from '../../utils/statusUtils';
+import { getNotesText } from '../../utils/notesUtils';
 import { useStore } from '../../store/useStore';
 import CircProg from '../CircProg';
 import CompactTaskCard from './CompactTaskCard';
@@ -117,11 +118,11 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
             {timeStr && <span className="lu-time-chip">{timeStr}</span>}
           </div>
         )}
-        {!compact && isBig && task.notes && (
+        {!compact && isBig && getNotesText(task.notes) && (
           <div style={{
             fontSize: 12, color: 'var(--t2)', marginTop: 4, lineHeight: 1.5,
             overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', opacity: 0.7
-          }}>{task.notes}</div>
+          }}>{getNotesText(task.notes)}</div>
         )}
         {!compact && !isNarrow && (hasLinks || hasSubtasks) && (
           <div className="card-icon-row" style={{ marginTop: 4, gap: 4 }}>

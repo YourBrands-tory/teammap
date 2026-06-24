@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { today, fmtTime } from '../../lib/constants';
 import { sel } from '../../store/useStore';
 import type { Template } from '../../utils/taskGen2Helpers';
+import { getNotesText } from '../../utils/notesUtils';
 
 interface Props {
   template: Template;
@@ -91,9 +92,9 @@ export default function TemplateCard({ template, S, compact, createConfirm, onCr
         {assignees.map((n, i) => (
           <span key={i} style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, background: 'var(--s2)', border: '1px solid var(--border)', fontWeight: 500 }}>{n}</span>
         ))}
-        {template.notes ? (
+        {getNotesText(template.notes) ? (
           <span style={{ fontSize: 11, color: 'var(--t2)', fontStyle: 'italic' }}>
-            &ldquo;{template.notes.slice(0, 40)}{template.notes.length > 40 ? '\u2026' : ''}&rdquo;
+            &ldquo;{getNotesText(template.notes).slice(0, 40)}{getNotesText(template.notes).length > 40 ? '\u2026' : ''}&rdquo;
           </span>
         ) : null}
       </div>

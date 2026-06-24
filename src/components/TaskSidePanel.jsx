@@ -1,88 +1,67 @@
-import { useState, useMemo, memo } from 'react';
+import { useMemo, memo } from 'react';
 import { sel } from '../store/useStore';
-import { fmtD, taskTimeStr } from '../lib/constants';
+import { taskTimeStr, DMOODS } from '../lib/constants';
+import { getStatusMaps } from '../utils/statusUtils';
 
-export default memo(function TaskSidePanel({ memberId, date, S, onOpenTask, hiddenTasks, onRestoreTask }) {
-  const [hiddenOpen, setHiddenOpen] = useState(false);
-  const member = S.members.find(m => m.id === memberId);
-  const tasks = useMemo(() => {
-    if (!memberId) return [];
-    return sel.tasksForMD(S, memberId, date);
-  }, [S, memberId, date]);
+const SIDE_PANEL_MOOD_IDS = ['top', 'rapid', 'secondhalf', 'followup'];
 
-  const visibleMoods = S.moods.filter(m => m.visible);
+const CARD_BG = {
+  top: '#fff8f8',
+  rapid: '#f8fafc',
+  secondhalf: '#fdf6f6',
+  followup: '#f8f9fd',
+};
+
+export default memo(function TaskSidePanel({ tasks, member, S, onOpenTask, hiddenTasks, onRestoreTask }) {
+  const { STC, STB } = useMemo(() => getStatusMaps(S.task_statuses), [S.task_statuses]);
+
+  const moods = useMemo(() => {
+    return SIDE_PANEL_MOOD_IDS.map(id => S.moods.find(m => m.id === id) || DMOODS.find(m => m.id === id)).filter(Boolean);
+  }, [S.moods]);
 
   const groups = useMemo(() => {
-    return visibleMoods.map(mood => {
-      const ids = tasks.filter(t => t.mood === mood.id && !t.hidden);
+    return moods.map(mood => {
+      const ids = (tasks || []).filter(t => t.mood === mood.id && !t.hidden);
       return { ...mood, ids };
-    }).filter(g => g.ids.length);
-  }, [visibleMoods, tasks]);
-
-  const groupedHidden = useMemo(() => {
-    if (!hiddenTasks?.length) return [];
-    return visibleMoods.map(mood => {
-      const ids = hiddenTasks.filter(t => t.mood === mood.id);
-      return { ...mood, ids };
-    }).filter(g => g.ids.length);
-  }, [visibleMoods, hiddenTasks]);
+    });
+  }, [moods, tasks]);
 
   return (
-    <div className="sp" style={{ width: 320, minWidth: 320, maxWidth: 360 }}>
-      <div className="sph">
-        <h4>{member?.name || 'My Tasks'}</h4>
-        <div style={{ fontSize: 10, color: 'var(--t3)' }}>{fmtD(date)}</div>
+    <div className="sp">
+      <div className="sph" style={{ padding: '8px 10px' }}>
+        <h4 style={{ fontSize: 11, fontWeight: 800, marginBottom: 2 }}>{member?.name || 'My Tasks'}</h4>
       </div>
-      <div className="spb">
-        {!groups.length && !groupedHidden.length ? (
-          <div style={{ fontSize: 12, color: 'var(--t3)', padding: '8px 0' }}>No tasks for this date.</div>
-        ) : (
-          <>
-            {groups.map(g => (
-              <div key={g.id} className="spsec">
-                <div className="spst" style={{ color: g.color }}>{g.icon} {g.label}</div>
-                {g.ids.map(t => {
-                  const c = sel.gc(S, t.clientId);
-                  return (
-                    <div key={t.id} className="spt" onClick={() => onOpenTask(t)}>
-                      <div className="sptn">{t.name}</div>
-                      <div className="sptm">
-                        {c ? c.name : ''}
-                        {c ? ' · ' : ''}{t.status}{taskTimeStr(t) ? ' · ' + taskTimeStr(t) : ''}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-
-            {groupedHidden.length > 0 && (
-              <div className="spsec" style={{ marginTop: 16 }}>
-                <div className="spst" style={{ cursor: 'pointer', userSelect: 'none' }}
-                  onClick={() => setHiddenOpen(o => !o)}>
-                  {hiddenOpen ? '▼' : '▶'} Hidden ({hiddenTasks.length})
-                </div>
-                {hiddenOpen && groupedHidden.map(g => (
-                  <div key={g.id} style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: g.color, marginBottom: 4, paddingLeft: 4 }}>
-                      {g.icon} {g.label} ({g.ids.length})
-                    </div>
-                    {g.ids.map(t => (
-                      <div key={t.id} className="spt" style={{ opacity: 0.7, display: 'flex', alignItems: 'center', gap: 6 }}
-                        onClick={() => onOpenTask(t)}>
-                        <div className="sptn" style={{ flex: 1, fontSize: 11 }}>{t.name}</div>
-                        {onRestoreTask && (
-                          <button className="lu-restore-btn" style={{ width: 18, height: 18, fontSize: 10 }}
-                            onClick={e => { e.stopPropagation(); onRestoreTask(t.id); }}
-                            title="Restore">&#8630;</button>
-                        )}
-                      </div>
-                    ))}
+      <div className="spb" style={{ padding: '6px 8px 10px' }}>
+        {groups.map(g => (
+          <div key={g.id} className="sp-mood-group">
+            <div className="sp-mood-head">
+              <span style={{ fontSize: 10 }}>{g.icon}</span>
+              <span className="sp-mood-label" style={{ color: g.color }}>{g.label}</span>
+              <span className="sp-mood-cnt" style={{ background: g.color + '22', color: g.color }}>{g.ids.length}</span>
+            </div>
+            {g.ids.length ? g.ids.map(t => {
+              const client = sel.gc(S, t.clientId);
+              const timeStr = taskTimeStr(t);
+              return (
+                <div key={t.id} className="sp-card" style={{ borderLeftColor: g.color, background: CARD_BG[g.id] || '#fafafa' }}
+                  onClick={() => onOpenTask(t)}>
+                  <div className="sp-card-title">{t.name}</div>
+                  {client && <div className="sp-card-client">{client.name}</div>}
+                  <div className="sp-card-row">
+                    <span className="sp-card-status" style={{ background: STB[t.status], color: STC[t.status] }}>
+                      {t.status}
+                    </span>
+                    {timeStr && <span className="sp-card-time">{timeStr}</span>}
                   </div>
-                ))}
-              </div>
+                </div>
+              );
+            }) : (
+              <div style={{ fontSize: 9, color: 'var(--t3)', padding: '3px 2px 4px' }}>No tasks</div>
             )}
-          </>
+          </div>
+        ))}
+        {hiddenTasks?.length > 0 && (
+          <div className="sp-hidden-line">{hiddenTasks.length} hidden task{hiddenTasks.length > 1 ? 's' : ''}</div>
         )}
       </div>
     </div>

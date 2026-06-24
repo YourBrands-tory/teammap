@@ -3,6 +3,7 @@ import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
 import { today, fmtD, taskTimeStr } from '../lib/constants';
 import { getStatusMaps, getCompleteStatus, getStandUpStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
+import { getNotesText } from '../utils/notesUtils';
 import Avatar from '../components/Avatar';
 import TaskModal from '../components/TaskModal';
 import StatusPopup from '../components/StatusPopup';
@@ -68,6 +69,7 @@ export default function TaskDashboard() {
   const dayPct = total ? Math.round(done/total*100) : 0;
   const reviewCount = allTasks.filter(t=>t.status===reviewStatus).length;
   const spM = sel.gm(S, S.settings.spMember) || S.members[0];
+  const spTasks = useMemo(() => spM ? sel.tasksForMD(S, spM.id, dashDate) : [], [S, spM, dashDate]);
 
   const mobileMember = S.members[mobileMemberIdx] || S.members[0];
   const VISIBLE_MEMBER_LIMIT = 5;
@@ -134,13 +136,7 @@ export default function TaskDashboard() {
             ))}
           </div>
         </div>
-        <div className="sp">
-          <div className="sph">
-            <h4>{spM ? spM.name : 'Quick View'}</h4>
-            <div style={{fontSize:10,color:'var(--t3)'}}>{fmtD(dashDate)}</div>
-          </div>
-          <div className="spb"><TaskSidePanel memberId={spM?.id} date={dashDate} S={S} onOpenTask={openTask} /></div>
-        </div>
+        <TaskSidePanel tasks={spTasks} member={spM} S={S} onOpenTask={openTask} />
       </div>
 
       {/* ── MOBILE LAYOUT ── */}
@@ -261,7 +257,7 @@ export default function TaskDashboard() {
 
                   {/* Side panel content */}
                   <div className="td-mob-sheet-section" style={{flex:1,overflowY:'auto'}}>
-                    <TaskSidePanel memberId={spM?.id} date={dashDate} S={S} onOpenTask={(t) => { openTask(t); setMobileSheet(null); }} />
+                    <TaskSidePanel tasks={spTasks} member={spM} S={S} onOpenTask={(t) => { openTask(t); setMobileSheet(null); }} />
                   </div>
                 </>
               )}
@@ -476,7 +472,8 @@ const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
   const timeStr = taskTimeStr(task);
   const extra = isHero?' hero':isImp?' imp-card':isTop?' top':isLight?' light':'';
   const [linkPop, setLinkPop] = useState(false);
-  const hasNotes = task.notes?.trim().length > 0;
+  const notesText = getNotesText(task.notes);
+  const hasNotes = notesText.length > 0;
   const hasLinks = task.links?.length > 0;
   const hasSubtasks = task.subtasks?.length > 0;
   const subTotal = task.subtasks?.length || 0;
@@ -511,7 +508,7 @@ const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
         <div className="card-icon-row">
           {hasNotes && (
             <span className="card-icon-pill notes-pill" aria-label="Has notes">
-              📝<span className="card-pill-tip">{task.notes}</span>
+              📝<span className="card-pill-tip">{notesText}</span>
             </span>
           )}
           {hasLinks && (
@@ -700,7 +697,8 @@ const MobileTaskCard = memo(function MobileTaskCard({ task, member, S, expanded,
   const client = sel.gc(S, task.clientId);
   const timeStr = taskTimeStr(task);
   const [linkPop, setLinkPop] = useState(false);
-  const hasNotes = task.notes?.trim().length > 0;
+  const notesText = getNotesText(task.notes);
+  const hasNotes = notesText.length > 0;
   const hasLinks = task.links?.length > 0;
   const hasSubtasks = task.subtasks?.length > 0;
   const subTotal = task.subtasks?.length || 0;
@@ -743,7 +741,7 @@ const MobileTaskCard = memo(function MobileTaskCard({ task, member, S, expanded,
         <div className="card-icon-row mob">
           {hasNotes && (
             <span className="card-icon-pill notes-pill" aria-label="Has notes">
-              📝<span className="card-pill-tip">{task.notes}</span>
+              📝<span className="card-pill-tip">{notesText}</span>
             </span>
           )}
           {hasLinks && (

@@ -4,6 +4,7 @@ import { useUIStore } from '../store/useUIStore';
 import { today, fmtD, taskTimeStr } from '../lib/constants';
 import { getStatusMaps, getCompleteStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
 import { canCreateTask, getDailyActiveCount, getDailyLimit } from '../utils/taskLimits';
+import { getNotesText } from '../utils/notesUtils';
 import TaskModal from '../components/TaskModal';
 import TaskSidePanel from '../components/TaskSidePanel';
 import CircProg from '../components/CircProg';
@@ -32,6 +33,7 @@ export default function MemberTasks() {
     return sel.tasksForMD(S, memberId, dashDate);
   }, [S, memberId, dashDate]);
 
+  const me = useMemo(() => S.members.find(m => m.id === memberId), [S, memberId]);
   const visibleTasks = useMemo(() => myTasks.filter(t => t.status !== completeStatus && !t.hidden), [myTasks, completeStatus]);
   const hiddenTasks = useMemo(() => myTasks.filter(t => t.hidden), [myTasks]);
   const doneTasks = useMemo(() => myTasks.filter(t => t.status === completeStatus), [myTasks, completeStatus]);
@@ -134,7 +136,7 @@ export default function MemberTasks() {
         </div>
 
         <TaskSidePanel
-          memberId={memberId} date={dashDate} S={S} onOpenTask={openTask} />
+          tasks={visibleTasks} member={me} S={S} onOpenTask={openTask} hiddenTasks={hiddenTasks} />
       </div>
 
       <div className="lu-mobile-hidden">
@@ -286,7 +288,7 @@ const MTaskCard = ({ task, S, onOpenTask, onStatus, onHide }) => {
   const isHero = task.mood === 'hero', isTop = task.mood === 'top', isImp = task.mood === 'imp';
   const extra = isHero ? ' hero' : isImp ? ' imp-card' : isTop ? ' top' : ' light';
   const [linkPop, setLinkPop] = useState(false);
-  const hasNotes = task.notes?.trim().length > 0;
+  const hasNotes = getNotesText(task.notes).length > 0;
   const hasLinks = task.links?.length > 0;
   const hasSubtasks = task.subtasks?.length > 0;
   const subTotal = task.subtasks?.length || 0;
@@ -321,7 +323,7 @@ const MTaskCard = ({ task, S, onOpenTask, onStatus, onHide }) => {
         <div className="card-icon-row">
           {hasNotes && (
             <span className="card-icon-pill notes-pill" aria-label="Has notes">
-              📝<span className="card-pill-tip">{task.notes}</span>
+              📝<span className="card-pill-tip">{getNotesText(task.notes)}</span>
             </span>
           )}
           {hasLinks && (
