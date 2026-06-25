@@ -7,6 +7,7 @@ import { useStore, sel } from '../store/useStore';
 import { getStatusMaps, getDefaultStatus, getCompleteStatus, getPassStatus, getStatusesForRole, canDeleteTask } from '../utils/statusUtils';
 import { validateTaskCreation, getMoodLimit } from '../utils/taskLimits';
 import Avatar from './Avatar';
+import RichTextEditor from './ui/RichTextEditor';
 
 const DRAFT_KEY = 'tm_task_draft';
 
@@ -72,7 +73,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [saveError, setSaveError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [activity, setActivity] = useState([]);
-  const notesRef = useRef(null);
+
   const taskNameRef = useRef(null);
 
   // Reactive limit check
@@ -298,7 +299,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
       ...(isEdit ? { id: task.id, createdAt: task.createdAt } : {}),
       name: name.trim(), clientId: clientId || null, date: date || today(),
       mood, status, assignedTo: [...assigned], tags: [...tags],
-      estH: parseInt(estH) || 0, estM: parseInt(estM) || 0, notes: notes.trim(),
+      estH: parseInt(estH) || 0, estM: parseInt(estM) || 0, notes,
       subtasks: subtasks.map(s => ({ ...s })),
       links: links.map(l => ({ ...l })),
       isMilestone: isMs, milestoneId,
@@ -460,8 +461,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         {/* ── Section 2 — Details ── */}
         <div className={`modal-section${tab==='details'?' active':''}`}>
           <label className="fl">Notes</label>
-          <textarea ref={notesRef} className="task-notes" placeholder="Notes…" value={notes}
-            onChange={e=>setNotes(e.target.value)} />
+          <RichTextEditor value={notes} onChange={setNotes} />
 
           <label className="fl">Tags</label>
           <div className="tag-chip-pick horizontal-scroll">

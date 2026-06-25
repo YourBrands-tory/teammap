@@ -7,6 +7,9 @@ export function getNotesText(raw) {
       return extractText(doc.content);
     }
   } catch {}
+  if (raw.includes('<') && raw.includes('>')) {
+    return raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+  }
   return raw;
 }
 

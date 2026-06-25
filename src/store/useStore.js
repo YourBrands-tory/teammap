@@ -86,14 +86,14 @@ export const useStore = create((set, get) => ({
     const session = { memberId: data.id, role: data.role, name: data.name, color: data.color };
     try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch {}
 
-    // Best-effort Supabase Auth session (for future RLS use — not critical)
-    supabase.auth.signInWithPassword({ email, password }).then(r1 => {
-      if (r1.error) {
-        supabase.auth.signUp({ email, password }).then(() => {
-          supabase.auth.signInWithPassword({ email, password });
-        });
+    // Establish Supabase Auth session (RLS on pg_sheets requires this)
+    const authResult = await supabase.auth.signInWithPassword({ email, password });
+    if (authResult.error) {
+      const signUpResult = await supabase.auth.signUp({ email, password });
+      if (signUpResult.error) {
+        console.warn('[login] Supabase Auth setup failed:', signUpResult.error.message);
       }
-    });
+    }
 
     set({ session, role: data.role, loading: true, isAuthLoading: false });
     await get().loadAll();
@@ -114,6 +114,7 @@ export const useStore = create((set, get) => ({
             color: parsed.color || '',
           };
           set({ session, role: parsed.role, loading: true, isAuthLoading: false });
+          await supabase.auth.getSession(); // Restore Supabase Auth session from storage
           await get().loadAll();
           return;
         }

@@ -9,6 +9,7 @@ import FilterPanel from '../components/taskgen2/FilterPanel';
 import SavedViews from '../components/taskgen2/SavedViews';
 import MilestoneLinks from '../components/taskgen2/MilestoneLinks';
 import TaskModal from '../components/TaskModal';
+import RichTextEditor from '../components/ui/RichTextEditor';
 import Modal from '../components/Modal';
 import type { Template } from '../utils/taskGen2Helpers';
 
@@ -502,9 +503,8 @@ export default function TaskGen2() {
             </div>
             <div style={{ flex: 1 }}>
               <label className="fl" style={{ marginTop: 0 }}>Notes / description</label>
-              <textarea placeholder="What does this task involve?" value={tmplForm.notes}
-                onChange={e => setTmplForm({ ...tmplForm, notes: e.target.value })}
-                style={{ marginTop: 6, minHeight: 52 }} />
+              <RichTextEditor value={tmplForm.notes}
+                onChange={v => setTmplForm({ ...tmplForm, notes: v })} />
             </div>
           </div>
 
