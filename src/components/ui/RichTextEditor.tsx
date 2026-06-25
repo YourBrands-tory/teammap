@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -26,11 +27,17 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Notesâ€
       SlashCommands,
       Toggle,
     ],
-    content: value || '',
+    content: value || '<p></p>',
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML())
     },
   })
+
+  useEffect(() => {
+    if (editor && value !== editor.getHTML()) {
+      editor.commands.setContent(value || '<p></p>', { emitUpdate: false })
+    }
+  }, [value, editor])
 
   return (
     <div className="rich-editor-wrapper">

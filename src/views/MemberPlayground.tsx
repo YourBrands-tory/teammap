@@ -57,7 +57,7 @@ export default function MemberPlayground() {
       </div>
 
       {taskModal && (
-        <TaskModal
+        <TaskModal key={taskModal.id || 'new'}
           task={taskModal}
           fromCellText={fromCellText}
           onClose={() => { setTaskModal(null); setPendingCell(null); setFromCellText(''); }}
