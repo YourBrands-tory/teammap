@@ -1328,3 +1328,20 @@ td:hover .pg-cell-actions{display:flex}
 .member-tab-content .pg-app{overflow:visible}
 .member-tab-content .pg-body{overflow:visible}
 .member-tab-content .pg-scroll-wrap{overflow:visible!important}
+
+/* ── iOS Safari: prevent auto-zoom on focus ──────────────────── */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="date"],
+  input[type="email"],
+  input[type="search"],
+  input[type="url"],
+  input[type="password"],
+  input[type="tel"],
+  textarea,
+  select,
+  [contenteditable] {
+    font-size: 16px !important;
+  }
+}
