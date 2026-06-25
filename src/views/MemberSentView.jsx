@@ -179,7 +179,7 @@ export default function MemberSentView() {
         )}
       </div>
 
-      {modal && <TaskModal task={modal} onClose={closeModal} readonlyAssignee={true} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
+      {modal && <TaskModal task={modal} onClose={closeModal} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { today, fmtD, taskTimeStr } from '../lib/constants';
 import { getStatusMaps, getCompleteStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
 import { canCreateTask, getDailyActiveCount, getDailyLimit } from '../utils/taskLimits';
 import { getNotesText } from '../utils/notesUtils';
+import Avatar from '../components/Avatar';
 import TaskModal from '../components/TaskModal';
 import TaskSidePanel from '../components/TaskSidePanel';
 import CircProg from '../components/CircProg';
@@ -19,6 +20,7 @@ export default function MemberTasks() {
   const [dashDate, setDashDate] = useState(today());
   const [modal, setModal] = useState(null);
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('myTasks');
 
   const openTask = useCallback((t) => setModal(t), []);
   const closeModal = useCallback(() => setModal(null), []);
@@ -96,7 +98,7 @@ export default function MemberTasks() {
         padding: '10px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface)',
         display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap',
       }}>
-        <span className="stl" style={{ whiteSpace: 'nowrap' }}>My Tasks</span>
+        <span className="stl" style={{ whiteSpace: 'nowrap' }}>Tasks</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => shift(-1)}>←</button>
           <input type="date" value={dashDate} onChange={e => setDashDate(e.target.value)} style={{ width: 140, fontSize: 12 }} />
@@ -116,49 +118,77 @@ export default function MemberTasks() {
             }} />
           </div>
         </div>
-      </div>
-
-      {/* ── BODY ── */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-        <div className="task-dash-main" style={{ flex: 1, overflow: 'auto', padding: 12 }}>
-          {!visibleTasks.length ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 8, color: 'var(--t3)' }}>
-              <div style={{ fontSize: 36 }}>📋</div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>No tasks for this date</p>
-            </div>
-          ) : (
-            <div className="tcols" style={{ minWidth: 360 }}>
-              <MemberTaskCol memberId={memberId} date={dashDate} S={S}
-                tasks={visibleTasks} completeStatus={completeStatus}
-                onOpenTask={openTask} onStatus={setStatus} onHide={hideTask} />
-            </div>
-          )}
+        {/* ── View toggle ── */}
+        <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)', marginLeft: 'auto', flexShrink: 0 }}>
+          <button onClick={() => setViewMode('myTasks')} style={{
+            padding: '4px 12px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', border: 'none',
+            background: viewMode === 'myTasks' ? 'var(--accent)' : 'transparent',
+            color: viewMode === 'myTasks' ? '#fff' : 'var(--t3)',
+            transition: '.15s',
+          }}>My Tasks</button>
+          <button onClick={() => setViewMode('delegated')} style={{
+            padding: '4px 12px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', border: 'none',
+            background: viewMode === 'delegated' ? 'var(--accent)' : 'transparent',
+            color: viewMode === 'delegated' ? '#fff' : 'var(--t3)',
+            transition: '.15s',
+          }}>Delegated & Assigned</button>
         </div>
-
-        <TaskSidePanel
-          tasks={visibleTasks} member={me} S={S} onOpenTask={openTask} hiddenTasks={hiddenTasks} />
       </div>
 
-      <div className="lu-mobile-hidden">
-        <button className="lu-mobile-hidden-toggle" onClick={() => setMobilePanelOpen(o => !o)}>
-          👁 Tasks ({hiddenTasks.length} hidden)
-        </button>
-
-        {mobilePanelOpen && (
-          <div className="lu-mobile-drawer" onClick={() => setMobilePanelOpen(false)}>
-            <div className="lu-mobile-drawer-content" onClick={e => e.stopPropagation()}>
-              <div className="lu-mobile-drawer-head">
-                <span>{S.members.find(m => m.id === memberId)?.name || 'My Tasks'}</span>
-                <button className="btn btn-sm" onClick={() => setMobilePanelOpen(false)}>Close</button>
-              </div>
-              <TaskSidePanel
-                memberId={memberId} date={dashDate} S={S} onOpenTask={(t) => { openTask(t); setMobilePanelOpen(false); }} />
+      {viewMode === 'myTasks' ? (
+        <>
+          {/* ── MY TASKS BODY (unchanged) ── */}
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+            <div className="task-dash-main" style={{ flex: 1, overflow: 'auto', padding: 12 }}>
+              {!visibleTasks.length ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 8, color: 'var(--t3)' }}>
+                  <div style={{ fontSize: 36 }}>📋</div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>No tasks for this date</p>
+                </div>
+              ) : (
+                <div className="tcols" style={{ minWidth: 360 }}>
+                  <MemberTaskCol memberId={memberId} date={dashDate} S={S}
+                    tasks={visibleTasks} completeStatus={completeStatus}
+                    onOpenTask={openTask} onStatus={setStatus} onHide={hideTask} />
+                </div>
+              )}
             </div>
-          </div>
-        )}
-      </div>
 
-      {modal && <TaskModal task={modal} onClose={closeModal} readonlyAssignee={true} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
+            <TaskSidePanel
+              tasks={visibleTasks} member={me} S={S} onOpenTask={openTask} hiddenTasks={hiddenTasks} />
+          </div>
+
+          <div className="lu-mobile-hidden">
+            <button className="lu-mobile-hidden-toggle" onClick={() => setMobilePanelOpen(o => !o)}>
+              👁 Tasks ({hiddenTasks.length} hidden)
+            </button>
+
+            {mobilePanelOpen && (
+              <div className="lu-mobile-drawer" onClick={() => setMobilePanelOpen(false)}>
+                <div className="lu-mobile-drawer-content" onClick={e => e.stopPropagation()}>
+                  <div className="lu-mobile-drawer-head">
+                    <span>{S.members.find(m => m.id === memberId)?.name || 'My Tasks'}</span>
+                    <button className="btn btn-sm" onClick={() => setMobilePanelOpen(false)}>Close</button>
+                  </div>
+                  <TaskSidePanel
+                    memberId={memberId} date={dashDate} S={S} onOpenTask={(t) => { openTask(t); setMobilePanelOpen(false); }} />
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <DelegatedAssignedView
+          S={S}
+          memberId={memberId}
+          dashDate={dashDate}
+          completeStatus={completeStatus}
+          passStatus={passStatus}
+          openTask={openTask}
+        />
+      )}
+
+      {modal && <TaskModal task={modal} onClose={closeModal} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
     </div>
   );
 }
@@ -271,6 +301,271 @@ function MemberTaskCol({ memberId, date, S, tasks, completeStatus, onOpenTask, o
           title={limitReached ? `Daily task limit reached (${dailyActive}/${dailyCap})` : ''}
           style={{ fontSize: 11, flexShrink: 0, opacity: limitReached ? 0.5 : 1, cursor: limitReached ? 'not-allowed' : 'pointer', marginTop: 8 }}
           onClick={() => handleAddTask()}>+ Task</button>
+      </div>
+    </div>
+  );
+}
+
+/* ── DELEGATED & ASSIGNED VIEW ── */
+function DelegatedAssignedView({ S, memberId, dashDate, completeStatus, passStatus, openTask }) {
+  const { STC, STB } = getStatusMaps(S.task_statuses);
+
+  const { assignedToMe, delegatedByMe } = useMemo(() => {
+    if (!memberId) return { assignedToMe: [], delegatedByMe: [] };
+
+    const assignedToMe = S.tasks.filter(t =>
+      !t.deleted &&
+      t.date === dashDate &&
+      t.assignedTo.includes(memberId) &&
+      t.createdBy !== memberId
+    );
+
+    const delegatedByMe = S.tasks.filter(t =>
+      !t.deleted &&
+      t.date === dashDate &&
+      t.assignedTo.length > 0 &&
+      !t.assignedTo.includes(memberId) &&
+      t.createdBy === memberId
+    );
+
+    return { assignedToMe, delegatedByMe };
+  }, [S.tasks, memberId, dashDate]);
+
+  const createdAtExists = useMemo(() => S.tasks.some(t => t.createdBy), [S.tasks]);
+
+  const groupedBySender = useMemo(() => {
+    if (!createdAtExists) return [];
+    const groups = {};
+    assignedToMe.forEach(t => {
+      const senderId = t.createdBy;
+      if (!groups[senderId]) groups[senderId] = [];
+      groups[senderId].push(t);
+    });
+    return Object.entries(groups)
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([senderId, tasks]) => ({ sender: sel.gm(S, senderId), tasks }));
+  }, [assignedToMe, S, createdAtExists]);
+
+  const cardHover = (e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; };
+  const cardLeave = (e) => { e.currentTarget.style.boxShadow = 'none'; };
+
+  return (
+    <div style={{ flex: 1, overflow: 'auto', padding: '12px 16px' }}>
+      {/* ── Summary stat cards ── */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', gap: 12,
+          padding: '14px 16px', borderRadius: 8, background: '#fff',
+          border: '1px solid var(--border)',
+        }}>
+          <span style={{ fontSize: 22 }}>↙</span>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)', lineHeight: 1.2 }}>{assignedToMe.length}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', fontWeight: 500 }}>Assigned to me</div>
+          </div>
+        </div>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', gap: 12,
+          padding: '14px 16px', borderRadius: 8, background: '#fff',
+          border: '1px solid var(--border)',
+        }}>
+          <span style={{ fontSize: 22 }}>↗</span>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--accent)', lineHeight: 1.2 }}>{delegatedByMe.length}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', fontWeight: 500 }}>Delegated by me</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SECTION 1: Assigned to me ── */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--t3)',
+          marginBottom: 10, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          ↙ Assigned to me
+          <span style={{
+            fontSize: 9, fontWeight: 600, color: 'var(--t3)', background: 'var(--s2)',
+            padding: '1px 7px', borderRadius: 8,
+          }}>
+            {assignedToMe.length}
+          </span>
+        </div>
+
+        {assignedToMe.length === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--t3)', padding: '12px 0' }}>No tasks assigned to you for this date</div>
+        ) : !createdAtExists ? (
+          <>
+            <div style={{ fontSize: 11, color: 'var(--t3)', fontStyle: 'italic', marginBottom: 10 }}>
+              Task source tracking coming soon — showing all assigned tasks
+            </div>
+            {assignedToMe.map(t => <TaskCard key={t.id} task={t} S={S} STC={STC} STB={STB} onClick={() => openTask(t)} />)}
+          </>
+        ) : (
+          groupedBySender.map(({ sender, tasks }) => (
+            <div key={sender?.id || 'unknown'} style={{ marginBottom: 16 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 10px', marginBottom: 8, background: 'var(--s2)',
+                borderRadius: 6,
+              }}>
+                <Avatar name={sender?.name || '?'} color={sender?.color || 'var(--t3)'} size={18} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--t2)' }}>
+                  From {sender?.name || 'Unknown'}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--t3)', marginLeft: 'auto' }}>
+                  {tasks.length} task{tasks.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {tasks.map(t => <TaskCard key={t.id} task={t} S={S} STC={STC} STB={STB} onClick={() => openTask(t)} />)}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* ── SECTION 2: Delegated by me ── */}
+      <div>
+        <div style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', color: 'var(--t3)',
+          marginBottom: 10, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          ↗ Delegated by me
+          <span style={{
+            fontSize: 9, fontWeight: 600, color: 'var(--t3)', background: 'var(--s2)',
+            padding: '1px 7px', borderRadius: 8,
+          }}>
+            {delegatedByMe.length}
+          </span>
+        </div>
+
+        {delegatedByMe.length === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--t3)', padding: '12px 0' }}>You haven't delegated any tasks for this date</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {delegatedByMe.map(t => {
+              const assignee = sel.gm(S, t.assignedTo[0]);
+              const mood = sel.gmood(S, t.mood);
+              const client = sel.gc(S, t.clientId);
+              const hasSubtasks = t.subtasks?.length > 0;
+              const subTotal = t.subtasks?.length || 0;
+              const subDone = t.subtasks?.filter(s => s.done).length || 0;
+              const hasLinks = t.links?.length > 0;
+              return (
+                <div key={t.id} onClick={() => openTask(t)}
+                  onMouseOver={cardHover} onMouseOut={cardLeave}
+                  style={{
+                    background: '#fff', border: '1px solid var(--border)', borderRadius: 8,
+                    borderLeft: `3px solid ${mood?.color || 'var(--t3)'}`,
+                    padding: '10px 14px', cursor: 'pointer',
+                    transition: 'box-shadow .15s',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 16, flexShrink: 0 }}>{mood?.icon || '📋'}</span>
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.name}
+                    </span>
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                      whiteSpace: 'nowrap', background: STB[t.status], color: STC[t.status],
+                    }}>
+                      {t.status}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, flexWrap: 'wrap' }}>
+                    {client && (
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 4,
+                        background: (mood?.color || 'var(--t3)') + '18',
+                        color: mood?.color || 'var(--t3)', fontWeight: 600,
+                      }}>
+                        {client.name}
+                      </span>
+                    )}
+                    <span style={{ color: 'var(--t3)' }}>{t.date}</span>
+                    {assignee && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '2px 10px', borderRadius: 12,
+                        background: (assignee.color || 'var(--t3)') + '16',
+                        color: assignee.color || 'var(--t3)', fontWeight: 600,
+                      }}>
+                        → {assignee.name}
+                      </span>
+                    )}
+                    {hasSubtasks && (
+                      <CircProg done={subDone} total={subTotal} />
+                    )}
+                    {hasLinks && (
+                      <span style={{ color: 'var(--t3)', fontSize: 10 }}>🔗 {t.links.length}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TaskCard({ task, S, STC, STB, onClick }) {
+  const mood = sel.gmood(S, task.mood);
+  const client = sel.gc(S, task.clientId);
+  const sender = sel.gm(S, task.createdBy);
+  const hasSubtasks = task.subtasks?.length > 0;
+  const subTotal = task.subtasks?.length || 0;
+  const subDone = task.subtasks?.filter(s => s.done).length || 0;
+  const hasLinks = task.links?.length > 0;
+  const cardHover = (e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; };
+  const cardLeave = (e) => { e.currentTarget.style.boxShadow = 'none'; };
+  return (
+    <div onClick={onClick}
+      onMouseOver={cardHover} onMouseOut={cardLeave}
+      style={{
+        background: '#fff', border: '1px solid var(--border)', borderRadius: 8,
+        borderLeft: `3px solid ${mood?.color || 'var(--t3)'}`,
+        padding: '10px 14px', cursor: 'pointer',
+        transition: 'box-shadow .15s',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <span style={{ fontSize: 16, flexShrink: 0 }}>{mood?.icon || '📋'}</span>
+        <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--t1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {task.name}
+        </span>
+        <span style={{
+          padding: '3px 10px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+          whiteSpace: 'nowrap', background: STB[task.status], color: STC[task.status],
+        }}>
+          {task.status}
+        </span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, flexWrap: 'wrap' }}>
+        {client && (
+          <span style={{
+            padding: '2px 8px', borderRadius: 4,
+            background: (mood?.color || 'var(--t3)') + '18',
+            color: mood?.color || 'var(--t3)', fontWeight: 600,
+          }}>
+            {client.name}
+          </span>
+        )}
+        <span style={{ color: 'var(--t3)' }}>{task.date}</span>
+        {sender && (
+          <span style={{ color: 'var(--t3)', fontWeight: 500 }}>
+            from {sender.name}
+          </span>
+        )}
+        {hasSubtasks && (
+          <CircProg done={subDone} total={subTotal} />
+        )}
+        {hasLinks && (
+          <span style={{ color: 'var(--t3)', fontSize: 10 }}>🔗 {task.links.length}</span>
+        )}
       </div>
     </div>
   );

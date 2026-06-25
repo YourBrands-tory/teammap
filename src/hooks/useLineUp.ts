@@ -8,8 +8,12 @@ import type { DragEndEvent } from '@dnd-kit/core';
 type SortMode = 'mood' | 'team' | 'client' | null;
 type Filters = { member: string; client: string; mood: string; review: boolean; search: string; status: string };
 
-function getStoredViewMode(): 'standard' | 'compact' {
-  try { return localStorage.getItem('lineupViewMode') === 'compact' ? 'compact' : 'standard'; } catch { return 'standard'; }
+function getStoredViewMode(): 'priority' | 'compact' {
+  try {
+    const v = localStorage.getItem('lineupViewMode');
+    if (v === 'compact') return 'compact';
+    return 'priority';
+  } catch { return 'compact'; }
 }
 
 export default function useLineUp() {
@@ -25,9 +29,9 @@ export default function useLineUp() {
   const [panelWidth, setPanelWidth] = useState(uiViewState.panelWidth || 380);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [taskModal, setTaskModal] = useState<any>(null);
-  const [viewMode, setViewMode] = useState<'standard' | 'compact'>(getStoredViewMode);
+  const [viewMode, setViewMode] = useState<'priority' | 'compact'>(getStoredViewMode);
 
-  const handleSetViewMode = useCallback((mode: 'standard' | 'compact') => {
+  const handleSetViewMode = useCallback((mode: 'priority' | 'compact') => {
     setViewMode(mode);
     try { localStorage.setItem('lineupViewMode', mode); } catch {}
   }, []);

@@ -25,7 +25,11 @@ export default function MemberLineUp() {
   const [mobileHiddenOpen, setMobileHiddenOpen] = useState(false);
   const [taskModal, setTaskModal] = useState(null);
   const [viewMode, setViewMode] = useState(() => {
-    try { return localStorage.getItem('lineupViewMode') === 'compact' ? 'compact' : 'standard'; } catch { return 'standard'; }
+    try {
+      const v = localStorage.getItem('lineupViewMode');
+      if (v === 'compact') return 'compact';
+      return 'priority';
+    } catch { return 'compact'; }
   });
 
   // Persist UI state on change
@@ -149,7 +153,7 @@ export default function MemberLineUp() {
 
   const handleSetViewMode = useCallback((mode) => {
     setViewMode(mode);
-    try { localStorage.setItem('lineupViewMode', mode); } catch {}
+    try { localStorage.setItem('lineupViewMode', mode === 'priority' ? 'priority' : 'compact'); } catch {}
   }, []);
 
   return (
@@ -229,7 +233,7 @@ export default function MemberLineUp() {
         )}
       </div>
 
-      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} readonlyAssignee={true} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
+      {taskModal && <TaskModal task={taskModal} onClose={() => setTaskModal(null)} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
     </div>
   );
 }

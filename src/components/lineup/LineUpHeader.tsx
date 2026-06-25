@@ -19,13 +19,13 @@ interface Props {
   S: S;
   filters: Filters;
   isManager: boolean;
-  viewMode: 'standard' | 'compact';
+  viewMode: 'priority' | 'compact';
   onShift: (dir: number, val?: string) => void;
   onGoToday: () => void;
   onSetSortMode: (m: SortMode) => void;
   onSetFilter: (k: keyof Filters, v: string | boolean) => void;
   onNewTask: () => void;
-  onSetViewMode: (mode: 'standard' | 'compact') => void;
+  onSetViewMode: (mode: 'priority' | 'compact') => void;
   disableNewTask?: boolean;
 }
 
@@ -72,7 +72,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
             </div>
             <button className="btn btn-sm" onClick={onGoToday} style={{ fontWeight: 700 }}>Today</button>
             <div className="lu-hdr-view-toggle">
-              <button className={`btn btn-xs${viewMode === 'standard' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('standard')}>Standard</button>
+              <button className={`btn btn-xs${viewMode === 'priority' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('priority')}>Priority</button>
               <button className={`btn btn-xs${viewMode === 'compact' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('compact')}>Compact</button>
             </div>
             <button className="btn btn-sm btn-p" onClick={onNewTask} disabled={disableNewTask} title={disableNewTask ? 'Daily task limit reached' : ''}>+ New task</button>
@@ -174,7 +174,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
         <div className="mobile-action-row">
           <button className="btn btn-sm today-btn" onClick={onGoToday} style={{ fontWeight: 700, flexShrink: 0 }}>Today</button>
           <div className="view-toggle">
-            <button className={`btn btn-xs${viewMode === 'standard' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('standard')}>Standard</button>
+            <button className={`btn btn-xs${viewMode === 'priority' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('priority')}>Priority</button>
             <button className={`btn btn-xs${viewMode === 'compact' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('compact')}>Compact</button>
           </div>
           <span className="sort-label" style={{ fontSize: 11, color: 'var(--t3)', flexShrink: 0 }}>Sort:</span>
