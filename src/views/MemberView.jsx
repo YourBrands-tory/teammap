@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useStore } from '../store/useStore';
+import { getCompleteStatus, getPassStatus } from '../utils/statusUtils';
 import MemberLineUp from './MemberLineUp';
 import MemberPlayground from './MemberPlayground';
 import MemberKanban from './MemberKanban';
 import MemberTasks from './MemberTasks';
+import MemberSentView from './MemberSentView';
 import Toast from '../components/Toast';
 
 const TABS = [
@@ -11,6 +13,7 @@ const TABS = [
   { id: 'lu', label: 'Line Up', icon: '📋' },
   { id: 'pg', label: 'Playground', icon: '◢' },
   { id: 'kb', label: 'Kanban', icon: '📌' },
+  { id: 'sn', label: 'Sent', icon: '📤' },
 ];
 
 export default function MemberView() {
@@ -19,6 +22,22 @@ export default function MemberView() {
   const menuRef = useRef(null);
   const memberSession = useStore(s => s.session);
   const signOut = useStore(s => s.signOut);
+  const S = useStore(s => s.S);
+  const memberId = memberSession?.memberId;
+  const completeStatus = getCompleteStatus(S.task_statuses);
+  const passStatus = getPassStatus(S.task_statuses);
+
+  const sentPendingCount = useMemo(() => {
+    if (!memberId) return 0;
+    return S.tasks.filter(t =>
+      !t.deleted &&
+      t.createdBy === memberId &&
+      t.assignedTo.length > 0 &&
+      !t.assignedTo.includes(memberId) &&
+      t.status !== completeStatus &&
+      t.status !== passStatus
+    ).length;
+  }, [S.tasks, memberId, completeStatus, passStatus]);
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
@@ -61,8 +80,17 @@ export default function MemberView() {
         <div className="nav-brand" style={{fontSize:16}}>Team<span>Map</span></div>
         <div className="nav-desktop-items" style={{display:'flex',alignItems:'center',gap:0,marginLeft:16}}>
           {TABS.map(t => (
-            <div key={t.id} className={`nt${tab===t.id?' active':''}`} onClick={() => setTab(t.id)}>
+            <div key={t.id} className={`nt${tab===t.id?' active':''}`} onClick={() => setTab(t.id)} style={{ position: 'relative' }}>
               <span>{t.icon}</span> {t.label}
+              {t.id === 'sn' && sentPendingCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2, fontSize: 9,
+                  background: 'var(--warn)', color: '#fff', borderRadius: 8,
+                  padding: '1px 5px', fontWeight: 700, lineHeight: 1.3,
+                }}>
+                  {sentPendingCount}
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -87,6 +115,15 @@ export default function MemberView() {
             <div key={t.id} className={`nav-mobile-item${tab===t.id?' active':''}`} onClick={() => handleTab(t.id)}>
               <span style={{fontSize:16,width:24,textAlign:'center'}}>{t.icon}</span>
               <span>{t.label}</span>
+              {t.id === 'sn' && sentPendingCount > 0 && (
+                <span style={{
+                  marginLeft: 'auto', fontSize: 10,
+                  background: 'var(--warn)', color: '#fff', borderRadius: 8,
+                  padding: '1px 6px', fontWeight: 700,
+                }}>
+                  {sentPendingCount}
+                </span>
+              )}
             </div>
           ))}
           <div style={{borderTop:'1px solid var(--border)',margin:'8px 0'}} />
@@ -102,6 +139,7 @@ export default function MemberView() {
       <div className="member-tab-content" style={{ display: tab === 'pg' ? '' : 'none' }}><MemberPlayground /></div>
       <div className="member-tab-content" style={{ display: tab === 'kb' ? '' : 'none' }}><MemberKanban /></div>
       <div className="member-tab-content" style={{ display: tab === 'tk' ? '' : 'none' }}><MemberTasks /></div>
+      <div className="member-tab-content" style={{ display: tab === 'sn' ? '' : 'none' }}><MemberSentView /></div>
       <Toast />
     </div>
   );

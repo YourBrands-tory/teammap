@@ -15,6 +15,7 @@ const ListView = lazy(() => import('./views/ListView'));
 const TaskGen2 = lazy(() => import('./views/TaskGen2'));
 const LineUp = lazy(() => import('./views/LineUp'));
 const Playground = lazy(() => import('./views/Playground'));
+const DelegatedView = lazy(() => import('./views/DelegatedView'));
 
 const ALL_VIEWS = {
   tkd: TaskDashboard,
@@ -26,6 +27,7 @@ const ALL_VIEWS = {
   tg2: TaskGen2,
   lu:  LineUp,
   pg:  Playground,
+  dl:  DelegatedView,
 };
 
 function LoadingFallback() {

@@ -19,12 +19,13 @@ export const DMOODS = [
   { id:'followup', label:'Follow Up', icon:'📞', color:'#1d4ed8', bg:'#dbeafe', desc:'Tasks needing follow-up', max:null, visible:false, cardSize:'narrow' },
 ];
 
-export const NAV_ICONS = { tkd:'📊', tg2:'💡', lu:'📋', lv:'☷', tk:'☰', td:'▣', bl:'◯', pg:'◢', kb:'📌', st:'⚙' };
+export const NAV_ICONS = { tkd:'📊', tg2:'💡', lu:'📋', lv:'☷', tk:'☰', td:'▣', bl:'◯', pg:'◢', kb:'📌', st:'⚙', dl:'📤' };
 
-export const DEFAULT_NAV_ORDER = ['tkd','tg2','lu','lv','tk','td','bl','pg','st'];
+export const DEFAULT_NAV_ORDER = ['tkd','tg2','lu','lv','tk','dl','td','bl','pg','st'];
 export const DEFAULT_NAV_LABELS = {
   tkd:'Task Dashboard', tg2:'Task Gen 2.0', lu:'Line Up', lv:'List View',
-  tk:'Tasks & Milestones', td:'Team Dashboard', bl:'Builder', pg:'Playground', st:'Settings'
+  tk:'Tasks & Milestones', dl:'Delegated', td:'Team Dashboard', bl:'Builder',
+  pg:'Playground', st:'Settings'
 };
 
 // ── pure helpers (ported) ───────────────────────────────────────────────────
