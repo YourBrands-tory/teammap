@@ -206,28 +206,32 @@ export const useStore = create((set, get) => ({
     const tasksWithSubtasks = S.tasks.filter(t => t.subtasks?.length > 0).length;
     const tasksWithLinks = S.tasks.filter(t => t.links?.length > 0).length;
     console.log('[loadAll] done', { tasks: S.tasks.length, tasksWithSubtasks, tasksWithLinks, subtasks: subtaskCount, links: linkCount });
-    if (!S.moods || !S.moods.length) S.moods = JSON.parse(JSON.stringify(DMOODS));
-    if (S.moods && S.moods.length) {
-      const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.hidden; });
-      S.moods = S.moods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : (dflt[m.id] !== undefined ? dflt[m.id] : false) }));
+
+    // ── Moods: prefer moods table, fall back to app_state, then DMOODS ───────
+    const { data: moodRows } = await supabase.from('moods').select('*');
+    if (moodRows && moodRows.length > 0) {
+      S.moods = moodRows;
+    } else {
+      // Try app_state data (pre-migration fallback)
+      const appStateMoods = S.moods?.length ? S.moods : null;
+      if (appStateMoods) {
+        S.moods = appStateMoods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : false }));
+      } else {
+        S.moods = JSON.parse(JSON.stringify(DMOODS));
+      }
+      // Seed the moods table so next load reads from it directly
+      supabase.from('moods').upsert(S.moods.map(m => ({
+        id: m.id, label: m.label, icon: m.icon, color: m.color, bg: m.bg,
+        desc: m.desc, max: m.max, cardSize: m.cardSize, hidden: m.hidden,
+      }))).then();
     }
+
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members[0]?.id || null };
     if (S.settings.spMember == null) S.settings.spMember = S.members[0]?.id || null;
     if (!S.task_statuses || !S.task_statuses.length) {
       S.task_statuses = DEFAULT_TASK_STATUSES.map((label, i) => ({ id: uid(), label, order: i }));
       supabase.from('app_state').upsert({ key: 'task_statuses', value: S.task_statuses }).then();
     }
-
-    supabase.from('moods').select('id, hidden').then(({ data: moodRows }) => {
-      if (moodRows && moodRows.length) {
-        const patch = {}; moodRows.forEach(r => { patch[r.id] = r.hidden; });
-        get()._patchS((S2) => {
-          S2.moods = S2.moods.map(m => ({ ...m, hidden: patch[m.id] !== undefined ? patch[m.id] : m.hidden }));
-        });
-      } else {
-        supabase.from('moods').upsert(S.moods.map(m => ({ id: m.id, label: m.label, icon: m.icon, color: m.color, bg: m.bg, desc: m.desc, max: m.max, cardSize: m.cardSize, hidden: m.hidden }))).then();
-      }
-    });
 
     set({ S, loading:false });
     get()._subscribeRealtime();
@@ -512,12 +516,7 @@ export const useStore = create((set, get) => ({
     await get()._persistState('settings');
   },
   setMoods: async (moods) => {
-    const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.hidden; });
-    const safe = moods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : (dflt[m.id] !== undefined ? dflt[m.id] : false) }));
-    get()._patchS((S)=>{ S.moods=safe; }); await get()._persistState('moods');
-    for (const m of safe) {
-      await supabase.from('moods').upsert({ id: m.id, label: m.label, icon: m.icon, color: m.color, bg: m.bg, desc: m.desc, max: m.max, cardSize: m.cardSize, hidden: m.hidden }, { onConflict: 'id' });
-    }
+    get()._patchS((S)=>{ S.moods=moods; }); await get()._persistState('moods');
   },
   setNavOrder: async (order) => { get()._patchS((S)=>{ S.navOrder=order; }); await get()._persistState('navOrder'); },
   setNavLabels: async (labels) => { get()._patchS((S)=>{ S.navLabels=labels; }); await get()._persistState('navLabels'); },
@@ -541,8 +540,7 @@ export const useStore = create((set, get) => ({
     Object.assign(S, raw);
     if (!S.moods || !S.moods.length) S.moods = JSON.parse(JSON.stringify(DMOODS));
     if (S.moods && S.moods.length) {
-      const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.hidden; });
-      S.moods = S.moods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : (dflt[m.id] !== undefined ? dflt[m.id] : false) }));
+      S.moods = S.moods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : (m.visible !== undefined ? !m.visible : false) }));
     }
     if (!S.tags) S.tags = [];
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members?.[0]?.id||null };

@@ -54,6 +54,9 @@ export default function useSettings() {
     const moods = [...S.moods];
     if (index >= 0 && index < moods.length) {
       moods[index] = { ...moods[index], ...data };
+      await setMoods(moods);
+      const { id, label, icon, desc, max, cardSize, hidden, color, bg } = moods[index];
+      await supabase.from('moods').update({ label, icon, desc: desc || null, max, cardSize, hidden, color, bg }).eq('id', id);
     } else {
       const newMood = {
         id: uid(), label: data.label, icon: data.icon || '📌', desc: data.desc || '',
@@ -61,8 +64,12 @@ export default function useSettings() {
         hidden: data.hidden ?? false, color: COLORS[Math.floor(Math.random() * COLORS.length)], bg: '#f2f0ec',
       };
       moods.push(newMood);
+      await setMoods(moods);
+      await supabase.from('moods').insert({
+        id: newMood.id, label: newMood.label, icon: newMood.icon, desc: newMood.desc || null,
+        max: newMood.max, cardSize: newMood.cardSize, hidden: newMood.hidden, color: newMood.color, bg: newMood.bg,
+      });
     }
-    await setMoods(moods);
   }, [S.moods, setMoods]);
 
   const toggleMoodVisibility = useCallback(async (moodId: string) => {
@@ -71,7 +78,8 @@ export default function useSettings() {
     const nextHidden = !mood.hidden;
     const moods = S.moods.map(m => m.id === moodId ? { ...m, hidden: nextHidden } : m);
     await setMoods(moods);
-    await supabase.from('moods').upsert({ id: moodId, hidden: nextHidden }, { onConflict: 'id' });
+    const { error } = await supabase.from('moods').update({ hidden: nextHidden }).eq('id', moodId);
+    if (error) console.error('toggleMoodVisibility', error);
   }, [S.moods, setMoods]);
 
   // Tags
