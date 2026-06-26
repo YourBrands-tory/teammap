@@ -208,8 +208,8 @@ export const useStore = create((set, get) => ({
     console.log('[loadAll] done', { tasks: S.tasks.length, tasksWithSubtasks, tasksWithLinks, subtasks: subtaskCount, links: linkCount });
     if (!S.moods || !S.moods.length) S.moods = JSON.parse(JSON.stringify(DMOODS));
     if (S.moods && S.moods.length) {
-      const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.visible; });
-      S.moods = S.moods.map(m => ({ ...m, visible: m.visible !== undefined ? m.visible : (dflt[m.id] !== undefined ? dflt[m.id] : true) }));
+      const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.hidden; });
+      S.moods = S.moods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : (dflt[m.id] !== undefined ? dflt[m.id] : false) }));
     }
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members[0]?.id || null };
     if (S.settings.spMember == null) S.settings.spMember = S.members[0]?.id || null;
@@ -217,6 +217,17 @@ export const useStore = create((set, get) => ({
       S.task_statuses = DEFAULT_TASK_STATUSES.map((label, i) => ({ id: uid(), label, order: i }));
       supabase.from('app_state').upsert({ key: 'task_statuses', value: S.task_statuses }).then();
     }
+
+    supabase.from('moods').select('id, hidden').then(({ data: moodRows }) => {
+      if (moodRows && moodRows.length) {
+        const patch = {}; moodRows.forEach(r => { patch[r.id] = r.hidden; });
+        get()._patchS((S2) => {
+          S2.moods = S2.moods.map(m => ({ ...m, hidden: patch[m.id] !== undefined ? patch[m.id] : m.hidden }));
+        });
+      } else {
+        supabase.from('moods').upsert(S.moods.map(m => ({ id: m.id, label: m.label, icon: m.icon, color: m.color, bg: m.bg, desc: m.desc, max: m.max, cardSize: m.cardSize, hidden: m.hidden }))).then();
+      }
+    });
 
     set({ S, loading:false });
     get()._subscribeRealtime();
@@ -500,7 +511,14 @@ export const useStore = create((set, get) => ({
     get()._patchS((S)=>{ S.settings = { ...S.settings, ...patch }; });
     await get()._persistState('settings');
   },
-  setMoods: async (moods) => { get()._patchS((S)=>{ S.moods=moods; }); await get()._persistState('moods'); },
+  setMoods: async (moods) => {
+    const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.hidden; });
+    const safe = moods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : (dflt[m.id] !== undefined ? dflt[m.id] : false) }));
+    get()._patchS((S)=>{ S.moods=safe; }); await get()._persistState('moods');
+    for (const m of safe) {
+      await supabase.from('moods').upsert({ id: m.id, label: m.label, icon: m.icon, color: m.color, bg: m.bg, desc: m.desc, max: m.max, cardSize: m.cardSize, hidden: m.hidden }, { onConflict: 'id' });
+    }
+  },
   setNavOrder: async (order) => { get()._patchS((S)=>{ S.navOrder=order; }); await get()._persistState('navOrder'); },
   setNavLabels: async (labels) => { get()._patchS((S)=>{ S.navLabels=labels; }); await get()._persistState('navLabels'); },
   resetNav: async () => {
@@ -523,8 +541,8 @@ export const useStore = create((set, get) => ({
     Object.assign(S, raw);
     if (!S.moods || !S.moods.length) S.moods = JSON.parse(JSON.stringify(DMOODS));
     if (S.moods && S.moods.length) {
-      const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.visible; });
-      S.moods = S.moods.map(m => ({ ...m, visible: m.visible !== undefined ? m.visible : (dflt[m.id] !== undefined ? dflt[m.id] : true) }));
+      const dflt = {}; DMOODS.forEach(m => { dflt[m.id] = m.hidden; });
+      S.moods = S.moods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : (dflt[m.id] !== undefined ? dflt[m.id] : false) }));
     }
     if (!S.tags) S.tags = [];
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members?.[0]?.id||null };

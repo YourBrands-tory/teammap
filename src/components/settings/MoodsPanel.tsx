@@ -1,5 +1,5 @@
 interface Mood {
-  id: string; icon: string; label: string; cardSize?: string; visible?: boolean;
+  id: string; icon: string; label: string; cardSize?: string; hidden?: boolean;
 }
 
 interface Props {
@@ -36,12 +36,12 @@ export default function MoodsPanel({
             <span className="st-li-sub">{m.cardSize || 'narrow'}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
               <button className="btn btn-xs"
-                style={m.visible
+                style={!m.hidden
                   ? { background: '#dcfce7', color: '#16a34a', border: '1px solid #bbf7d0' }
                   : { background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca' }}
                 onClick={() => onToggleVisibility(m.id)}
-                title={m.visible ? 'Click to hide from all dashboards' : 'Click to show on all dashboards'}>
-                {m.visible ? 'Visible' : 'Hidden'}
+                title={!m.hidden ? 'Click to hide from all dashboards' : 'Click to show on all dashboards'}>
+                {!m.hidden ? 'Visible' : 'Hidden'}
               </button>
               <button className="btn btn-xs" onClick={() => onEdit(i)}>Edit</button>
             </div>

@@ -302,34 +302,24 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   }, [limitReached, stats.activeCount, dailyCap, member.name, date, onOpenTask, setToast]);
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
 
-  const primaryMoodIds = ['hero', 'imp', 'top'];
-  const visibleMoods = S.moods.filter(m => m.visible);
-  const hiddenMoodIds = useMemo(() => S.moods.filter(m => !m.visible).map(m => m.id), [S.moods]);
+  const hiddenMoodIds = useMemo(() => S.moods.filter(m => m.hidden).map(m => m.id), [S.moods]);
   const visibleTasks = reviewVisible.filter(t => !hiddenMoodIds.includes(t.mood));
   const suTasks = visibleTasks.filter(t=>t.status===standUpStatus);
 
-  const overflowMoods = visibleMoods.filter(m => !primaryMoodIds.includes(m.id));
   const overflowTasks = useMemo(() => {
     return reviewVisible.filter(t =>
-      t.status !== standUpStatus && (
-        overflowMoods.some(m => m.id === t.mood) ||
-        hiddenMoodIds.includes(t.mood)
-      )
+      t.status !== standUpStatus && hiddenMoodIds.includes(t.mood)
     );
-  }, [reviewVisible, overflowMoods, hiddenMoodIds, standUpStatus]);
+  }, [reviewVisible, hiddenMoodIds, standUpStatus]);
+
+  const overflowMoodIds = useMemo(() => new Set(hiddenMoodIds), [hiddenMoodIds]);
 
   const overflowMoodLabels = useMemo(() => {
-    const labels = overflowMoods.map(m => m.label);
+    const labels = S.moods.filter(m => m.hidden).map(m => m.label);
     if (!labels.length) return '';
     if (labels.length <= 2) return labels.join(' & ');
     return labels.slice(0, 2).join(', ') + ' & others';
-  }, [overflowMoods]);
-
-  const overflowMoodIds = useMemo(() => {
-    const ids = new Set(overflowMoods.map(m => m.id));
-    hiddenMoodIds.forEach(id => ids.add(id));
-    return ids;
-  }, [overflowMoods, hiddenMoodIds]);
+  }, [S.moods]);
 
   const groupedOverflowTasks = useMemo(() => {
     return overflowTasks.reduce((acc, task) => {
@@ -384,7 +374,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
           </div>
         )}
 
-        {visibleMoods.filter(m => primaryMoodIds.includes(m.id)).map(mood => {
+        {S.moods.filter(m => !m.hidden).map(mood => {
           const mid = mood.id;
           const mt = visibleTasks.filter(t=>t.mood===mid && t.status!==standUpStatus);
           if ((mid==='top'||mid==='creative') && !mt.length) return null;
@@ -425,7 +415,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
           style={{fontSize:11,flexShrink:0,opacity:limitReached?0.5:1,cursor:limitReached?'not-allowed':'pointer'}}
           onClick={()=>handleAddTask()}>+ Task</button>
 
-        {drawerOpen && S.moods.filter(m => overflowMoodIds.has(m.id)).map(mood => {
+        {drawerOpen && S.moods.filter(m => m.hidden).map(mood => {
           const moodTasks = groupedOverflowTasks[mood.id] || [];
           if (!moodTasks.length) return null;
           const mid = mood.id;
@@ -555,34 +545,24 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
     onOpenTask({ date, mood: moodId, assignedTo: [member.id] });
   }, [limitReached, dailyActive, dailyCap, member.name, date, onOpenTask, setToast]);
 
-  const primaryMoodIds = ['hero', 'imp', 'top'];
-  const visibleMoods = S.moods.filter(m => m.visible);
-  const hiddenMoodIds = useMemo(() => S.moods.filter(m => !m.visible).map(m => m.id), [S.moods]);
+  const hiddenMoodIds = useMemo(() => S.moods.filter(m => m.hidden).map(m => m.id), [S.moods]);
   const visibleTasks = visible.filter(t => !hiddenMoodIds.includes(t.mood));
   const suTasks = visibleTasks.filter(t=>t.status===standUpStatus);
 
-  const overflowMoods = visibleMoods.filter(m => !primaryMoodIds.includes(m.id));
   const overflowTasks = useMemo(() => {
     return visible.filter(t =>
-      t.status !== standUpStatus && (
-        overflowMoods.some(m => m.id === t.mood) ||
-        hiddenMoodIds.includes(t.mood)
-      )
+      t.status !== standUpStatus && hiddenMoodIds.includes(t.mood)
     );
-  }, [visible, overflowMoods, hiddenMoodIds, standUpStatus]);
+  }, [visible, hiddenMoodIds, standUpStatus]);
 
   const overflowMoodLabels = useMemo(() => {
-    const labels = overflowMoods.map(m => m.label);
+    const labels = S.moods.filter(m => m.hidden).map(m => m.label);
     if (!labels.length) return '';
     if (labels.length <= 2) return labels.join(' & ');
     return labels.slice(0, 2).join(', ') + ' & others';
-  }, [overflowMoods]);
+  }, [S.moods]);
 
-  const overflowMoodIds = useMemo(() => {
-    const ids = new Set(overflowMoods.map(m => m.id));
-    hiddenMoodIds.forEach(id => ids.add(id));
-    return ids;
-  }, [overflowMoods, hiddenMoodIds]);
+  const overflowMoodIds = useMemo(() => new Set(hiddenMoodIds), [hiddenMoodIds]);
 
   const groupedOverflowTasks = useMemo(() => {
     return overflowTasks.reduce((acc, task) => {
@@ -616,7 +596,7 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
         </div>
       )}
 
-      {visibleMoods.filter(m => primaryMoodIds.includes(m.id)).map(mood => {
+      {S.moods.filter(m => !m.hidden).map(mood => {
         const mid = mood.id;
         const mt = visibleTasks.filter(t=>t.mood===mid && t.status!==standUpStatus);
         if ((mid==='top'||mid==='creative') && !mt.length) return null;
@@ -657,7 +637,7 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
           style={{fontSize:11,marginTop:4,flexShrink:0,opacity:limitReached?0.5:1,cursor:limitReached?'not-allowed':'pointer'}}
           onClick={()=>handleAddTask()}>+ Task</button>
 
-        {overflowOpen && S.moods.filter(m => overflowMoodIds.has(m.id)).map(mood => {
+        {overflowOpen && S.moods.filter(m => m.hidden).map(mood => {
           const moodTasks = groupedOverflowTasks[mood.id] || [];
           if (!moodTasks.length) return null;
           const mid = mood.id;

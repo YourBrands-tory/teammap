@@ -9,14 +9,14 @@ export const CC = { Strategy:'#7c3aed', Operations:'#2196c4', Support:'#2d6a4f',
 export const MOOD_ORDER = ['top','hero','imp','creative','rapid','share','secondhalf','followup'];
 
 export const DMOODS = [
-  { id:'top', label:'Top', icon:'🔴', color:'#dc2626', bg:'#fee2e2', desc:'Urgent, do first', max:null, visible:true, cardSize:'narrow' },
-  { id:'hero', label:'Hero', icon:'⚡', color:'#c9920a', bg:'#fffbeb', desc:'High impact, max 2/day', max:2, visible:true, cardSize:'big' },
-  { id:'imp', label:'Imp', icon:'⭐', color:'#7c3aed', bg:'#ede9fe', desc:'Important, max 3/day', max:3, visible:true, cardSize:'big' },
-  { id:'creative', label:'Creative', icon:'🎨', color:'#be185d', bg:'#fce7f3', desc:'Creative work', max:null, visible:true, cardSize:'mid' },
-  { id:'rapid', label:'Rapid', icon:'💨', color:'#0f7c6c', bg:'#d1fae5', desc:'Quick tasks', max:null, visible:false, cardSize:'narrow' },
-  { id:'share', label:'Share', icon:'🔗', color:'#2196c4', bg:'#e3f2fd', desc:'To share/handoff', max:null, visible:false, cardSize:'narrow' },
-  { id:'secondhalf', label:'Second Half', icon:'🌤️', color:'#d97706', bg:'#fef3c7', desc:'Second half of the day', max:null, visible:false, cardSize:'narrow' },
-  { id:'followup', label:'Follow Up', icon:'📞', color:'#1d4ed8', bg:'#dbeafe', desc:'Tasks needing follow-up', max:null, visible:false, cardSize:'narrow' },
+  { id:'top', label:'Top', icon:'🔴', color:'#dc2626', bg:'#fee2e2', desc:'Urgent, do first', max:null, hidden:false, cardSize:'narrow' },
+  { id:'hero', label:'Hero', icon:'⚡', color:'#c9920a', bg:'#fffbeb', desc:'High impact, max 2/day', max:2, hidden:false, cardSize:'big' },
+  { id:'imp', label:'Imp', icon:'⭐', color:'#7c3aed', bg:'#ede9fe', desc:'Important, max 3/day', max:3, hidden:false, cardSize:'big' },
+  { id:'creative', label:'Creative', icon:'🎨', color:'#be185d', bg:'#fce7f3', desc:'Creative work', max:null, hidden:false, cardSize:'mid' },
+  { id:'rapid', label:'Rapid', icon:'💨', color:'#0f7c6c', bg:'#d1fae5', desc:'Quick tasks', max:null, hidden:true, cardSize:'narrow' },
+  { id:'share', label:'Share', icon:'🔗', color:'#2196c4', bg:'#e3f2fd', desc:'To share/handoff', max:null, hidden:true, cardSize:'narrow' },
+  { id:'secondhalf', label:'Second Half', icon:'🌤️', color:'#d97706', bg:'#fef3c7', desc:'Second half of the day', max:null, hidden:true, cardSize:'narrow' },
+  { id:'followup', label:'Follow Up', icon:'📞', color:'#1d4ed8', bg:'#dbeafe', desc:'Tasks needing follow-up', max:null, hidden:true, cardSize:'narrow' },
 ];
 
 export const NAV_ICONS = { tkd:'📊', tg2:'💡', lu:'📋', lv:'☷', tk:'☰', td:'▣', bl:'◯', pg:'◢', kb:'📌', st:'⚙', dl:'📤' };

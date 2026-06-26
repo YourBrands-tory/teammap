@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useStore, sel } from '../store/useStore';
+import { supabase } from '../lib/supabase';
 import { uid, COLORS, DEFAULT_TASK_STATUSES } from '../lib/constants';
 import { reorderArray, reorderClients } from '../utils/settingsHelpers';
 
@@ -57,7 +58,7 @@ export default function useSettings() {
       const newMood = {
         id: uid(), label: data.label, icon: data.icon || '📌', desc: data.desc || '',
         max: data.max ?? null, cardSize: data.cardSize || 'narrow',
-        visible: data.visible ?? true, color: COLORS[Math.floor(Math.random() * COLORS.length)], bg: '#f2f0ec',
+        hidden: data.hidden ?? false, color: COLORS[Math.floor(Math.random() * COLORS.length)], bg: '#f2f0ec',
       };
       moods.push(newMood);
     }
@@ -65,8 +66,12 @@ export default function useSettings() {
   }, [S.moods, setMoods]);
 
   const toggleMoodVisibility = useCallback(async (moodId: string) => {
-    const moods = S.moods.map(m => m.id === moodId ? { ...m, visible: !m.visible } : m);
+    const mood = S.moods.find(m => m.id === moodId);
+    if (!mood) return;
+    const nextHidden = !mood.hidden;
+    const moods = S.moods.map(m => m.id === moodId ? { ...m, hidden: nextHidden } : m);
     await setMoods(moods);
+    await supabase.from('moods').upsert({ id: moodId, hidden: nextHidden }, { onConflict: 'id' });
   }, [S.moods, setMoods]);
 
   // Tags

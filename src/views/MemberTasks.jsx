@@ -43,34 +43,6 @@ export default function MemberTasks() {
   const doneCount = doneTasks.length;
   const dayPct = total ? Math.round(doneCount / total * 100) : 0;
 
-  const moodSections = useMemo(() => {
-    const primaryIds = ['hero', 'imp', 'top'];
-    const moods = S.moods.filter(m => m.visible);
-    const primaryMoods = moods.filter(m => primaryIds.includes(m.id));
-    const overflowMoods = moods.filter(m => !primaryIds.includes(m.id));
-    const sections = [];
-
-    const suTasks = visibleTasks.filter(t => {
-      const suStatus = getReviewStatus(S.task_statuses);
-      return false;
-    });
-
-    primaryMoods.forEach(mood => {
-      const tasks = visibleTasks.filter(t => t.mood === mood.id);
-      if (tasks.length > 0 || mood.id === 'hero') {
-        sections.push({ mood, tasks });
-      }
-    });
-
-    const overflowTasks = visibleTasks.filter(t => overflowMoods.some(m => m.id === t.mood));
-    if (overflowTasks.length > 0) {
-      const overflowMood = moods.find(m => m.id === overflowMoods[0]?.id);
-      sections.push({ mood: { id: 'overflow', icon: '📦', label: 'More', color: 'var(--t2)', bg: 'var(--s2)' }, tasks: overflowTasks });
-    }
-
-    return sections;
-  }, [visibleTasks, S.moods, S.task_statuses]);
-
   const setStatus = useCallback(async (taskId, status) => {
     const task = S.tasks.find(t => t.id === taskId);
     if (task && status !== completeStatus) {
@@ -200,10 +172,7 @@ function MemberTaskCol({ memberId, date, S, tasks, completeStatus, onOpenTask, o
   const capColor = dailyActive > dailyCap ? '#e76f51' : dailyActive === dailyCap ? '#d97706' : 'var(--t2)';
   const limitReached = dailyActive >= dailyCap;
 
-  const primaryIds = ['hero', 'imp', 'top'];
-  const moods = S.moods.filter(m => m.visible);
-  const primaryMoods = moods.filter(m => primaryIds.includes(m.id));
-  const overflowMoods = moods.filter(m => !primaryIds.includes(m.id));
+  const visibleMoods = S.moods.filter(m => !m.hidden);
 
   const moodMins = (moodId) => tasks.filter(t => t.mood === moodId).reduce((a, t) => a + ((t.estH || 0) * 60 + (t.estM || 0)), 0);
   const hm = (m) => m ? `${Math.floor(m / 60)}h${m % 60 ? ' ' + m % 60 + 'm' : ''}` : null;
@@ -248,7 +217,7 @@ function MemberTaskCol({ memberId, date, S, tasks, completeStatus, onOpenTask, o
         </div>
       </div>
       <div className="tcolb">
-        {primaryMoods.map(mood => {
+        {visibleMoods.map(mood => {
           const mt = tasks.filter(t => t.mood === mood.id);
           const isHero = mood.id === 'hero', isImp = mood.id === 'imp';
           const secClass = isHero ? 'hero-sec' : isImp ? 'imp-sec' : 'other-sec';
@@ -269,28 +238,6 @@ function MemberTaskCol({ memberId, date, S, tasks, completeStatus, onOpenTask, o
               <div className="msec-tasks">
                 {mt.length ? mt.map(t => <MTaskCard key={t.id} task={t} S={S} onOpenTask={onOpenTask} onStatus={onStatus} onHide={onHide} />)
                   : <div style={{ fontSize: 10, color: 'var(--t3)', padding: '5px 4px', fontStyle: 'italic' }}>No active {mood.label}</div>}
-              </div>
-              {addTaskBtn(mood.id)}
-            </div>
-          );
-        })}
-
-        {overflowMoods.map(mood => {
-          const mt = tasks.filter(t => t.mood === mood.id);
-          if (!mt.length) return null;
-          return (
-            <div key={mood.id} className="msec" style={{ marginTop: 4 }}>
-              <div className="msec-head" style={{ background: 'transparent' }}>
-                <span style={{ fontSize: 10 }}>{mood.icon}</span>
-                <span className="msec-label" style={{ color: mood.color, fontSize: 9.5 }}>{mood.label}</span>
-                <span className="msec-cnt" style={{ background: mood.color + '22', color: mood.color }}>
-                  {mt.length}
-                </span>
-                {hm(moodMins(mood.id)) && <span style={{ fontSize: 9, color: mood.color, marginLeft: hm(moodMins(mood.id)) ? 2 : 'auto', fontWeight: 700, opacity: 0.7 }}>{hm(moodMins(mood.id))}</span>}
-                {plusBtn(mood.id, mood.color)}
-              </div>
-              <div className="msec-tasks">
-                {mt.map(t => <MTaskCard key={t.id} task={t} S={S} onOpenTask={onOpenTask} onStatus={onStatus} onHide={onHide} />)}
               </div>
               {addTaskBtn(mood.id)}
             </div>
