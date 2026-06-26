@@ -38,7 +38,6 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const { STATS } = getStatusMaps(S.task_statuses);
   const roleStatuses = getStatusesForRole(S.task_statuses, session?.role);
   const upsertTask = useStore(s => s.upsertTask);
-  const patchTaskSubtasks = useStore(s => s.patchTaskSubtasks);
   const upsertTag = useStore(s => s.upsertTag);
   const upsertMilestone = useStore(s => s.upsertMilestone);
   const softDeleteTask = useStore(s => s.softDeleteTask);
@@ -70,9 +69,29 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const loadTaskActivity = useStore(s => s.loadTaskActivity);
   const [tDetailTab, setTDetailTab] = useState('sub');
-  const [saveError, setSaveError] = useState(null);
-  const [saving, setSaving] = useState(false);
   const [activity, setActivity] = useState([]);
+  const taskIdRef = useRef(task.id || null);
+  const [saveStatus, setSaveStatus] = useState(task.id ? 'idle' : 'idle');
+  const debounceRef = useRef(null);
+  const fieldsRef = useRef({});
+  const lastSnapshot = useRef('');
+  const retryCount = useRef(0);
+  const mountedRef = useRef(true);
+  const saveStatusTimer = useRef(null);
+  const saveQueue = useRef(Promise.resolve());
+
+  // Initialize snapshot on first render to prevent auto-save on mount for existing tasks
+  if (task.id && lastSnapshot.current === '') {
+    lastSnapshot.current = JSON.stringify([
+      name.trim(), mood, [...assigned].sort(),
+      clientId || '', date || '', status, String(estH), String(estM),
+      notes, [...tags].sort(), isMs, msId || '',
+      subtasks.map(x => x.text + String(x.done)).sort().join('|'),
+      links.map(x => x.url).sort().join('|'),
+    ]);
+  }
+
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   const taskNameRef = useRef(null);
 
@@ -90,10 +109,106 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [tab, setTab] = useState('essentials');
   const hasDetailContent = isEdit && (task.notes || (task.tags?.length > 0) || (task.subtasks?.length > 0) || (task.links?.length > 0));
 
+  useEffect(() => { taskNameRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    if (task.id) loadTaskActivity(task.id).then(setActivity);
+  }, [task.id, loadTaskActivity]);
+
+  // Keep a ref with the latest field values (no stale closures in debounce callbacks)
+  useEffect(() => {
+    fieldsRef.current = { name, mood, assigned: [...assigned], clientId, date, status, estH, estM, notes, tags: [...tags], isMs, msId, subtasks: subtasks.map(s => ({...s})), links: links.map(l => ({...l})) };
+  });
+
+  const doSave = useCallback(() => {
+    const result = saveQueue.current.catch(() => {}).then(async () => {
+      const f = fieldsRef.current;
+      const currentId = taskIdRef.current;
+      if (!f.name.trim() || !f.mood || !f.assigned.length) return null;
+
+      const snapshot = JSON.stringify([
+        f.name.trim(), f.mood, [...f.assigned].sort(),
+        f.clientId || '', f.date || '', f.status, String(f.estH), String(f.estM),
+        f.notes, [...f.tags].sort(), f.isMs, f.msId || '',
+        f.subtasks.map(x => x.text + String(x.done)).sort().join('|'),
+        f.links.map(x => x.url).sort().join('|'),
+      ]);
+      if (snapshot === lastSnapshot.current && currentId) return null;
+
+      if (mountedRef.current) setSaveStatus('saving');
+
+      const payload = {
+        ...(currentId ? { id: currentId } : {}),
+        name: f.name.trim(), clientId: f.clientId || null, date: f.date || today(),
+        mood: f.mood, status: f.status, assignedTo: [...f.assigned], tags: [...f.tags],
+        estH: parseInt(f.estH) || 0, estM: parseInt(f.estM) || 0, notes: f.notes,
+        subtasks: f.subtasks.map(s => ({ ...s })),
+        links: f.links.map(l => ({ ...l })),
+        isMilestone: f.isMs, milestoneId: f.msId || null,
+      };
+
+      if (f.isMs && !f.msId) {
+        try {
+          const nm = await upsertMilestone({
+            name: f.name, description: '', color: sel.gmood(S, f.mood).color || COLORS[0], assignedTo: [...f.assigned],
+          });
+          payload.milestoneId = nm.id;
+        } catch (e) { console.error('[AutoSave] milestone creation failed', e); }
+      }
+
+      const isManager = session?.role === 'admin' || session?.role === 'manager';
+      const allDone = f.subtasks.length && f.subtasks.every(s => s.done);
+      const cStatus = getCompleteStatus(S.task_statuses);
+      if (allDone && isManager && f.status !== cStatus) {
+        payload.status = cStatus;
+      }
+
+      try {
+        const saved = await upsertTask(payload);
+        if (!currentId) {
+          taskIdRef.current = saved.id;
+        }
+        retryCount.current = 0;
+        lastSnapshot.current = snapshot;
+        if (mountedRef.current) {
+          setSaveStatus('saved');
+          clearTimeout(saveStatusTimer.current);
+          saveStatusTimer.current = setTimeout(() => {
+            if (mountedRef.current) setSaveStatus(prev => prev === 'saved' ? 'idle' : prev);
+          }, 2000);
+        }
+        return saved;
+      } catch (err) {
+        console.error('[AutoSave] failed:', err);
+        if (mountedRef.current) setSaveStatus('error');
+        if (retryCount.current < 3) {
+          retryCount.current++;
+          setTimeout(() => { if (mountedRef.current) doSave(); }, 3000);
+        }
+        return null;
+      }
+    });
+    saveQueue.current = result;
+    return result;
+  }, [S, session, upsertTask, upsertMilestone]);
+
+  const flushSave = useCallback(() => {
+    if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+    return doSave();
+  }, [doSave]);
+
+  const scheduleSave = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSave(), 600);
+  }, [doSave]);
+
   const handleClose = useCallback(() => {
-    clearDraft();
-    onClose();
-  }, [onClose]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    doSave().finally(() => {
+      clearDraft();
+      onClose();
+    });
+  }, [doSave, onClose]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -113,11 +228,12 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     };
   }, [handleClose]);
 
-  useEffect(() => { taskNameRef.current?.focus(); }, []);
-
+  // Auto-save: debounce on any field change
   useEffect(() => {
-    if (task.id) loadTaskActivity(task.id).then(setActivity);
-  }, [task.id, loadTaskActivity]);
+    const f = { name, mood, assigned };
+    if (!f.name.trim() || !f.mood || !f.assigned.length) return;
+    scheduleSave();
+  }, [name, mood, assigned, clientId, date, status, estH, estM, notes, tags, isMs, msId, subtasks, links, scheduleSave]);
 
   function timeAgo(ts) {
     const diff = Date.now() - ts;
@@ -202,24 +318,8 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   };
 
   const toggleSubtask = useCallback((i) => {
-    setSubtasks((prev) => {
-      const next = prev.map((s, idx) => idx === i ? { ...s, done: !s.done } : s);
-      if (task.id) {
-        patchTaskSubtasks(task.id, next)
-          .catch(err => console.error('[TaskModal.toggleSubtask] save failed:', err));
-        const isManager = session?.role === 'admin' || session?.role === 'manager';
-        const allDone = next.length && next.every(s => s.done);
-        if (allDone && isManager) {
-          const completeStatus = S.task_statuses?.find(s => s.label === 'Complete' || s.label.toLowerCase().includes('complete'))?.label || 'Complete';
-          if (completeStatus !== status) {
-            upsertTask({ id: task.id, status: completeStatus })
-              .catch(err => console.error('[TaskModal.toggleSubtask] status update failed:', err));
-          }
-        }
-      }
-      return next;
-    });
-  }, [task.id, session?.role, S.task_statuses, status, upsertTask, patchTaskSubtasks]);
+    setSubtasks((prev) => prev.map((s, idx) => idx === i ? { ...s, done: !s.done } : s));
+  }, []);
 
   const editSubtaskText = useCallback((i, text) => {
     text = text.trim();
@@ -244,12 +344,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
       const oldIdx = prev.findIndex(s => s.id === active.id);
       const newIdx = prev.findIndex(s => s.id === over.id);
       if (oldIdx === -1 || newIdx === -1) return prev;
-      const reordered = arrayMove(prev, oldIdx, newIdx).map((s, i) => ({ ...s, order: i }));
-      if (task.id) {
-        patchTaskSubtasks(task.id, reordered)
-          .catch(err => console.error('[TaskModal.dragEnd] patchTaskSubtasks failed:', err));
-      }
-      return reordered;
+      return arrayMove(prev, oldIdx, newIdx).map((s, i) => ({ ...s, order: i }));
     });
   };
 
@@ -266,59 +361,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     setLinks(links.filter((_, idx) => idx !== i));
   };
 
-  const save = async () => {
-    setSaveError(null);
-    const e = {};
-    if (!name.trim()) e.name = true;
-    if (!mood) e.mood = true;
-    if (!assigned.length) e.assigned = true;
-    setErr(e);
-    if (Object.keys(e).length) return;
-
-    // Daily task limit check
-    const cStatus = getCompleteStatus(S.task_statuses);
-    const pStatus = getPassStatus(S.task_statuses);
-    const taskDate = date || today();
-    for (const mid of assigned) {
-      const result = validateTaskCreation(S, mid, mood, taskDate, task.id);
-      if (!result.valid) {
-        setSaveError(result.error);
-        return;
-      }
-    }
-
-    let milestoneId = msId || null;
-    if (isMs && !milestoneId) {
-      const nm = await upsertMilestone({
-        name, description: '', color: sel.gmood(S, mood).color || COLORS[0], assignedTo: [...assigned],
-      });
-      milestoneId = nm.id;
-    }
-
-    const payload = {
-      ...(isEdit ? { id: task.id, createdAt: task.createdAt } : {}),
-      name: name.trim(), clientId: clientId || null, date: date || today(),
-      mood, status, assignedTo: [...assigned], tags: [...tags],
-      estH: parseInt(estH) || 0, estM: parseInt(estM) || 0, notes,
-      subtasks: subtasks.map(s => ({ ...s })),
-      links: links.map(l => ({ ...l })),
-      isMilestone: isMs, milestoneId,
-    };
-    console.log('[TaskModal.save] saving', { id: payload.id, subtasks: payload.subtasks?.length, links: payload.links?.length });
-    setSaving(true);
-    try {
-      const saved = await upsertTask(payload);
-      clearDraft();
-      if (onSave) onSave(saved);
-      onClose();
-    } catch (err) {
-      const msg = err?.message || err?.error?.message || String(err);
-      console.error('[TaskModal.save] FAILED:', msg);
-      setSaveError(msg);
-    } finally {
-      setSaving(false);
-    }
-  };
+  // ── Manual save removed — auto-save handles all persistence ──
 
   const del = async () => {
     if (!confirm('Delete this task? It moves to Deleted Tasks where you can recover it.')) return;
@@ -439,10 +482,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
           <div style={{display:'flex',gap:16,alignItems:'flex-start',marginTop:6}}>
             <div style={{flex:1,minWidth:0}}>
               <label className="fl" style={{marginTop:0}}>Status</label>
-              <select value={status} onChange={e=>{
-                setStatus(e.target.value);
-                if (task.id) upsertTask({ ...task, status: e.target.value }).catch(err => console.error('[TaskModal] status upsertTask failed:', err));
-              }} style={{width:'100%',maxWidth:200}}>
+              <select value={status} onChange={e=>setStatus(e.target.value)} style={{width:'100%',maxWidth:200}}>
                 {roleStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
@@ -585,15 +625,15 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         {limitError && <div style={{marginTop:10,padding:'8px 12px',background:'#d32f2f22',border:'1px solid #d32f2f',borderRadius:6,color:'#d32f2f',fontSize:13,fontWeight:600}}>
           {limitError}
         </div>}
-        {saveError && <div style={{marginTop:10,padding:'8px 12px',background:'#d32f2f22',border:'1px solid #d32f2f',borderRadius:6,color:'#d32f2f',fontSize:13,fontWeight:600}}>
-          Save failed: {saveError}
-        </div>}
         <div className="modal-footer">
           <div className="modal-footer-left">
             {isEdit && canDeleteTask(session, task) && <button className="btn btn-d" onClick={del}>🗑 Delete</button>}
             <button className="modal-close-text" onClick={handleClose}>Close</button>
           </div>
           <div className="modal-footer-right">
+            {saveStatus === 'saving' && <span style={{fontSize:12,color:'var(--t3)',fontWeight:600}}>Saving…</span>}
+            {saveStatus === 'saved' && <span style={{fontSize:12,color:'var(--accent)',fontWeight:600}}>Auto-saved</span>}
+            {saveStatus === 'error' && <span style={{fontSize:12,color:'var(--warn)',fontWeight:600}}>Couldn't save. Retrying…</span>}
             {onSaveAsTemplate && (
               <button className="btn btn-outline" onClick={() => onSaveAsTemplate({
                 name, clientId, mood, assignedTo: [...assigned],
@@ -603,7 +643,6 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
                 links: links.map(l => ({ ...l })),
               })}>Save as Template</button>
             )}
-            <button className="btn btn-p" onClick={save} disabled={saving || !!limitError}>{saving ? 'Saving…' : 'Save task'}</button>
           </div>
         </div>
       </div>
