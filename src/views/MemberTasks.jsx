@@ -36,7 +36,7 @@ export default function MemberTasks() {
   }, [S, memberId, dashDate]);
 
   const me = useMemo(() => S.members.find(m => m.id === memberId), [S, memberId]);
-  const visibleTasks = useMemo(() => myTasks.filter(t => t.status !== completeStatus && !t.hidden), [myTasks, completeStatus]);
+  const visibleTasks = useMemo(() => myTasks.filter(t => t.status !== completeStatus), [myTasks, completeStatus]);
   const hiddenTasks = useMemo(() => myTasks.filter(t => t.hidden), [myTasks]);
   const doneTasks = useMemo(() => myTasks.filter(t => t.status === completeStatus), [myTasks, completeStatus]);
   const total = myTasks.length;

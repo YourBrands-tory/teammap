@@ -77,6 +77,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const lastSnapshot = useRef('');
   const retryCount = useRef(0);
   const mountedRef = useRef(true);
+  const hasEverHadRequiredFields = useRef(false);
   const saveStatusTimer = useRef(null);
   const saveQueue = useRef(Promise.resolve());
 
@@ -232,8 +233,13 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   useEffect(() => {
     const f = { name, mood, assigned };
     if (!f.name.trim() || !f.mood || !f.assigned.length) return;
+    if (!taskIdRef.current && !hasEverHadRequiredFields.current) {
+      hasEverHadRequiredFields.current = true;
+      flushSave();
+      return;
+    }
     scheduleSave();
-  }, [name, mood, assigned, clientId, date, status, estH, estM, notes, tags, isMs, msId, subtasks, links, scheduleSave]);
+  }, [name, mood, assigned, clientId, date, status, estH, estM, notes, tags, isMs, msId, subtasks, links, scheduleSave, flushSave]);
 
   function timeAgo(ts) {
     const diff = Date.now() - ts;
@@ -361,8 +367,6 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     setLinks(links.filter((_, idx) => idx !== i));
   };
 
-  // ── Manual save removed — auto-save handles all persistence ──
-
   const del = async () => {
     if (!confirm('Delete this task? It moves to Deleted Tasks where you can recover it.')) return;
     await softDeleteTask(task.id);
@@ -406,7 +410,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         <div className={`modal-section${tab==='essentials'?' active':''}`}>
           <label className="fl">Mood *</label>
           <div className="mood-pick-row horizontal-scroll" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
-            {S.moods.filter(m => m.visible || m.id === mood).map(m => {
+            {S.moods.filter(m => !m.hidden || m.id === mood).map(m => {
               const on = mood === m.id;
               const moodLimit = m.max;
               const moodFull = moodLimit !== null && assigned.length > 0 && (() => {
@@ -634,6 +638,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
             {saveStatus === 'saving' && <span style={{fontSize:12,color:'var(--t3)',fontWeight:600}}>Saving…</span>}
             {saveStatus === 'saved' && <span style={{fontSize:12,color:'var(--accent)',fontWeight:600}}>Auto-saved</span>}
             {saveStatus === 'error' && <span style={{fontSize:12,color:'var(--warn)',fontWeight:600}}>Couldn't save. Retrying…</span>}
+            <button className="btn" disabled={!isEdit && (!name.trim() || !mood || !assigned.length)} onClick={flushSave}>Save Task</button>
             {onSaveAsTemplate && (
               <button className="btn btn-outline" onClick={() => onSaveAsTemplate({
                 name, clientId, mood, assignedTo: [...assigned],

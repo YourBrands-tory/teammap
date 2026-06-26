@@ -46,7 +46,7 @@ export default function useMemberKanban() {
     S.moods.forEach((m: any) => { moodMap[m.id] = m; });
 
     return moodOrder
-      .filter((mid: string) => moodMap[mid] && moodMap[mid].visible)
+      .filter((mid: string) => moodMap[mid])
       .map((mid: string) => {
         const mood = moodMap[mid];
         const tasks = myTasks.filter((t: any) => t.mood === mid);

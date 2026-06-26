@@ -1,30 +1,32 @@
 import { useMemo, memo } from 'react';
 import { sel } from '../store/useStore';
-import { taskTimeStr, DMOODS } from '../lib/constants';
-import { getStatusMaps } from '../utils/statusUtils';
+import { today, taskTimeStr } from '../lib/constants';
+import { getStatusMaps, getCompleteStatus } from '../utils/statusUtils';
 
-const SIDE_PANEL_MOOD_IDS = ['top', 'rapid', 'secondhalf', 'followup'];
-
-const CARD_BG = {
-  top: '#fff8f8',
-  rapid: '#f8fafc',
-  secondhalf: '#fdf6f6',
-  followup: '#f8f9fd',
-};
+const SIDE_PANEL_MOODS = ['top', 'rapid', 'secondhalf', 'followup'];
 
 export default memo(function TaskSidePanel({ tasks, member, S, onOpenTask, hiddenTasks, onRestoreTask }) {
   const { STC, STB } = useMemo(() => getStatusMaps(S.task_statuses), [S.task_statuses]);
+  const completeStatus = useMemo(() => getCompleteStatus(S.task_statuses), [S.task_statuses]);
 
   const moods = useMemo(() => {
-    return SIDE_PANEL_MOOD_IDS.map(id => S.moods.find(m => m.id === id) || DMOODS.find(m => m.id === id)).filter(Boolean);
+    return SIDE_PANEL_MOODS.map(id => S.moods.find(m => m.id === id)).filter(Boolean);
   }, [S.moods]);
 
   const groups = useMemo(() => {
+    const todayStr = today();
+    const memberId = member?.id;
     return moods.map(mood => {
-      const ids = (tasks || []).filter(t => t.mood === mood.id && !t.hidden);
+      const ids = (S.tasks || []).filter(t =>
+        t.mood === mood.id &&
+        t.date === todayStr &&
+        t.assignedTo?.includes(memberId) &&
+        t.status !== completeStatus &&
+        !t.deleted
+      );
       return { ...mood, ids };
     });
-  }, [moods, tasks]);
+  }, [moods, S.tasks, member, completeStatus]);
 
   return (
     <div className="sp">
@@ -43,7 +45,7 @@ export default memo(function TaskSidePanel({ tasks, member, S, onOpenTask, hidde
               const client = sel.gc(S, t.clientId);
               const timeStr = taskTimeStr(t);
               return (
-                <div key={t.id} className="sp-card" style={{ borderLeftColor: g.color, background: CARD_BG[g.id] || '#fafafa' }}
+                <div key={t.id} className="sp-card" style={{ borderLeftColor: g.color, background: g.bg || '#fafafa' }}
                   onClick={() => onOpenTask(t)}>
                   <div className="sp-card-title">{t.name}</div>
                   {client && <div className="sp-card-client">{client.name}</div>}
