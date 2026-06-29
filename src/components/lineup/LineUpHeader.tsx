@@ -1,4 +1,4 @@
-import { fmtD } from '../../lib/constants';
+import { fmtD, MOOD_ORDER } from '../../lib/constants';
 import { getCompleteStatus, getPassStatus } from '../../utils/statusUtils';
 
 type SortMode = 'mood' | 'team' | 'client' | null;
@@ -132,7 +132,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
             </select>
             <select className="fsel" value={filters.mood} onChange={e => onSetFilter('mood', e.target.value)}>
               <option value="">All moods</option>
-              {S.moods.filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
+              {[...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
             </select>
             <select className="fsel" value={filters.status} onChange={e => onSetFilter('status', e.target.value)}>
               <option value="">All statuses</option>
@@ -218,7 +218,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
           </select>
           <select className="fsel" value={filters.mood} onChange={e => onSetFilter('mood', e.target.value)}>
             <option value="">All moods</option>
-            {S.moods.filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
+            {[...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
           </select>
           <select className="fsel" value={filters.status} onChange={e => onSetFilter('status', e.target.value)}>
             <option value="">All statuses</option>

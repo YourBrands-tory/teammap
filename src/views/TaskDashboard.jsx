@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
-import { today, fmtD, taskTimeStr } from '../lib/constants';
+import { today, fmtD, taskTimeStr, MOOD_ORDER } from '../lib/constants';
 import { getStatusMaps, getCompleteStatus, getStandUpStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
 import { getNotesText } from '../utils/notesUtils';
 import Avatar from '../components/Avatar';
@@ -302,8 +302,8 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   }, [limitReached, stats.activeCount, dailyCap, member.name, date, onOpenTask, setToast]);
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
 
-  const visibleMoods = S.moods.filter(m => !m.hidden);
-  const hiddenMoods = S.moods.filter(m => m.hidden);
+  const visibleMoods = [...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden);
+  const hiddenMoods = [...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => m.hidden);
   const hiddenTasks = reviewVisible.filter(t =>
     hiddenMoods.some(m => m.id === t.mood)
   );
@@ -528,8 +528,8 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
     onOpenTask({ date, mood: moodId, assignedTo: [member.id] });
   }, [limitReached, dailyActive, dailyCap, member.name, date, onOpenTask, setToast]);
 
-  const visibleMoods = S.moods.filter(m => !m.hidden);
-  const hiddenMoods = S.moods.filter(m => m.hidden);
+  const visibleMoods = [...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden);
+  const hiddenMoods = [...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => m.hidden);
   const hiddenTasks = useMemo(() => {
     return visible.filter(t =>
       t.status !== standUpStatus && hiddenMoods.some(m => m.id === t.mood)

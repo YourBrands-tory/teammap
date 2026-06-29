@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getStatusMaps, getReviewStatus } from '../../utils/statusUtils';
 import { useStore, sel } from '../../store/useStore';
+import { MOOD_ORDER } from '../../lib/constants';
 import type { LVFilters } from '../../utils/listViewHelpers';
 
 interface Props {
@@ -77,7 +78,7 @@ export default function ListToolbar({
 
       <FilterSelect label="Mood" value={lvFilters.mood} onChange={v => onSetFilter('mood', v)}>
         <option value="">All moods</option>
-        {S.moods.filter((m: any) => !m.hidden).map((m: any) => (
+        {[...S.moods].sort((a: any, b: any) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter((m: any) => !m.hidden).map((m: any) => (
           <option key={m.id} value={m.id}>{m.icon} {m.label}</option>
         ))}
       </FilterSelect>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
+import { MOOD_ORDER } from '../lib/constants';
 import useTaskGen2 from '../hooks/useTaskGen2';
 import ProjectSidebar from '../components/taskgen2/ProjectSidebar';
 import TemplateCard from '../components/taskgen2/TemplateCard';
@@ -351,7 +352,7 @@ export default function TaskGen2() {
               freqTags={freqTags}
               clients={sortedClients}
               members={S.members}
-              moods={S.moods.filter((m: any) => !m.hidden)}
+              moods={[...S.moods].sort((a: any, b: any) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter((m: any) => !m.hidden)}
               multi={tg2AllMulti}
               onToggle={handleToggleMulti}
               onSelect={handleSetMulti}
@@ -456,7 +457,7 @@ export default function TaskGen2() {
 
           <label className="fl">Mood</label>
           <div className="mood-pick-row horizontal-scroll">
-            {S.moods.filter((m: any) => !m.hidden || m.id === tmplForm.mood).map((m: any) => {
+            {[...S.moods].sort((a: any, b: any) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter((m: any) => !m.hidden || m.id === tmplForm.mood).map((m: any) => {
               const on = tmplForm.mood === m.id;
               return (
                 <div key={m.id} className={`mood-opt-btn${on ? ' on' : ''}`}

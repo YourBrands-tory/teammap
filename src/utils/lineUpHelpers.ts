@@ -1,4 +1,5 @@
 import { getCompleteStatus, getReviewStatus } from './statusUtils';
+import { MOOD_ORDER } from '../lib/constants';
 
 type CardSize = 'narrow' | 'mid' | 'big';
 
@@ -44,8 +45,7 @@ export function getFilteredAndSortedTasks(S: AppState, date: string, filters: Fi
 
   // When a sort mode is active, sort ALL filtered tasks by that mode
   if (sortMode === 'mood') {
-    const mo = S.moods.map(m => m.id);
-    return [...tasks].sort((a, b) => mo.indexOf(a.mood) - mo.indexOf(b.mood));
+    return [...tasks].sort((a, b) => MOOD_ORDER.indexOf(a.mood) - MOOD_ORDER.indexOf(b.mood));
   }
   if (sortMode === 'team') {
     return [...tasks].sort((a, b) => {
