@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
-import { today, fmtD, taskTimeStr, MOOD_ORDER } from '../lib/constants';
+import { today, fmtD, taskTimeStr } from '../lib/constants';
 import { getStatusMaps, getCompleteStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
 import { canCreateTask, getDailyActiveCount, getDailyLimit } from '../utils/taskLimits';
 import { getNotesText } from '../utils/notesUtils';
@@ -172,7 +172,7 @@ function MemberTaskCol({ memberId, date, S, tasks, completeStatus, onOpenTask, o
   const capColor = dailyActive > dailyCap ? '#e76f51' : dailyActive === dailyCap ? '#d97706' : 'var(--t2)';
   const limitReached = dailyActive >= dailyCap;
 
-  const visibleMoods = [...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden);
+  const visibleMoods = S.moods.filter(m => !m.hidden);
 
   const moodMins = (moodId) => tasks.filter(t => t.mood === moodId).reduce((a, t) => a + ((t.estH || 0) * 60 + (t.estM || 0)), 0);
   const hm = (m) => m ? `${Math.floor(m / 60)}h${m % 60 ? ' ' + m % 60 + 'm' : ''}` : null;

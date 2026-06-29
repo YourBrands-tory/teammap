@@ -1,4 +1,3 @@
-import { MOOD_ORDER } from '../lib/constants';
 import { getStatusMaps } from './statusUtils';
 
 export interface LVFilters {
@@ -61,7 +60,7 @@ export function filterAndSortTasks(
     let av: any, bv: any;
     if (sort.col === 'date') { av = a.date || ''; bv = b.date || ''; }
     else if (sort.col === 'name') { av = a.name.toLowerCase(); bv = b.name.toLowerCase(); }
-    else if (sort.col === 'mood') { av = MOOD_ORDER.indexOf(a.mood); bv = MOOD_ORDER.indexOf(b.mood); }
+    else if (sort.col === 'mood') { const mo = lookup.moods.map((m: any) => m.id); av = mo.indexOf(a.mood); bv = mo.indexOf(b.mood); }
     else if (sort.col === 'status') { av = STATS.indexOf(a.status); bv = STATS.indexOf(b.status); }
     else if (sort.col === 'client') {
       const ca = lookup.clients.find((c: any) => c.id === a.clientId);

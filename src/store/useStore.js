@@ -7,6 +7,23 @@ import {
 import { getCompleteStatus, getReviewStatus } from '../utils/statusUtils';
 import { validateTaskCreation } from '../utils/taskLimits';
 
+// Module-level deduplication map for broadcast ↔ postgres_changes.
+// Maps taskId → setTimeout handle. Prevents redundant processing
+// when a broadcast event arrives before the matching Postgres Changes event.
+const recentBC = new Map();
+
+function markBroadcast(id) {
+  const existing = recentBC.get(id);
+  if (existing) clearTimeout(existing);
+  const t = setTimeout(() => { if (recentBC.get(id) === t) recentBC.delete(id); }, 5000);
+  recentBC.set(id, t);
+}
+
+function wasBroadcast(id) {
+  if (recentBC.has(id)) { clearTimeout(recentBC.get(id)); recentBC.delete(id); return true; }
+  return false;
+}
+
 const taskFromRow = (r) => {
   const t = {
     id:r.id, name:r.name, clientId:r.client_id, date:r.date, mood:r.mood,
@@ -63,6 +80,7 @@ export const useStore = create((set, get) => ({
   isAuthLoading: true,
   saveFlash: 0,
   _rtChannel: null,
+  _bcChannel: null,
   _syncInterval: null,
   _lastRealtimeEvent: 0,
 
@@ -137,11 +155,13 @@ export const useStore = create((set, get) => ({
         try { localStorage.removeItem(SESSION_KEY); } catch {}
         const ch = get()._rtChannel;
         if (ch) { supabase.removeChannel(ch); }
+        const bc = get()._bcChannel;
+        if (bc) { supabase.removeChannel(bc); }
         get()._stopPeriodicSync();
         set({
           session: null, role: null,
           S: JSON.parse(JSON.stringify(EMPTY_S)),
-          loading: false, isAuthLoading: false, _rtChannel: null,
+          loading: false, isAuthLoading: false, _rtChannel: null, _bcChannel: null,
         });
       }
     });
@@ -154,12 +174,14 @@ export const useStore = create((set, get) => ({
     try { localStorage.removeItem(SESSION_KEY); } catch {}
     const ch = get()._rtChannel;
     if (ch) { supabase.removeChannel(ch); }
+    const bc = get()._bcChannel;
+    if (bc) { supabase.removeChannel(bc); }
     get()._stopPeriodicSync();
     try { await supabase.auth.signOut(); } catch {}
     set({
       session: null, role: null,
       S: JSON.parse(JSON.stringify(EMPTY_S)),
-      loading: false, isAuthLoading: false, _rtChannel: null,
+      loading: false, isAuthLoading: false, _rtChannel: null, _bcChannel: null,
     });
   },
 
@@ -168,6 +190,7 @@ export const useStore = create((set, get) => ({
     const cur = get().S;
     if (!force && cur?.tasks?.length) {
       get()._subscribeRealtime();
+      get()._subscribeBroadcast();
       get()._startPeriodicSync();
       return;
     }
@@ -243,6 +266,7 @@ export const useStore = create((set, get) => ({
 
     set({ S, loading:false });
     get()._subscribeRealtime();
+    get()._subscribeBroadcast();
     get()._startPeriodicSync();
   },
 
@@ -254,9 +278,16 @@ export const useStore = create((set, get) => ({
         { event: '*', schema: 'public', table: 'tasks' },
         (payload) => {
           const { new: row, eventType } = payload;
+          const rid = row?.id;
+          // Deduplicate: skip if already processed via broadcast
+          if (rid && wasBroadcast(rid)) {
+            set({ _lastRealtimeEvent: Date.now() });
+            return;
+          }
+          if (rid) markBroadcast(rid);
           get()._patchS((next) => {
             if (eventType === 'DELETE') {
-              next.tasks = next.tasks.filter(t => t.id !== row.id);
+              next.tasks = next.tasks.filter(t => t.id !== rid);
             } else if (row) {
               const task = taskFromRow(row);
               const i = next.tasks.findIndex(t => t.id === task.id);
@@ -314,6 +345,58 @@ export const useStore = create((set, get) => ({
   _stopPeriodicSync: () => {
     const interval = get()._syncInterval;
     if (interval) { clearInterval(interval); set({ _syncInterval: null }); }
+  },
+
+  // ── Broadcast channel (fast path — direct WebSocket, <100ms) ──────────────
+  _subscribeBroadcast: () => {
+    if (get()._bcChannel) return;
+    const ch = supabase.channel('tasks-bc');
+    ch.on('broadcast', { event: '*' }, (payload) => {
+      const { row, id: pid, e: eventType } = payload.payload;
+      const rid = row?.id || pid;
+      if (!rid) return;
+      // Deduplicate: skip if already processed via Postgres Changes
+      if (wasBroadcast(rid)) return;
+      markBroadcast(rid);
+      get()._patchS((next) => {
+        if (eventType === 'DELETE') {
+          next.tasks = next.tasks.filter(t => t.id !== rid);
+        } else if (row) {
+          const task = taskFromRow(row);
+          const i = next.tasks.findIndex(t => t.id === task.id);
+          if (i >= 0) {
+            next.tasks = next.tasks.map((t, idx) => idx === i ? task : t);
+          } else {
+            next.tasks = [...next.tasks, task];
+          }
+        }
+      });
+    });
+    ch.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('[Broadcast] channel ready');
+      }
+    });
+    set({ _bcChannel: ch });
+  },
+
+  _broadcast: async (eventType, row) => {
+    const ch = get()._bcChannel;
+    if (!ch) return;
+    try {
+      await ch.send({
+        type: 'broadcast',
+        event: 't',
+        payload: { row, id: row?.id, e: eventType },
+      });
+    } catch {}
+  },
+
+  _afterMutate: (task, eventType) => {
+    const id = task?.id;
+    if (!id) return;
+    markBroadcast(id);
+    get()._broadcast(eventType, task);
   },
 
   flashSaved: () => set((s)=>({ saveFlash: s.saveFlash+1 })),
@@ -434,14 +517,24 @@ export const useStore = create((set, get) => ({
     let error = null, result = null;
     try {
       if (isNew) {
-        result = await supabase.from('tasks').insert(row);
+        result = await supabase.from('tasks').insert(row).select();
       } else {
         const { id: rowId, created_at, created_by, ...data } = row;
-        result = await supabase.from('tasks').update(data).eq('id', rowId);
+        result = await supabase.from('tasks').update(data).eq('id', rowId).select();
       }
     } catch (e) { error = e; }
     if (result && result.error) error = result.error;
     if (error) throw error;
+    // Reconcile with server version + broadcast to other clients
+    const serverRow = result?.data?.[0];
+    if (serverRow) {
+      const serverTask = taskFromRow(serverRow);
+      get()._patchS((next) => {
+        const i = next.tasks.findIndex(x => x.id === serverTask.id);
+        if (i >= 0) next.tasks = next.tasks.map((x, idx) => idx === i ? serverTask : x);
+      });
+      get()._afterMutate(serverRow, isNew ? 'INSERT' : 'UPDATE');
+    }
     return t;
   },
   // Lightweight subtask-only update — no activity log, but update local state
@@ -451,10 +544,14 @@ export const useStore = create((set, get) => ({
     get()._patchS((next) => {
       next.tasks = next.tasks.map(t => t.id === taskId ? { ...t, subtasks, updatedAt: now } : t);
     });
-    const { error } = await supabase.from('tasks')
+    const result = await supabase.from('tasks')
       .update({ subtasks, updated_by: session?.memberId || null, updated_at: now })
-      .eq('id', taskId);
+      .eq('id', taskId)
+      .select();
+    const error = result?.error;
     if (error) console.error('[patchTaskSubtasks] failed:', error);
+    const serverRow = result?.data?.[0];
+    if (serverRow) get()._afterMutate(serverRow, 'UPDATE');
   },
 
   setTaskStatus: async (taskId, status) => {
@@ -467,8 +564,10 @@ export const useStore = create((set, get) => ({
       S.tasks = S.tasks.map(t => t.id===taskId ? (updated={...t,status,updatedAt:Date.now()}) : t);
     });
     if (updated) {
-      await supabase.from('tasks')
-        .update({ status, updated_by: session?.memberId || null, updated_at: updated.updatedAt }).eq('id', taskId);
+      const result = await supabase.from('tasks')
+        .update({ status, updated_by: session?.memberId || null, updated_at: updated.updatedAt }).eq('id', taskId).select();
+      const serverRow = result?.data?.[0];
+      if (serverRow) get()._afterMutate(serverRow, 'UPDATE');
       const activities = [{ action: 'status_changed', field: 'status', oldValue: updated.status, newValue: status }];
       if (status === getReviewStatus(get().S.task_statuses)) {
         activities.push({ action: 'marked_for_review', field: 'status', oldValue: updated.status, newValue: status });
@@ -487,18 +586,23 @@ export const useStore = create((set, get) => ({
       return;
     }
     get()._patchS((S)=>{ S.tasks = S.tasks.map(t=>t.id===taskId?{...t,deleted:true,updatedAt:Date.now()}:t); });
-    await supabase.from('tasks').update({ deleted:true, updated_by: session?.memberId || null, updated_at:Date.now() }).eq('id', taskId);
+    const result = await supabase.from('tasks').update({ deleted:true, updated_by: session?.memberId || null, updated_at:Date.now() }).eq('id', taskId).select();
+    const serverRow = result?.data?.[0];
+    if (serverRow) get()._afterMutate(serverRow, 'UPDATE');
     get()._addActivity(taskId, [{ action: 'deleted', field: null, oldValue: null, newValue: null }]);
   },
   recoverTask: async (taskId) => {
     const session = get().session;
     get()._patchS((S)=>{ S.tasks = S.tasks.map(t=>t.id===taskId?{...t,deleted:false,updatedAt:Date.now()}:t); });
-    await supabase.from('tasks').update({ deleted:false, updated_by: session?.memberId || null, updated_at:Date.now() }).eq('id', taskId);
+    const result = await supabase.from('tasks').update({ deleted:false, updated_by: session?.memberId || null, updated_at:Date.now() }).eq('id', taskId).select();
+    const serverRow = result?.data?.[0];
+    if (serverRow) get()._afterMutate(serverRow, 'UPDATE');
     get()._addActivity(taskId, [{ action: 'recovered', field: null, oldValue: null, newValue: null }]);
   },
   purgeTask: async (taskId) => {
     get()._patchS((S)=>{ S.tasks = S.tasks.filter(t=>t.id!==taskId); });
     await supabase.from('tasks').delete().eq('id', taskId);
+    get()._afterMutate({ id: taskId }, 'DELETE');
   },
 
   // ── MEMBERS ───────────────────────────────────────────────────────────────

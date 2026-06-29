@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
-import { today, fmtD, taskTimeStr, MOOD_ORDER } from '../lib/constants';
+import { today, fmtD, taskTimeStr } from '../lib/constants';
 import { getStatusMaps, getCompleteStatus, getStandUpStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
 import { getNotesText } from '../utils/notesUtils';
 import Avatar from '../components/Avatar';
@@ -302,8 +302,8 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   }, [limitReached, stats.activeCount, dailyCap, member.name, date, onOpenTask, setToast]);
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
 
-  const visibleMoods = [...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden);
-  const hiddenMoods = [...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => m.hidden);
+  const visibleMoods = S.moods.filter(m => !m.hidden);
+  const hiddenMoods = S.moods.filter(m => m.hidden);
   const hiddenTasks = reviewVisible.filter(t =>
     hiddenMoods.some(m => m.id === t.mood)
   );
@@ -370,7 +370,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
                             justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:'auto',opacity:limitReached?0.5:1}}>+</button>
                       </div>
                       <div className="msec-tasks">
-                        {moodTasks.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)}
+                        {moodTasks.map(t => <TCard key={t.id} task={t} member={member} moods={S.moods} clients={S.clients} tags={S.tags} taskStatuses={S.task_statuses} members={S.members} onOpenTask={onOpenTask} onStatus={onStatus} />)}
                       </div>
                     </div>
                   );
@@ -383,7 +383,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
         {suTasks.length>0 && (
           <div className="msec su-sec">
             <div className="su-head">🗣 Stand Up <span style={{fontSize:9,background:'var(--warn)',color:'#fff',padding:'1px 5px',borderRadius:8,marginLeft:2}}>{suTasks.length}</span></div>
-            <div className="msec-tasks">{suTasks.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)}</div>
+            <div className="msec-tasks">{suTasks.map(t => <TCard key={t.id} task={t} member={member} moods={S.moods} clients={S.clients} tags={S.tags} taskStatuses={S.task_statuses} members={S.members} onOpenTask={onOpenTask} onStatus={onStatus} />)}</div>
           </div>
         )}
 
@@ -416,7 +416,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
                     justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
               </div>
               <div className="msec-tasks">
-                {mt.length ? mt.map(t => <TCard key={t.id} task={t} member={member} S={S} onOpenTask={onOpenTask} onStatus={onStatus} />)
+                {mt.length ? mt.map(t => <TCard key={t.id} task={t} member={member} moods={S.moods} clients={S.clients} tags={S.tags} taskStatuses={S.task_statuses} members={S.members} onOpenTask={onOpenTask} onStatus={onStatus} />)
                   : <div style={{fontSize:10,color:'var(--t3)',padding:'5px 4px',fontStyle:'italic'}}>No active {mood.label}</div>}
               </div>
             </div>
@@ -435,12 +435,12 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
 /* ── CIRCULAR SUBTASK PROGRESS ── */
 
 /* ── DESKTOP TASK CARD ── */
-const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
-  const { STC, STB } = getStatusMaps(useStore.getState().S.task_statuses);
-  const mood = sel.gmood(S, task.mood);
+const TCard = memo(function TCard({ task, member, moods, clients, tags, taskStatuses, members, onOpenTask, onStatus }) {
+  const { STC, STB } = useMemo(() => getStatusMaps(taskStatuses), [taskStatuses]);
+  const mood = useMemo(() => moods.find(m => m.id === task.mood), [moods, task.mood]);
   const isHero=task.mood==='hero', isTop=task.mood==='top', isImp=task.mood==='imp';
   const isLight=!isHero&&!isImp&&!isTop;
-  const client = sel.gc(S, task.clientId);
+  const client = useMemo(() => clients.find(c => c.id === task.clientId), [clients, task.clientId]);
   const timeStr = taskTimeStr(task);
   const extra = isHero?' hero':isImp?' imp-card':isTop?' top':isLight?' light':'';
   const [linkPop, setLinkPop] = useState(false);
@@ -456,7 +456,7 @@ const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
       <div style={{display:'flex',alignItems:'flex-start',gap:4,marginBottom:2}}>
         <div className="tcn" style={{flex:1}}>{task.isMilestone?'🏁 ':''}{task.name}</div>
       </div>
-      {client && <div className="tcc" style={{color:mood.color,fontWeight:600}}>{client.name}</div>}
+      {client && <div className="tcc" style={{color:mood?.color||'var(--t2)',fontWeight:600}}>{client.name}</div>}
       <div className="tcs-row">
         <span className="tcs" style={{background:STB[task.status],color:STC[task.status]}}
           onClick={(e)=>{e.stopPropagation();onStatus({ taskId:task.id, rect:e.target.getBoundingClientRect() });}}>
@@ -466,12 +466,12 @@ const TCard = memo(function TCard({ task, member, S, onOpenTask, onStatus }) {
       </div>
       {task.tags?.length>0 && (
         <div style={{display:'flex',gap:3,flexWrap:'wrap',marginTop:3}}>
-          {task.tags.map(tid => { const tg = sel.gtag(S, tid); return tg ? <span key={tid} className="ttag-chip">{tg.label}</span> : null; })}
+          {task.tags.map(tid => { const tg = tags.find(t=>t.id===tid); return tg ? <span key={tid} className="ttag-chip">{tg.label}</span> : null; })}
         </div>
       )}
       {task.assignedTo?.length>1 && (
         <div style={{display:'flex',gap:3,flexWrap:'wrap',marginTop:3}}>
-          {task.assignedTo.filter(id=>id!==member.id).map(id => { const m = sel.gm(S, id); return m ? (
+          {task.assignedTo.filter(id=>id!==member.id).map(id => { const m = members.find(x=>x.id===id); return m ? (
             <span key={id} style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--s2)',
               border:'1px solid var(--border)',fontWeight:600,color:'var(--t2)'}}>{m.name}</span>) : null; })}
         </div>
@@ -528,8 +528,8 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
     onOpenTask({ date, mood: moodId, assignedTo: [member.id] });
   }, [limitReached, dailyActive, dailyCap, member.name, date, onOpenTask, setToast]);
 
-  const visibleMoods = [...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden);
-  const hiddenMoods = [...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => m.hidden);
+  const visibleMoods = S.moods.filter(m => !m.hidden);
+  const hiddenMoods = S.moods.filter(m => m.hidden);
   const hiddenTasks = useMemo(() => {
     return visible.filter(t =>
       t.status !== standUpStatus && hiddenMoods.some(m => m.id === t.mood)
@@ -577,7 +577,7 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
                             justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:'auto',opacity:limitReached?0.5:1}}>+</button>
                       </div>
                       <div className="msec-tasks">
-                        {moodTasks.map(t => <MobileTaskCard key={t.id} task={t} member={member} S={S} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)}
+                        {moodTasks.map(t => <MobileTaskCard key={t.id} task={t} member={member} moods={S.moods} clients={S.clients} tags={S.tags} taskStatuses={S.task_statuses} members={S.members} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)}
                       </div>
                     </div>
                   );
@@ -591,7 +591,7 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
       {suTasks.length>0 && (
         <div className="msec su-sec" style={{marginBottom:6}}>
           <div className="su-head" style={{padding:'4px 6px'}}>🗣 Stand Up <span style={{fontSize:9,background:'var(--warn)',color:'#fff',padding:'1px 6px',borderRadius:8,marginLeft:2}}>{suTasks.length}</span></div>
-          <div className="msec-tasks" style={{maxHeight:100,overflowY:'auto'}}>{suTasks.map(t => <MobileTaskCard key={t.id} task={t} member={member} S={S} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)}</div>
+          <div className="msec-tasks" style={{maxHeight:100,overflowY:'auto'}}>{suTasks.map(t => <MobileTaskCard key={t.id} task={t} member={member} moods={S.moods} clients={S.clients} tags={S.tags} taskStatuses={S.task_statuses} members={S.members} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)}</div>
         </div>
       )}
 
@@ -624,7 +624,7 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
                   justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
             </div>
             <div className="msec-tasks" style={{maxHeight:isHero?160:isImp?120:80,overflowY:'auto'}}>
-              {mt.length ? mt.map(t => <MobileTaskCard key={t.id} task={t} member={member} S={S} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)
+              {mt.length ? mt.map(t => <MobileTaskCard key={t.id} task={t} member={member} moods={S.moods} clients={S.clients} tags={S.tags} taskStatuses={S.task_statuses} members={S.members} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)
                 : <div style={{fontSize:10,color:'var(--t3)',padding:'4px 4px',fontStyle:'italic'}}>No active {mood.label}</div>}
             </div>
           </div>
@@ -640,10 +640,10 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
 });
 
 /* ── MOBILE TASK CARD (simplified, expandable) ── */
-const MobileTaskCard = memo(function MobileTaskCard({ task, member, S, expanded, onToggleExpand, onOpenTask, onStatus }) {
-  const { STC, STB } = getStatusMaps(useStore.getState().S.task_statuses);
-  const mood = sel.gmood(S, task.mood);
-  const client = sel.gc(S, task.clientId);
+const MobileTaskCard = memo(function MobileTaskCard({ task, member, moods, clients, tags, taskStatuses, members, expanded, onToggleExpand, onOpenTask, onStatus }) {
+  const { STC, STB } = useMemo(() => getStatusMaps(taskStatuses), [taskStatuses]);
+  const mood = useMemo(() => moods.find(m => m.id === task.mood), [moods, task.mood]);
+  const client = useMemo(() => clients.find(c => c.id === task.clientId), [clients, task.clientId]);
   const timeStr = taskTimeStr(task);
   const [linkPop, setLinkPop] = useState(false);
   const notesText = getNotesText(task.notes);
@@ -675,12 +675,12 @@ const MobileTaskCard = memo(function MobileTaskCard({ task, member, S, expanded,
         <div className="td-mob-card-detail" onClick={e => e.stopPropagation()}>
           {task.tags?.length > 0 && (
             <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:4}}>
-              {task.tags.map(tid => { const tg = sel.gtag(S, tid); return tg ? <span key={tid} className="ttag-chip">{tg.label}</span> : null; })}
+              {task.tags.map(tid => { const tg = tags.find(t=>t.id===tid); return tg ? <span key={tid} className="ttag-chip">{tg.label}</span> : null; })}
             </div>
           )}
           {task.assignedTo?.length > 1 && (
             <div style={{display:'flex',gap:4,flexWrap:'wrap',fontSize:10,color:'var(--t2)'}}>
-              {task.assignedTo.filter(id=>id!==member.id).map(id => { const m = sel.gm(S, id); return m ? (
+              {task.assignedTo.filter(id=>id!==member.id).map(id => { const m = members?.find(x=>x.id===id); return m ? (
                 <span key={id} style={{padding:'2px 7px',borderRadius:4,background:'var(--s2)',border:'1px solid var(--border)',fontWeight:600}}>{m.name}</span>) : null; })}
             </div>
           )}

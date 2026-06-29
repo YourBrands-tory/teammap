@@ -1,4 +1,3 @@
-import { MOOD_ORDER } from '../lib/constants';
 
 export interface TemplateSubtask {
   text: string;
@@ -79,7 +78,8 @@ export function filterTemplatesAll(
   } else if (sort === 'name') {
     result.sort((a, b) => a.name.localeCompare(b.name));
   } else if (sort === 'mood') {
-    result.sort((a, b) => MOOD_ORDER.indexOf(a.mood) - MOOD_ORDER.indexOf(b.mood));
+    const moodOrder = moods.map(m => m.id);
+    result.sort((a, b) => moodOrder.indexOf(a.mood) - moodOrder.indexOf(b.mood));
   }
   return result;
 }

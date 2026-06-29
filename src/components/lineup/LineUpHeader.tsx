@@ -1,4 +1,4 @@
-import { fmtD, MOOD_ORDER } from '../../lib/constants';
+import { fmtD } from '../../lib/constants';
 import { getCompleteStatus, getPassStatus } from '../../utils/statusUtils';
 
 type SortMode = 'mood' | 'team' | 'client' | null;
@@ -6,7 +6,7 @@ type Filters = { member: string; client: string; mood: string; review: boolean; 
 
 interface Member { id: string; name: string; capacity?: number; }
 interface Client { id: string; name: string; }
-interface Mood { id: string; icon: string; label: string; visible?: boolean; }
+interface Mood { id: string; icon: string; label: string; hidden?: boolean; visible?: boolean; }
 interface Task { id: string; date: string; assignedTo?: string[]; status: string; deleted?: boolean; }
 interface S { members: Member[]; clients: Client[]; moods: Mood[]; tasks: Task[]; task_statuses?: { id: string; label: string; order: number }[]; }
 interface Prog { done: number; total: number; pct: number; }
@@ -132,7 +132,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
             </select>
             <select className="fsel" value={filters.mood} onChange={e => onSetFilter('mood', e.target.value)}>
               <option value="">All moods</option>
-              {[...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
+              {S.moods.filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
             </select>
             <select className="fsel" value={filters.status} onChange={e => onSetFilter('status', e.target.value)}>
               <option value="">All statuses</option>
@@ -218,7 +218,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
           </select>
           <select className="fsel" value={filters.mood} onChange={e => onSetFilter('mood', e.target.value)}>
             <option value="">All moods</option>
-            {[...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
+            {S.moods.filter(m => !m.hidden).map(m => <option key={m.id} value={m.id}>{m.icon} {m.label}</option>)}
           </select>
           <select className="fsel" value={filters.status} onChange={e => onSetFilter('status', e.target.value)}>
             <option value="">All statuses</option>

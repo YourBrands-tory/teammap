@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback, memo } from 'react';
 import { DndContext, PointerSensor, TouchSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { COLORS, today, uid, MOOD_ORDER } from '../lib/constants';
+import { COLORS, today, uid } from '../lib/constants';
 import { useStore, sel } from '../store/useStore';
 import { getStatusMaps, getDefaultStatus, getCompleteStatus, getPassStatus, getStatusesForRole, canDeleteTask } from '../utils/statusUtils';
 import { validateTaskCreation, getMoodLimit } from '../utils/taskLimits';
@@ -410,7 +410,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         <div className={`modal-section${tab==='essentials'?' active':''}`}>
           <label className="fl">Mood *</label>
           <div className="mood-pick-row horizontal-scroll" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
-            {[...S.moods].sort((a, b) => MOOD_ORDER.indexOf(a.id) - MOOD_ORDER.indexOf(b.id)).filter(m => !m.hidden || m.id === mood).map(m => {
+            {S.moods.map(m => {
               const on = mood === m.id;
               const moodLimit = m.max;
               const moodFull = moodLimit !== null && assigned.length > 0 && (() => {

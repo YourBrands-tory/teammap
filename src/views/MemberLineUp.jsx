@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
-import { today, MOOD_ORDER } from '../lib/constants';
+import { today } from '../lib/constants';
 import { dayProgress } from '../utils/lineUpHelpers';
 import { getCompleteStatus, getReviewStatus, canDeleteTask } from '../utils/statusUtils';
 import { canCreateTask, getDailyActiveCount, getDailyLimit } from '../utils/taskLimits';
@@ -85,7 +85,8 @@ export default function MemberLineUp() {
       });
     }
     if (sortMode === 'mood') {
-      return [...tasks].sort((a, b) => MOOD_ORDER.indexOf(a.mood) - MOOD_ORDER.indexOf(b.mood));
+      const moodOrder = S.moods.map(m => m.id);
+      return [...tasks].sort((a, b) => moodOrder.indexOf(a.mood) - moodOrder.indexOf(b.mood));
     }
     return tasks;
   }, [myTasksOnDate, completeStatus, filters, S.task_statuses, sortMode, S.clients, S.moods]);

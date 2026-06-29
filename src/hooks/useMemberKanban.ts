@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
-import { today, MOOD_ORDER } from '../lib/constants';
+import { today } from '../lib/constants';
 import { getCompleteStatus } from '../utils/statusUtils';
 
 export default function useMemberKanban() {
@@ -41,17 +41,10 @@ export default function useMemberKanban() {
 
   // Moods in canonical order, each with their tasks
   const moodsWithTasks = useMemo(() => {
-    const moodOrder = MOOD_ORDER;
-    const moodMap: Record<string, any> = {};
-    S.moods.forEach((m: any) => { moodMap[m.id] = m; });
-
-    return moodOrder
-      .filter((mid: string) => moodMap[mid])
-      .map((mid: string) => {
-        const mood = moodMap[mid];
-        const tasks = myTasks.filter((t: any) => t.mood === mid);
-        return { ...mood, tasks };
-      });
+    return S.moods.map((m: any) => {
+      const tasks = myTasks.filter((t: any) => t.mood === m.id);
+      return { ...m, tasks };
+    });
   }, [S.moods, myTasks]);
 
   const setStatus = useCallback(async (taskId: string, status: string) => {
