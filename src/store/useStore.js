@@ -230,7 +230,8 @@ export const useStore = create((set, get) => ({
     S.tasks      = (tasks.data||[]).map(taskFromRow);
     S.milestones = (milestones.data||[]).map(msFromRow);
     S.tags       = (tags.data||[]).map(tagFromRow);
-    (st.data||[]).forEach(r => { if (STATE_KEYS.includes(r.key)) S[r.key] = r.value; });
+    let hasAppStateMoods = false;
+    (st.data||[]).forEach(r => { if (STATE_KEYS.includes(r.key)) { S[r.key] = r.value; if (r.key === 'moods') hasAppStateMoods = true; } });
 
     const subtaskCount = S.tasks.reduce((a, t) => a + (t.subtasks?.length || 0), 0);
     const linkCount = S.tasks.reduce((a, t) => a + (t.links?.length || 0), 0);
@@ -238,23 +239,22 @@ export const useStore = create((set, get) => ({
     const tasksWithLinks = S.tasks.filter(t => t.links?.length > 0).length;
     console.log('[loadAll] done', { tasks: S.tasks.length, tasksWithSubtasks, tasksWithLinks, subtasks: subtaskCount, links: linkCount });
 
-    // ── Moods: prefer moods table, fall back to app_state, then DMOODS ───────
-    const { data: moodRows } = await supabase.from('moods').select('*');
-    if (moodRows && moodRows.length > 0) {
-      S.moods = moodRows;
+    // ── Moods: prefer app_state (preserves array order), fall back to moods table, then DMOODS
+    if (hasAppStateMoods) {
+      // Loaded from app_state on line 233 — use as-is, preserving drag order
+      S.moods = S.moods.map(m => ({
+        ...m,
+        hidden: m.hidden !== undefined ? m.hidden : false,
+      }));
     } else {
-      // Try app_state data (pre-migration fallback)
-      const appStateMoods = S.moods?.length ? S.moods : null;
-      if (appStateMoods) {
-        S.moods = appStateMoods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : false }));
+      const { data: moodRows } = await supabase.from('moods').select('*');
+      if (moodRows && moodRows.length > 0) {
+        S.moods = moodRows;
       } else {
         S.moods = JSON.parse(JSON.stringify(DMOODS));
       }
-      // Seed the moods table so next load reads from it directly
-      supabase.from('moods').upsert(S.moods.map(m => ({
-        id: m.id, label: m.label, icon: m.icon, color: m.color, bg: m.bg,
-        desc: m.desc, max: m.max, cardSize: m.cardSize, hidden: m.hidden,
-      }))).then();
+      // Seed app_state so future loads read saved order from here
+      supabase.from('app_state').upsert({ key: 'moods', value: S.moods }).then();
     }
 
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members[0]?.id || null };
@@ -678,7 +678,14 @@ export const useStore = create((set, get) => ({
     await get()._persistState('settings');
   },
   setMoods: async (moods) => {
-    get()._patchS((S)=>{ S.moods=moods; }); await get()._persistState('moods');
+    get()._patchS((S)=>{ S.moods=moods; });
+    await Promise.all([
+      get()._persistState('moods'),
+      supabase.from('moods').upsert(moods.map(m => ({
+        id: m.id, label: m.label, icon: m.icon, color: m.color, bg: m.bg,
+        desc: m.desc, max: m.max, cardSize: m.cardSize, hidden: m.hidden,
+      }))),
+    ]);
   },
   setNavOrder: async (order) => { get()._patchS((S)=>{ S.navOrder=order; }); await get()._persistState('navOrder'); },
   setNavLabels: async (labels) => { get()._patchS((S)=>{ S.navLabels=labels; }); await get()._persistState('navLabels'); },
