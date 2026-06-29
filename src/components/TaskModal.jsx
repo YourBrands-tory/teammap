@@ -62,6 +62,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [isMs, setIsMs] = useState(initVal('isMs', !!task.isMilestone));
   const [msId, setMsId] = useState(initVal('msId', task.milestoneId || ''));
   const [err, setErr] = useState({});
+  const [nudgeMsg, setNudgeMsg] = useState('');
   const [subtasks, setSubtasks] = useState(ensureSubtaskIds(initVal('subtasks', task.subtasks ? task.subtasks.map(s => ({ ...s })) : [])));
   const [links, setLinks] = useState(initVal('links', task.links ? task.links.map(l => ({ ...l })) : []));
   const [newSubtask, setNewSubtask] = useState('');
@@ -203,13 +204,40 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     debounceRef.current = setTimeout(() => doSave(), 600);
   }, [doSave]);
 
-  const handleClose = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    doSave().finally(() => {
-      clearDraft();
-      onClose();
-    });
-  }, [doSave, onClose]);
+  function nudgeMissingFields(hasName, hasMood, hasAssignee) {
+    const tn = document.getElementById('tn');
+    const mp = document.getElementById('mprow');
+    const ta = document.getElementById('tarow');
+    if (!hasName && tn) {
+      tn.classList.add('nudge-shake');
+      tn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => tn.classList.remove('nudge-shake'), 600);
+    }
+    if (!hasMood && mp) {
+      mp.classList.add('nudge-flash');
+      setTimeout(() => mp.classList.remove('nudge-flash'), 600);
+    }
+    if (!hasAssignee && ta) {
+      ta.classList.add('nudge-flash');
+      setTimeout(() => ta.classList.remove('nudge-flash'), 600);
+    }
+    setNudgeMsg('Add a task name, mood and assignee — then you\'re good to go');
+    setTimeout(() => setNudgeMsg(''), 3000);
+  }
+
+  const tryCloseModal = useCallback(() => {
+    const hasName = name.trim().length > 0;
+    const hasMood = !!mood;
+    const hasAssignee = assigned.length > 0;
+    if (hasName && hasMood && hasAssignee) {
+      flushSave().then(() => {
+        clearDraft();
+        onClose();
+      });
+    } else {
+      nudgeMissingFields(hasName, hasMood, hasAssignee);
+    }
+  }, [name, mood, assigned, flushSave, onClose]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -220,14 +248,14 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         target instanceof HTMLTextAreaElement ||
         target.isContentEditable;
       if (isTyping) return;
-      if (e.key === 'Escape') handleClose();
+      if (e.key === 'Escape') tryCloseModal();
     };
     document.addEventListener('keydown', onEsc);
     return () => {
       document.body.style.overflow = '';
       document.removeEventListener('keydown', onEsc);
     };
-  }, [handleClose]);
+  }, [tryCloseModal]);
 
   // Auto-save: debounce on any field change
   useEffect(() => {
@@ -375,7 +403,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   };
 
   return (
-    <div className="mbg" onMouseDown={(e)=>e.target.classList.contains('mbg')&&handleClose()}>
+    <div className="mbg" onMouseDown={(e)=>e.target.classList.contains('mbg')&&tryCloseModal()}>
       <div className="modal modal-lg" onMouseDown={e=>e.stopPropagation()}>
         <h2 style={{marginBottom:4}}>{isEdit ? 'Edit task' : 'New task'}</h2>
         {fromCellText && (
@@ -384,6 +412,8 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
           </div>
         )}
         <div style={{fontSize:11,color:'var(--warn)',marginBottom:10}}>* Task name, assigned to &amp; mood are required</div>
+
+        {nudgeMsg && <div className="nudge-banner">{nudgeMsg}</div>}
 
         {isEdit && (task.createdBy || task.updatedBy) && (
           <div style={{fontSize:11,color:'var(--t2)',marginBottom:10,lineHeight:1.6}}>
@@ -394,7 +424,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         )}
 
         <label className="fl" style={{marginTop:0}}>Task name *</label>
-        <input ref={taskNameRef} type="text" placeholder="What needs to be done?" value={name}
+        <input ref={taskNameRef} id="tn" type="text" placeholder="What needs to be done?" value={name}
           className={err.name?'req':''} onChange={e=>setName(e.target.value)} />
 
         {/* ── Section tabs ── */}
@@ -409,7 +439,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         {/* ── Section 1 — Essentials ── */}
         <div className={`modal-section${tab==='essentials'?' active':''}`}>
           <label className="fl">Mood *</label>
-          <div className="mood-pick-row horizontal-scroll" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
+          <div id="mprow" className="mood-pick-row horizontal-scroll" style={err.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
             {S.moods.map(m => {
               const on = mood === m.id;
               const moodLimit = m.max;
@@ -451,7 +481,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
               })}
             </div>
           ) : (
-            <div className="ttag-row horizontal-scroll" style={err.assigned?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
+            <div id="tarow" className="ttag-row horizontal-scroll" style={err.assigned?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
               {S.members.map(m => (
                 <div key={m.id} className={`ttagopt${assigned.includes(m.id)?' on':''}`}
                   onClick={()=>toggle(assigned,setAssigned,m.id)}>
@@ -632,7 +662,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         <div className="modal-footer">
           <div className="modal-footer-left">
             {isEdit && canDeleteTask(session, task) && <button className="btn btn-d" onClick={del}>🗑 Delete</button>}
-            <button className="modal-close-text" onClick={handleClose}>Close</button>
+            <button className="modal-close-text" onClick={tryCloseModal}>Close</button>
           </div>
           <div className="modal-footer-right">
             {saveStatus === 'saving' && <span style={{fontSize:12,color:'var(--t3)',fontWeight:600}}>Saving…</span>}

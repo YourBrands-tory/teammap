@@ -55,6 +55,11 @@ textarea{resize:vertical;min-height:60px;line-height:1.5}
 /* horizontal scroll utility */
 .horizontal-scroll{display:flex;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;touch-action:pan-x;scrollbar-width:none}
 .horizontal-scroll::-webkit-scrollbar{display:none}
+@keyframes nudgeShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.nudge-shake{animation:nudgeShake .4s ease;border-color:var(--warn)!important}
+.nudge-flash{outline:2px solid var(--warn)!important;animation:nudgeShake .4s ease}
+.nudge-banner{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;border-radius:var(--r,8px);padding:8px 12px;font-size:12px;font-weight:500;margin-bottom:12px;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 /* modal */
 .mbg{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center}
 .modal{background:var(--surface);border-radius:24px;padding:26px;width:min(720px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;box-shadow:0 8px 32px rgba(0,0,0,.12)}
