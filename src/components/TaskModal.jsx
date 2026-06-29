@@ -662,7 +662,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         <div className="modal-footer">
           <div className="modal-footer-left">
             {isEdit && canDeleteTask(session, task) && <button className="btn btn-d" onClick={del}>🗑 Delete</button>}
-            <button className="modal-close-text" onClick={tryCloseModal}>Close</button>
+            <button className="modal-close-text" onClick={onClose}>Close</button>
           </div>
           <div className="modal-footer-right">
             {saveStatus === 'saving' && <span style={{fontSize:12,color:'var(--t3)',fontWeight:600}}>Saving…</span>}
