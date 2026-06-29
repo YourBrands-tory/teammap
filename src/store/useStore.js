@@ -63,6 +63,8 @@ export const useStore = create((set, get) => ({
   isAuthLoading: true,
   saveFlash: 0,
   _rtChannel: null,
+  _syncInterval: null,
+  _lastRealtimeEvent: 0,
 
   S: JSON.parse(JSON.stringify(EMPTY_S)),
 
@@ -135,6 +137,7 @@ export const useStore = create((set, get) => ({
         try { localStorage.removeItem(SESSION_KEY); } catch {}
         const ch = get()._rtChannel;
         if (ch) { supabase.removeChannel(ch); }
+        get()._stopPeriodicSync();
         set({
           session: null, role: null,
           S: JSON.parse(JSON.stringify(EMPTY_S)),
@@ -151,6 +154,7 @@ export const useStore = create((set, get) => ({
     try { localStorage.removeItem(SESSION_KEY); } catch {}
     const ch = get()._rtChannel;
     if (ch) { supabase.removeChannel(ch); }
+    get()._stopPeriodicSync();
     try { await supabase.auth.signOut(); } catch {}
     set({
       session: null, role: null,
@@ -162,7 +166,11 @@ export const useStore = create((set, get) => ({
   // ── boot: pull all data (no Supabase Auth dependency) ──────────────────────
   loadAll: async (force) => {
     const cur = get().S;
-    if (!force && cur?.tasks?.length) return;
+    if (!force && cur?.tasks?.length) {
+      get()._subscribeRealtime();
+      get()._startPeriodicSync();
+      return;
+    }
     set({ loading: true });
 
     if (!get().session) { set({ loading:false }); return; }
@@ -235,6 +243,7 @@ export const useStore = create((set, get) => ({
 
     set({ S, loading:false });
     get()._subscribeRealtime();
+    get()._startPeriodicSync();
   },
 
   _subscribeRealtime: () => {
@@ -245,20 +254,66 @@ export const useStore = create((set, get) => ({
         { event: '*', schema: 'public', table: 'tasks' },
         (payload) => {
           const { new: row, eventType } = payload;
-          get()._patchS((S) => {
+          get()._patchS((next) => {
             if (eventType === 'DELETE') {
-              S.tasks = S.tasks.filter(t => t.id !== row.id);
+              next.tasks = next.tasks.filter(t => t.id !== row.id);
             } else if (row) {
               const task = taskFromRow(row);
-              const i = S.tasks.findIndex(t => t.id === task.id);
-              if (i >= 0) { S.tasks[i] = task; }
-              else { S.tasks.push(task); }
+              const i = next.tasks.findIndex(t => t.id === task.id);
+              if (i >= 0) {
+                next.tasks = next.tasks.map((t, idx) => idx === i ? task : t);
+              } else {
+                next.tasks = [...next.tasks, task];
+              }
             }
           });
+          set({ _lastRealtimeEvent: Date.now() });
         }
       )
-      .subscribe();
-    set({ _rtChannel: channel });
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] tasks channel subscribed');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[Realtime] tasks channel error — will retry in 10s');
+          setTimeout(() => { try { get()._subscribeRealtime(); } catch {} }, 10000);
+        } else if (status === 'TIMED_OUT') {
+          console.warn('[Realtime] tasks channel timed out — retrying');
+          setTimeout(() => { try { get()._subscribeRealtime(); } catch {} }, 5000);
+        }
+      });
+    set({ _rtChannel: channel, _lastRealtimeEvent: Date.now() });
+  },
+
+  _startPeriodicSync: () => {
+    const existing = get()._syncInterval;
+    if (existing) { clearInterval(existing); }
+    const interval = setInterval(async () => {
+      const now = Date.now();
+      const lastEvent = get()._lastRealtimeEvent;
+      // Only sync if no realtime events in the last 25 seconds (subscription may be down)
+      if (now - lastEvent < 25000) return;
+      console.log('[Sync] No realtime events recently — fetching latest tasks');
+      const { data } = await supabase
+        .from('tasks')
+        .select('*')
+        .gt('updated_at', lastEvent - 60000);
+      if (data?.length) {
+        get()._patchS((next) => {
+          data.forEach((row) => {
+            const task = taskFromRow(row);
+            const i = next.tasks.findIndex(t => t.id === task.id);
+            if (i >= 0) { next.tasks = next.tasks.map((t, idx) => idx === i ? task : t); }
+            else { next.tasks = [...next.tasks, task]; }
+          });
+        });
+      }
+    }, 30000);
+    set({ _syncInterval: interval });
+  },
+
+  _stopPeriodicSync: () => {
+    const interval = get()._syncInterval;
+    if (interval) { clearInterval(interval); set({ _syncInterval: null }); }
   },
 
   flashSaved: () => set((s)=>({ saveFlash: s.saveFlash+1 })),
@@ -389,10 +444,13 @@ export const useStore = create((set, get) => ({
     if (error) throw error;
     return t;
   },
-  // Lightweight subtask-only update — no _patchS, no activity log, no re-render cascade
+  // Lightweight subtask-only update — no activity log, but update local state
   patchTaskSubtasks: async (taskId, subtasks) => {
     const now = Date.now();
     const session = get().session;
+    get()._patchS((next) => {
+      next.tasks = next.tasks.map(t => t.id === taskId ? { ...t, subtasks, updatedAt: now } : t);
+    });
     const { error } = await supabase.from('tasks')
       .update({ subtasks, updated_by: session?.memberId || null, updated_at: now })
       .eq('id', taskId);

@@ -26,7 +26,7 @@ export default memo(function TaskSidePanel({ tasks, member, S, onOpenTask, hidde
       );
       return { ...mood, ids };
     });
-  }, [moods, S.tasks, member, completeStatus]);
+  }, [moods, S.tasks.length, S.tasks, member, completeStatus]);
 
   return (
     <div className="sp">
