@@ -39,7 +39,6 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const roleStatuses = getStatusesForRole(S.task_statuses, session?.role);
   const upsertTask = useStore(s => s.upsertTask);
   const upsertTag = useStore(s => s.upsertTag);
-  const upsertMilestone = useStore(s => s.upsertMilestone);
   const softDeleteTask = useStore(s => s.softDeleteTask);
 
   const isEdit = !!task.id;
@@ -59,8 +58,6 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   const [notes, setNotes] = useState(initVal('notes', task.notes || ''));
   const [tags, setTags] = useState(initVal('tags', task.tags ? [...task.tags] : []));
   const [newTag, setNewTag] = useState('');
-  const [isMs, setIsMs] = useState(initVal('isMs', !!task.isMilestone));
-  const [msId, setMsId] = useState(initVal('msId', task.milestoneId || ''));
   const [err, setErr] = useState({});
   const [nudgeMsg, setNudgeMsg] = useState('');
   const [subtasks, setSubtasks] = useState(ensureSubtaskIds(initVal('subtasks', task.subtasks ? task.subtasks.map(s => ({ ...s })) : [])));
@@ -87,7 +84,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     lastSnapshot.current = JSON.stringify([
       name.trim(), mood, [...assigned].sort(),
       clientId || '', date || '', status, String(estH), String(estM),
-      notes, [...tags].sort(), isMs, msId || '',
+      notes, [...tags].sort(),
       subtasks.map(x => x.text + String(x.done)).sort().join('|'),
       links.map(x => x.url).sort().join('|'),
     ]);
@@ -119,7 +116,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
 
   // Keep a ref with the latest field values (no stale closures in debounce callbacks)
   useEffect(() => {
-    fieldsRef.current = { name, mood, assigned: [...assigned], clientId, date, status, estH, estM, notes, tags: [...tags], isMs, msId, subtasks: subtasks.map(s => ({...s})), links: links.map(l => ({...l})) };
+    fieldsRef.current = { name, mood, assigned: [...assigned], clientId, date, status, estH, estM, notes, tags: [...tags], subtasks: subtasks.map(s => ({...s})), links: links.map(l => ({...l})) };
   });
 
   const doSave = useCallback(() => {
@@ -131,7 +128,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
       const snapshot = JSON.stringify([
         f.name.trim(), f.mood, [...f.assigned].sort(),
         f.clientId || '', f.date || '', f.status, String(f.estH), String(f.estM),
-        f.notes, [...f.tags].sort(), f.isMs, f.msId || '',
+        f.notes, [...f.tags].sort(),
         f.subtasks.map(x => x.text + String(x.done)).sort().join('|'),
         f.links.map(x => x.url).sort().join('|'),
       ]);
@@ -146,17 +143,8 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         estH: parseInt(f.estH) || 0, estM: parseInt(f.estM) || 0, notes: f.notes,
         subtasks: f.subtasks.map(s => ({ ...s })),
         links: f.links.map(l => ({ ...l })),
-        isMilestone: f.isMs, milestoneId: f.msId || null,
+        isMilestone: !!task.isMilestone, milestoneId: task.milestoneId || null,
       };
-
-      if (f.isMs && !f.msId) {
-        try {
-          const nm = await upsertMilestone({
-            name: f.name, description: '', color: sel.gmood(S, f.mood).color || COLORS[0], assignedTo: [...f.assigned],
-          });
-          payload.milestoneId = nm.id;
-        } catch (e) { console.error('[AutoSave] milestone creation failed', e); }
-      }
 
       const isManager = session?.role === 'admin' || session?.role === 'manager';
       const allDone = f.subtasks.length && f.subtasks.every(s => s.done);
@@ -193,7 +181,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     });
     saveQueue.current = result;
     return result;
-  }, [S, session, upsertTask, upsertMilestone]);
+  }, [S, session, upsertTask]);
 
   const flushSave = useCallback(() => {
     if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
@@ -268,7 +256,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
       return;
     }
     scheduleSave();
-  }, [name, mood, assigned, clientId, date, status, estH, estM, notes, tags, isMs, msId, subtasks, links, scheduleSave, flushSave]);
+  }, [name, mood, assigned, clientId, date, status, estH, estM, notes, tags, subtasks, links, scheduleSave, flushSave]);
 
   function timeAgo(ts) {
     const diff = Date.now() - ts;
@@ -319,10 +307,10 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
     saveDraft({
       _taskId: draftId,
       name, mood, assigned, clientId, date, status,
-      estH, estM, notes, tags, isMs, msId, subtasks, links,
+      estH, estM, notes, tags, subtasks, links,
       newTag, newSubtask, newLinkLabel, newLinkUrl, tDetailTab,
     });
-  }, [name, mood, assigned, clientId, date, status, estH, estM, notes, tags, isMs, msId, subtasks, links, newTag, newSubtask, newLinkLabel, newLinkUrl, tDetailTab, draftId]);
+  }, [name, mood, assigned, clientId, date, status, estH, estM, notes, tags, subtasks, links, newTag, newSubtask, newLinkLabel, newLinkUrl, tDetailTab, draftId]);
 
   const toggle = (arr, set, id) =>
     set(arr.includes(id) ? arr.filter(x => x !== id) : [...arr, id]);
@@ -641,20 +629,6 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
               </div>
             ))}
           </div>
-
-          <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8}}>
-            <input type="checkbox" id="tms" checked={isMs} onChange={e=>setIsMs(e.target.checked)} />
-            <label htmlFor="tms" style={{fontSize:13,fontWeight:600,cursor:'pointer'}}>Milestone task</label>
-          </div>
-          {(isMs || msId) && (
-            <div>
-              <label className="fl">Link to milestone</label>
-              <select value={msId} onChange={e=>setMsId(e.target.value)}>
-                <option value="">— None —</option>
-                {S.milestones.filter(m=>!m.deleted).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
-            </div>
-          )}
         </div>
 
         {limitError && <div style={{marginTop:10,padding:'8px 12px',background:'#d32f2f22',border:'1px solid #d32f2f',borderRadius:6,color:'#d32f2f',fontSize:13,fontWeight:600}}>

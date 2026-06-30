@@ -31,6 +31,7 @@ const ALL_VIEWS = {
   pg:  Playground,
   dl:  DelegatedView,
   sc:  SMCalendar,
+  ms:  MilestonesView,
 };
 
 function LoadingFallback() {

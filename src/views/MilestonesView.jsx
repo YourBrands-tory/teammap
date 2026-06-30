@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { getDeadlineClass, getDeadlineLabel } from '../lib/constants';
 import MilestoneModal from '../components/MilestoneModal';
@@ -9,8 +9,23 @@ export default function MilestonesView() {
   const [modal, setModal] = useState(null);
   const [taskModal, setTaskModal] = useState(null);
   const [clientFilter, setClientFilter] = useState('');
+  const linkAfterCreateRef = useRef(null);
   const openTask = useCallback((t) => setTaskModal(t), []);
   const closeTask = useCallback(() => setTaskModal(null), []);
+
+  const handleCreateTaskForSubstep = useCallback((ssId, taskData, linkCallback) => {
+    linkAfterCreateRef.current = { ssId, linkCallback };
+    setTaskModal(taskData);
+  }, []);
+
+  const handleTaskSave = useCallback((savedTask) => {
+    const pending = linkAfterCreateRef.current;
+    if (pending && savedTask?.id) {
+      pending.linkCallback(savedTask.id);
+      setTaskModal(null);
+    }
+    linkAfterCreateRef.current = null;
+  }, []);
 
   const activeMilestones = useMemo(() => {
     return S.milestones.filter(m => !m.deleted).sort((a, b) => {
@@ -126,8 +141,8 @@ export default function MilestonesView() {
         })}
       </div>
 
-      {modal && <MilestoneModal milestone={modal.id ? modal : null} onClose={() => setModal(null)} onOpenTask={openTask} />}
-      {taskModal && <TaskModal task={taskModal} onClose={closeTask} />}
+      {modal && <MilestoneModal milestone={modal.id ? modal : null} onClose={() => setModal(null)} onOpenTask={openTask} onCreateTaskForSubstep={handleCreateTaskForSubstep} />}
+      {taskModal && <TaskModal task={taskModal} onClose={closeTask} onSave={handleTaskSave} />}
     </div>
   );
 }

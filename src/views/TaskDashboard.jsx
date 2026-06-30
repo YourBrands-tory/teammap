@@ -14,12 +14,32 @@ import MilestoneModal from '../components/MilestoneModal';
 const minsOf = (t) => (t.estH||0)*60 + (t.estM||0);
 const hm = (m) => m ? `${Math.floor(m/60)}h${m%60?' '+m%60+'m':''}` : null;
 
+function isTaskHiddenBySubstep(taskId, milestones) {
+  if (!milestones) return false;
+  let linked = false;
+  for (const ms of milestones) {
+    if (ms.deleted) continue;
+    for (const ss of (ms.substeps || [])) {
+      if (ss.linkedTaskId === taskId) {
+        if (ss.showOnDashboard) return false;
+        linked = true;
+      }
+    }
+  }
+  return linked;
+}
+
+function filterDashboardTasks(tasks, milestones) {
+  if (!milestones || !milestones.length) return tasks;
+  return tasks.filter(t => !isTaskHiddenBySubstep(t.id, milestones));
+}
+
 function getMemberStats(S, memberId, date, completeStatus, passStatus, reviewStatus) {
-  const allTasks = sel.tasksForMD(S, memberId, date);
-  const activeCount = S.tasks.filter(t =>
+  const allTasks = filterDashboardTasks(sel.tasksForMD(S, memberId, date), S.milestones);
+  const activeCount = filterDashboardTasks(S.tasks.filter(t =>
     t.assignedTo?.includes(memberId) && t.date === date && !t.deleted &&
     t.status !== completeStatus && t.status !== passStatus
-  ).length;
+  ), S.milestones).length;
   const reviewPendingCount = allTasks.filter(t => t.status === reviewStatus).length;
   const doneCount = allTasks.filter(t => t.status === completeStatus).length;
   const total = allTasks.length;
@@ -82,13 +102,13 @@ export default function TaskDashboard() {
     setDashDate(d.toISOString().slice(0,10));
   };
 
-  const allTasks = sel.tasksOnDate(S, dashDate);
+  const allTasks = filterDashboardTasks(sel.tasksOnDate(S, dashDate), S.milestones);
   const total = allTasks.length;
   const done = allTasks.filter(t=>t.status===completeStatus).length;
   const dayPct = total ? Math.round(done/total*100) : 0;
   const reviewCount = allTasks.filter(t=>t.status===reviewStatus).length;
   const spM = sel.gm(S, S.settings.spMember) || S.members[0];
-  const spTasks = useMemo(() => spM ? sel.tasksForMD(S, spM.id, dashDate) : [], [S, spM, dashDate]);
+  const spTasks = useMemo(() => spM ? filterDashboardTasks(sel.tasksForMD(S, spM.id, dashDate), S.milestones) : [], [S, spM, dashDate]);
 
   const mobileMember = S.members[mobileMemberIdx] || S.members[0];
   const VISIBLE_MEMBER_LIMIT = 5;
@@ -305,7 +325,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   const completeStatus = getCompleteStatus(S.task_statuses);
   const passStatus = getPassStatus(S.task_statuses);
   const standUpStatus = getStandUpStatus(S.task_statuses);
-  const allTasks = sel.tasksForMD(S, member.id, date);
+  const allTasks = filterDashboardTasks(sel.tasksForMD(S, member.id, date), S.milestones);
   const stats = getMemberStats(S, member.id, date, completeStatus, passStatus, reviewStatus);
 
   const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
@@ -562,7 +582,7 @@ const TCard = memo(function TCard({ task, member, moods, clients, tags, taskStat
 const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCards, onToggleExpand, onOpenTask, onStatus, onOpenMs }) {
   const completeStatus = getCompleteStatus(S.task_statuses);
   const standUpStatus = getStandUpStatus(S.task_statuses);
-  const allTasks = sel.tasksForMD(S, member.id, date);
+  const allTasks = filterDashboardTasks(sel.tasksForMD(S, member.id, date), S.milestones);
   const visible = allTasks.filter(t=>t.status!==completeStatus);
   const doneCount = allTasks.filter(t=>t.status===completeStatus).length;
   const pct = allTasks.length ? Math.round(doneCount/allTasks.length*100) : 0;

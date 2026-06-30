@@ -22,21 +22,22 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   const [taskSearch, setTaskSearch] = useState(null);
   const [searchQ, setSearchQ] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
+  const [triedSave, setTriedSave] = useState(false);
 
   const subTotal = m.substeps.length;
   const subDone = m.substeps.filter(s => s.done).length;
   const subPct = subTotal ? Math.round(subDone / subTotal * 100) : 0;
 
-  const allTasks = useMemo(() => S.tasks.filter(t => !t.deleted && t.status !== 'Complete' && t.status !== 'Pass'), [S.tasks]);
+  const allTasks = useMemo(() => S.tasks.filter(t => !t.deleted && t.status !== 'Complete'), [S.tasks]);
 
   const searchResults = useMemo(() => {
-    if (!searchQ.trim()) return allTasks.slice(0, 30);
+    if (!searchQ.trim()) return allTasks;
     const q = searchQ.toLowerCase();
     return allTasks.filter(t => {
       const nameMatch = t.name.toLowerCase().includes(q);
       const clientMatch = sel.gc(S, t.clientId)?.name?.toLowerCase().includes(q);
       return nameMatch || clientMatch;
-    }).slice(0, 30);
+    });
   }, [allTasks, searchQ, S]);
 
   const close = () => { onClose?.(); };
@@ -114,6 +115,10 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
 
   const save = async () => {
     if (!m.title.trim()) return;
+    if (!m.mood || !m.assignedTo.length) {
+      setTriedSave(true);
+      return;
+    }
     await upsertMilestone(m);
     close();
   };
@@ -180,29 +185,30 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
           ))}
         </div>
 
-        <div style={{flex:1,overflowY:'auto',padding:'16px 0'}}>
+        <div style={{flex:1,overflowY:'auto',padding:'16px 0',minHeight:220}}>
 
           {/* ── SLIDE 0: Essentials ── */}
           <div className={`modal-section${tab===0?' active':''}`}>
             <label className="fl">Mood *</label>
-            <div className="mood-pick-row" style={!m.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
+            <div className="mood-pick-row" style={triedSave&&!m.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
               {S.moods.map(mood => {
                 const on = m.mood === mood.id;
                 return (
                   <div key={mood.id} className={`mood-opt-btn${on?' on':''}`}
                     style={on?{background:mood.bg,color:mood.color,borderColor:mood.color,borderWidth:2}:{}}
-                    onClick={() => updateField('mood',mood.id)}>
+                    onClick={() => { updateField('mood',mood.id); setTriedSave(false); }}>
                     {mood.icon} {mood.label}
                   </div>
                 );
               })}
             </div>
+            {triedSave && !m.mood && <div style={{fontSize:11,color:'var(--warn)',marginTop:4}}>Select a mood</div>}
 
             <label className="fl">Assign to *</label>
-            <div className="ttag-row horizontal-scroll" style={!m.assignedTo.length?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
+            <div className="ttag-row horizontal-scroll" style={triedSave&&!m.assignedTo.length?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
               {S.members.map(mem => (
                 <div key={mem.id} className={`ttagopt${m.assignedTo.includes(mem.id)?' on':''}`}
-                  onClick={()=>toggleAssign(mem.id)}
+                  onClick={()=>{ toggleAssign(mem.id); setTriedSave(false); }}
                   style={m.assignedTo.includes(mem.id)?{borderColor:mem.color,background:mem.color+'22',color:mem.color}:{}}>
                   <span className="av" style={{width:16,height:16,borderRadius:'50%',fontSize:8,background:mem.color,color:'#fff',display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                     {mem.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}
@@ -211,15 +217,17 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
                 </div>
               ))}
             </div>
+            {triedSave && !m.assignedTo.length && <div style={{fontSize:11,color:'var(--warn)',marginTop:4}}>Select at least one member</div>}
 
             <label className="fl">Client / Project</label>
             <div className="ttag-row horizontal-scroll">
               {sel.scl(S).map(c => {
                 const on = m.clientId === c.id;
+                const col = c.color || 'var(--accent)';
                 return (
                   <div key={c.id} onClick={()=>setClient(c.id)}
-                    className={`ttagopt${on?' on':''}`}
-                    style={on?{borderColor:c.color,background:c.color+'18',color:c.color}:{}}>
+                    className={`ms-client-chip${on?' on':''}`}
+                    style={on?{borderColor:col,background:col+'18',color:col}:{}}>
                     {c.name}
                   </div>
                 );
@@ -231,12 +239,12 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
               <input type="date" value={m.date} onChange={e=>updateField('date',e.target.value)} style={{width:150}} />
               <button className="btn btn-xs" onClick={()=>updateField('date',today())}>Today</button>
               <button className="btn btn-xs" onClick={() => {
-                const d = new Date(today()+'T12:00:00'); d.setDate(d.getDate()+1);
-                updateField('date',d.toISOString().slice(0,10));
+                const d = new Date(); d.setDate(d.getDate()+1);
+                updateField('date',d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
               }}>Tomorrow</button>
               <button className="btn btn-xs" onClick={() => {
-                const d = new Date(today()+'T12:00:00'); d.setDate(d.getDate()-1);
-                updateField('date',d.toISOString().slice(0,10));
+                const d = new Date(); d.setDate(d.getDate()-1);
+                updateField('date',d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
               }}>Yesterday</button>
             </div>
 
@@ -331,7 +339,17 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
               })}
             </div>
 
-            <button className="ms-add-ss-btn" onClick={addSubstep}>+ Add substep</button>
+            {subTotal === 0 && (
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 20px',gap:16}}>
+                <span style={{fontSize:13,color:'var(--t3)',textAlign:'center',lineHeight:1.5}}>
+                  No substeps yet — break this milestone into smaller steps
+                </span>
+                <button className="btn btn-p" onClick={addSubstep} style={{fontSize:13,padding:'8px 16px'}}>+ Add substep</button>
+              </div>
+            )}
+            {subTotal > 0 && (
+              <button className="ms-add-ss-btn" onClick={addSubstep}>+ Add substep</button>
+            )}
 
             {taskSearch && (
               <div className="ms-task-overlay">
