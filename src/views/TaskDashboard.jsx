@@ -16,17 +16,16 @@ const hm = (m) => m ? `${Math.floor(m/60)}h${m%60?' '+m%60+'m':''}` : null;
 
 function isTaskHiddenBySubstep(taskId, milestones) {
   if (!milestones) return false;
-  let linked = false;
   for (const ms of milestones) {
     if (ms.deleted) continue;
     for (const ss of (ms.substeps || [])) {
-      if (ss.linkedTaskId === taskId) {
+      if ((ss.linkedTaskIds || []).includes(taskId)) {
         if (ss.showOnDashboard) return false;
-        linked = true;
+        return true;
       }
     }
   }
-  return linked;
+  return false;
 }
 
 function filterDashboardTasks(tasks, milestones) {

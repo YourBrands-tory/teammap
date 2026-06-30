@@ -234,7 +234,6 @@ export default function SMCalendar() {
                             const p = moodPastel(t.mood);
                             const moodColor = p?.text || 'var(--t3)';
                             const theMood = t.mood ? S.moods.find(x => x.id === t.mood) : null;
-                            const assignee = t.assignedTo?.length ? sel.gm(S, t.assignedTo[0]) : null;
                             const client = t.clientId ? sel.gc(S, t.clientId) : null;
                             const hasLinks = t.links?.length > 0;
                             const hasSubtasks = t.subtasks?.length > 0;
@@ -249,10 +248,13 @@ export default function SMCalendar() {
                                   {theMood && <span className="mood-tag" style={{ background: p?.bg || 'var(--s2)', color: moodColor }}>{theMood.icon} {theMood.label}</span>}
                                   <span className="task-name">{t.name}</span>
                                 </div>
-                                {(assignee || client) && (
+                                {(t.assignedTo?.length > 0 || client) && (
                                   <div className="task-meta">
-                                    {assignee && <span className="assignee-text">{assignee.name}</span>}
-                                    {assignee && client && <span className="dot-sep" />}
+                                    {t.assignedTo?.map(mId => {
+                                      const member = sel.gm(S, mId);
+                                      return member ? <span key={mId} className="assignee-text">{member.name}</span> : null;
+                                    })}
+                                    {t.assignedTo?.length > 0 && client && <span className="dot-sep" />}
                                     {client && <span className="client-text" style={{ color: client.color || 'var(--t2)' }}>{client.name}</span>}
                                   </div>
                                 )}
@@ -300,7 +302,6 @@ export default function SMCalendar() {
             )}
             {todayTasks.map(t => {
               const client = t.clientId ? sel.gc(S, t.clientId) : null;
-              const assignee = t.assignedTo?.length ? sel.gm(S, t.assignedTo[0]) : null;
               const hasTime = t.estH || t.estM;
               const timeLabel = hasTime ? `${t.estH || 0}h${t.estM ? ` ${t.estM}m` : ''}` : 'No fixed time';
               return (
@@ -313,11 +314,14 @@ export default function SMCalendar() {
                         {client.name}
                       </span>
                     )}
-                    {assignee && (
-                      <span className="smc-today-tag" style={{ background: (assignee.color || '#eceae5') + '33', color: assignee.color || 'var(--t2)' }}>
-                        {assignee.name}
-                      </span>
-                    )}
+                    {t.assignedTo?.map(mId => {
+                      const member = sel.gm(S, mId);
+                      return member ? (
+                        <span key={mId} className="smc-today-tag" style={{ background: (member.color || '#eceae5') + '33', color: member.color || 'var(--t2)' }}>
+                          {member.name}
+                        </span>
+                      ) : null;
+                    })}
                   </div>
                 </div>
               );

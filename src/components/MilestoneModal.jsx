@@ -2,6 +2,16 @@ import { useState, useMemo } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { today, uid, getDeadlineClass, getDeadlineLabel } from '../lib/constants';
 
+const migrateSS = (ss) => {
+  if (ss.linkedTaskId && !ss.linkedTaskIds) {
+    return { ...ss, linkedTaskIds: [ss.linkedTaskId], linkedTaskId: undefined };
+  }
+  if (!ss.linkedTaskIds) {
+    return { ...ss, linkedTaskIds: [] };
+  }
+  return ss;
+};
+
 export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreateTaskForSubstep }) {
   const S = useStore(s => s.S);
   const upsertMilestone = useStore(s => s.upsertMilestone);
@@ -10,7 +20,7 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   const isEdit = !!milestone;
   const [m, setM] = useState(() => milestone ? {
     ...milestone,
-    substeps: milestone.substeps || [],
+    substeps: (milestone.substeps || []).map(migrateSS),
     displayMode: milestone.displayMode || 'daily',
     displayDays: milestone.displayDays || [],
   } : {
@@ -72,7 +82,7 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   };
 
   const addSubstep = () => {
-    const newSs = { id: uid(), title: '', done: false, linkedTaskId: null, showOnDashboard: false };
+    const newSs = { id: uid(), title: '', done: false, linkedTaskIds: [], showOnDashboard: false };
     setM(prev => ({ ...prev, substeps: [...prev.substeps, newSs] }));
     setExpandedSS(prev => ({ ...prev, [newSs.id]: true }));
   };
@@ -84,16 +94,16 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   const linkTaskToSubstep = (ssId, taskId) => {
     setM(prev => ({
       ...prev,
-      substeps: prev.substeps.map(s => s.id === ssId ? { ...s, linkedTaskId: taskId } : s)
+      substeps: prev.substeps.map(s => s.id === ssId ? { ...s, linkedTaskIds: [...new Set([...(s.linkedTaskIds||[]), taskId])] } : s)
     }));
     setTaskSearch(null);
     setSearchQ('');
   };
 
-  const unlinkSubstep = (ssId) => {
+  const unlinkFromSubstep = (ssId, taskId) => {
     setM(prev => ({
       ...prev,
-      substeps: prev.substeps.map(s => s.id === ssId ? { ...s, linkedTaskId: null } : s)
+      substeps: prev.substeps.map(s => s.id === ssId ? { ...s, linkedTaskIds: (s.linkedTaskIds||[]).filter(id => id !== taskId) } : s)
     }));
   };
 
@@ -272,9 +282,6 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
 
             <div style={{display:'flex',flexDirection:'column',gap:4}}>
               {m.substeps.map(ss => {
-                const mood = ss.linkedTaskId ? sel.gmood(S, S.tasks.find(t => t.id === ss.linkedTaskId)?.mood) : null;
-                const client = ss.linkedTaskId ? sel.gc(S, S.tasks.find(t => t.id === ss.linkedTaskId)?.clientId) : null;
-                const linkedTask = ss.linkedTaskId ? S.tasks.find(t => t.id === ss.linkedTaskId) : null;
                 return (
                   <div key={ss.id} className="ms-ss-card">
                     <div className="ms-ss-card-head" onClick={()=>setExpandedSS(prev=>({...prev,[ss.id]:!prev[ss.id]}))}>
@@ -282,7 +289,7 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
                         {ss.done ? '✓' : ''}
                       </div>
                       <span className={`ms-ss-title${ss.done?' done':''}`}>{ss.title || 'Untitled'}</span>
-                      {ss.linkedTaskId && <span className="ms-ss-linked">🔗 Task</span>}
+                      {ss.linkedTaskIds?.length > 0 && <span className="ms-ss-linked">🔗 {ss.linkedTaskIds.length} task{ss.linkedTaskIds.length > 1 ? 's' : ''}</span>}
                       <span className="ms-ss-expand">{expandedSS[ss.id] ? '▲' : '▼'}</span>
                     </div>
                     {expandedSS[ss.id] && (
@@ -290,41 +297,51 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
                         <input type="text" placeholder="Substep title" value={ss.title} onChange={e=>updateSubstepTitle(ss.id,e.target.value)} />
 
                         <div className="ms-ss-link-section">
-                          <label className="ms-ss-link-label">LINKED TASK</label>
-                          {ss.linkedTaskId && linkedTask ? (
-                            <div style={{
-                              display:'flex',alignItems:'center',gap:8,
-                              border:'1px solid var(--border)',
-                              borderLeft:`3px solid ${mood?.color||'var(--accent)'}`,
-                              borderRadius:'var(--r)',padding:'10px 12px',
-                              background:'var(--surface)',fontSize:12,
-                            }}>
-                              <span style={{fontSize:16,flexShrink:0}}>{mood?.icon||''}</span>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{linkedTask.name}</div>
-                                <div style={{display:'flex',alignItems:'center',gap:4,marginTop:2,flexWrap:'wrap'}}>
-                                  {client && <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:(client.color||'var(--s2)')+'22',color:client.color||'var(--t2)',fontWeight:600}}>{client.name}</span>}
-                                  {mood && <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:mood.bg,color:mood.color,fontWeight:600}}>{mood.icon} {mood.label}</span>}
-                                  <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--s2)',fontWeight:600,color:'var(--t2)'}}>{linkedTask.status}</span>
-                                  <span style={{fontSize:9,color:'var(--t3)',whiteSpace:'nowrap'}}>{linkedTask.date||''}</span>
-                                </div>
-                              </div>
-                              <div style={{display:'flex',gap:4,flexShrink:0}}>
-                                <button className="ms-ss-lp-action" title="Open task" onClick={()=>handleOpenTask(linkedTask.id)}>✎</button>
-                                <button className="ms-ss-lp-action" title="Unlink" onClick={()=>unlinkSubstep(ss.id)}>⊗</button>
-                              </div>
-                            </div>
-                          ) : ss.linkedTaskId && !linkedTask ? (
-                            <span style={{color:'var(--warn)',fontSize:12}}>Task not found</span>
-                          ) : (
-                            <div className="ms-ss-link-btns">
-                              <button onClick={()=>{setTaskSearch(ss.id);setSearchQ('');}}>🔍 Link existing task</button>
-                              <button onClick={()=>handleCreateAndLink(ss.id)}>+ Create new task</button>
+                          <label className="ms-ss-link-label">LINKED TASKS</label>
+
+                          {(ss.linkedTaskIds||[]).length > 0 && (
+                            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                              {(ss.linkedTaskIds||[]).map(taskId => {
+                                const lt = S.tasks.find(t => t.id === taskId);
+                                const tm = lt ? sel.gmood(S, lt.mood) : null;
+                                const tc = lt ? sel.gc(S, lt.clientId) : null;
+                                return lt ? (
+                                  <div key={taskId} style={{
+                                    display:'flex',alignItems:'center',gap:8,
+                                    border:'1px solid var(--border)',
+                                    borderLeft:`3px solid ${tm?.color||'var(--accent)'}`,
+                                    borderRadius:'var(--r)',padding:'10px 12px',
+                                    background:'var(--surface)',fontSize:12,
+                                  }}>
+                                    <span style={{fontSize:16,flexShrink:0}}>{tm?.icon||''}</span>
+                                    <div style={{flex:1,minWidth:0}}>
+                                      <div style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{lt.name}</div>
+                                      <div style={{display:'flex',alignItems:'center',gap:4,marginTop:2,flexWrap:'wrap'}}>
+                                        {tc && <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:(tc.color||'var(--s2)')+'22',color:tc.color||'var(--t2)',fontWeight:600}}>{tc.name}</span>}
+                                        {tm && <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:tm.bg,color:tm.color,fontWeight:600}}>{tm.icon} {tm.label}</span>}
+                                        <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--s2)',fontWeight:600,color:'var(--t2)'}}>{lt.status}</span>
+                                        <span style={{fontSize:9,color:'var(--t3)',whiteSpace:'nowrap'}}>{lt.date||''}</span>
+                                      </div>
+                                    </div>
+                                    <div style={{display:'flex',gap:4,flexShrink:0}}>
+                                      <button className="ms-ss-lp-action" title="Open task" onClick={()=>handleOpenTask(lt.id)}>✎</button>
+                                      <button className="ms-ss-lp-action" title="Unlink" onClick={()=>unlinkFromSubstep(ss.id, taskId)}>⊗</button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span key={taskId} style={{color:'var(--warn)',fontSize:12}}>Task not found (id: {taskId})</span>
+                                );
+                              })}
                             </div>
                           )}
+
+                          <div className="ms-ss-link-btns">
+                            <button onClick={()=>{setTaskSearch(ss.id);setSearchQ('');}}>🔍 Link existing task</button>
+                            <button onClick={()=>handleCreateAndLink(ss.id)}>+ Create new task</button>
+                          </div>
                         </div>
 
-                        {ss.linkedTaskId && (
+                        {(ss.linkedTaskIds||[]).length > 0 && (
                           <div className="ms-ss-ck-row">
                             <input type="checkbox" checked={ss.showOnDashboard} onChange={()=>toggleSSDashboard(ss.id)} />
                             <span>Show on Task Dashboard</span>
