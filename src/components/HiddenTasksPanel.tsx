@@ -53,18 +53,18 @@ export default function HiddenTasksPanel({ hiddenTasks, moods, onRestore, panelW
       <div className="lu-hidden-panel" style={{ width: panelWidth || 280 }}>
         <div className="lu-hidden-head">
           <span>Hidden</span>
-          <span style={{ background: 'var(--s2)', color: 'var(--t2)', padding: '1px 7px', borderRadius: 10, fontSize: 11 }}>
+          <span className="lu-hidden-count">
             {hiddenTasks.length}
           </span>
         </div>
         <div className="lu-hidden-body">
           {!hiddenTasks.length ? (
-            <div style={{ fontSize: 12, color: 'var(--t3)', padding: '12px 6px', textAlign: 'center' }}>No hidden tasks</div>
+            <div className="lu-hidden-empty">No hidden tasks</div>
           ) : hiddenTasks.map(t => {
             const mood = moods.find(m => m.id === t.mood);
             return (
               <div key={t.id} className="lu-hidden-card">
-                <span style={{ fontSize: 13 }}>{mood?.icon || '?'}</span>
+                <span className="lu-hidden-mood-icon">{mood?.icon || '?'}</span>
                 <span className="lu-title" style={{ flex: 1 }}>{t.name}</span>
                 <button className="lu-restore-btn" onClick={() => onRestore(t.id)} title="Bring back to line up">&#8630;</button>
               </div>

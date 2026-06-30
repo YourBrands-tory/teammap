@@ -3,19 +3,27 @@ import Modal from '../Modal';
 import { COLORS } from '../../lib/constants';
 
 interface Props {
-  client?: { id: string; name: string; industry?: string; color?: string } | null;
-  onSave: (id: string | null, name: string, industry: string, color: string) => void;
+  client?: { id: string; name: string; industry?: string; color?: string; serviceCategoryIds?: string[] } | null;
+  serviceCategories?: { id: string; label: string; color?: string }[];
+  onSave: (id: string | null, name: string, industry: string, color: string, serviceCategoryIds: string[]) => void;
   onClose: () => void;
 }
 
-export default function ClientModal({ client, onSave, onClose }: Props) {
+export default function ClientModal({ client, serviceCategories, onSave, onClose }: Props) {
   const [name, setName] = useState(client?.name || '');
   const [industry, setIndustry] = useState(client?.industry || '');
   const [color, setColor] = useState(client?.color || COLORS[Math.floor(Math.random() * COLORS.length)]);
+  const [selectedCats, setSelectedCats] = useState<string[]>(client?.serviceCategoryIds || []);
+
+  const toggleCat = (id: string) => {
+    setSelectedCats(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const save = () => {
     if (!name.trim()) return;
-    onSave(client?.id || null, name.trim(), industry.trim(), color);
+    onSave(client?.id || null, name.trim(), industry.trim(), color, selectedCats);
     onClose();
   };
 
@@ -29,6 +37,23 @@ export default function ClientModal({ client, onSave, onClose }: Props) {
       <label className="fl">Industry / type</label>
       <input type="text" placeholder="e.g. Finance" value={industry}
         onChange={e => setIndustry(e.target.value)} />
+
+      <label className="fl">Service categories</label>
+      <div className="tag-chip-pick" style={{ marginTop: 0 }}>
+        {(serviceCategories || []).map(sc => {
+          const on = selectedCats.includes(sc.id);
+          return (
+            <span key={sc.id} className={`tcp${on ? ' on' : ''}`}
+              style={on ? { background: sc.color || 'var(--accent)', borderColor: sc.color || 'var(--accent)' } : {}}
+              onClick={() => toggleCat(sc.id)}>
+              {sc.label}
+            </span>
+          );
+        })}
+        {(!serviceCategories || serviceCategories.length === 0) && (
+          <span style={{ fontSize: 11, color: 'var(--t3)' }}>No categories yet</span>
+        )}
+      </div>
 
       {!client && (
         <>

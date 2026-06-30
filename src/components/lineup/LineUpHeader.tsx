@@ -40,18 +40,17 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
   const pStatus = getPassStatus(S.task_statuses);
 
   const progressContent = (
-    <div className="lu-hdr-progress" style={{ flex: 1, minWidth: 80, maxWidth: 260 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--t3)', marginBottom: 2 }}>
+    <div className="lu-hdr-progress">
+      <div className="lu-hdr-progress-head">
         <span>Day progress</span>
         <span style={{ fontWeight: 700, color: prog.pct === 100 ? 'var(--accent)' : 'var(--t2)' }}>
           {prog.done}/{prog.total} &middot; {prog.pct}%
         </span>
       </div>
-      <div style={{ height: 6, background: 'var(--s3)', borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{
-          height: '100%', borderRadius: 3,
+      <div className="lu-hdr-progress-track">
+        <div className="lu-hdr-progress-fill" style={{
           background: prog.pct === 100 ? 'var(--accent)' : prog.pct > 60 ? 'var(--a2)' : 'var(--info)',
-          width: `${prog.pct}%`, transition: '.4s'
+          width: `${prog.pct}%`
         }} />
       </div>
     </div>
@@ -64,10 +63,10 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
         {/* ROW 1 — Navigation | Progress | Sort | Filters */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, width: '100%', flexWrap: 'nowrap' }}>
           {/* Navigation group */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <div className="lu-hdr-nav-group">
             <div className="lu-hdr-date-nav">
               <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => onShift(-1)}>&#8592;</button>
-              <input type="date" value={date} onChange={e => onShift(0, e.target.value)} style={{ width: 140, fontSize: 12 }} />
+              <input type="date" value={date} onChange={e => onShift(0, e.target.value)} className="lu-hdr-date-input" />
               <button className="btn btn-sm" style={{ padding: '4px 10px', fontSize: 15, fontWeight: 700 }} onClick={() => onShift(1)}>&#8594;</button>
             </div>
             <button className="btn btn-sm" onClick={onGoToday} style={{ fontWeight: 700 }}>Today</button>
@@ -79,28 +78,27 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
           </div>
 
           {/* Progress group */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-            <span style={{ fontSize: 12, color: 'var(--t2)', whiteSpace: 'nowrap' }}>{fmtD(date)}</span>
-            <div style={{ width: 140 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--t3)', marginBottom: 2 }}>
+          <div className="lu-hdr-progress-group">
+            <span className="lu-hdr-date-text">{fmtD(date)}</span>
+            <div className="lu-hdr-progress-wrap">
+              <div className="lu-hdr-progress-head">
                 <span style={{ fontWeight: 700, color: prog.pct === 100 ? 'var(--accent)' : 'var(--t2)' }}>
                   {prog.done}/{prog.total} &middot; {prog.pct}%
                 </span>
               </div>
-              <div style={{ height: 6, background: 'var(--s3)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{
-                  height: '100%', borderRadius: 3,
+              <div className="lu-hdr-progress-track">
+                <div className="lu-hdr-progress-fill" style={{
                   background: prog.pct === 100 ? 'var(--accent)' : prog.pct > 60 ? 'var(--a2)' : 'var(--info)',
-                  width: `${prog.pct}%`, transition: '.4s'
+                  width: `${prog.pct}%`
                 }} />
               </div>
             </div>
-            <span className="lu-time-chip" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>&#9201; {totalStr}</span>
+            <span className="lu-time-chip">&#9201; {totalStr}</span>
           </div>
 
           {/* Sort group */}
-          <div className="sort-group" style={{ flexShrink: 0 }}>
-            <span className="sort-label" style={{ fontSize: 11, color: 'var(--t3)' }}>Sort:</span>
+          <div className="sort-group">
+            <span className="lu-hdr-sort-label">Sort:</span>
             {sortModes.map(m => (
               <button key={m} className={`btn btn-xs${sortMode === m ? ' btn-p' : ''}`} onClick={() => onSetSortMode(m)}>
                 {m.charAt(0).toUpperCase() + m.slice(1)}
@@ -109,7 +107,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
           </div>
 
           {/* Filter group */}
-          <div className="filter-group" style={{ flex: 1, minWidth: 0 }}>
+          <div className="filter-group">
             {isManager && (
               <select className="fsel" value={filters.member} onChange={e => onSetFilter('member', e.target.value)}>
                 <option value="">All members</option>
@@ -144,7 +142,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
         </div>
 
         {/* ROW 2 — Review & Search */}
-        <div className="search-row" style={{ display: 'flex', gap: 12, alignItems: 'center', width: '100%' }}>
+        <div className="search-row">
           <button
             className={`btn btn-sm${filters.review ? ' btn-p' : ''}`}
             onClick={() => onSetFilter('review', !filters.review)}
@@ -158,7 +156,6 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
             placeholder="Search tasks..."
             value={filters.search}
             onChange={e => onSetFilter('search', e.target.value)}
-            style={{ flex: 1, minWidth: 300 }}
           />
         </div>
       </div>
@@ -177,7 +174,7 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
             <button className={`btn btn-xs${viewMode === 'priority' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('priority')}>Priority</button>
             <button className={`btn btn-xs${viewMode === 'compact' ? ' btn-p' : ''}`} onClick={() => onSetViewMode('compact')}>Compact</button>
           </div>
-          <span className="sort-label" style={{ fontSize: 11, color: 'var(--t3)', flexShrink: 0 }}>Sort:</span>
+          <span className="lu-hdr-sort-label">Sort:</span>
           {sortModes.map(m => (
             <button key={m} className={`btn btn-xs${sortMode === m ? ' btn-p' : ''}`} onClick={() => onSetSortMode(m)} style={{ flexShrink: 0 }}>
               {m.charAt(0).toUpperCase() + m.slice(1)}
@@ -187,12 +184,12 @@ export default function LineUpHeader({ date, prog, totalMins, sortMode, S, filte
         </div>
 
         <div className="lu-mob-info-row">
-          <span style={{ fontSize: 12, color: 'var(--t2)' }}>{fmtD(date)}</span>
+          <span className="lu-hdr-date-text">{fmtD(date)}</span>
         </div>
 
         <div className="lu-mob-progress-row">
           {progressContent}
-          <span className="lu-time-chip" style={{ fontSize: 12 }}>&#9201; {totalStr}</span>
+          <span className="lu-time-chip">&#9201; {totalStr}</span>
         </div>
 
         <div className="lu-mob-filter-row">

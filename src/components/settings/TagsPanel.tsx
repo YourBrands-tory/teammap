@@ -13,10 +13,12 @@ interface Props {
   onAdd: (label: string) => void;
   onEdit: (tag: Tag) => void;
   onDelete: (id: string) => void;
+  title?: string;
+  typeKey?: string;
 }
 
 export default function TagsPanel({
-  tags, stDrag, onDragStart, onDragEnd, onDrop, onAdd, onEdit, onDelete,
+  tags, stDrag, onDragStart, onDragEnd, onDrop, onAdd, onEdit, onDelete, title = 'Tags', typeKey = 'tag',
 }: Props) {
   const [newLabel, setNewLabel] = useState('');
 
@@ -29,16 +31,16 @@ export default function TagsPanel({
   return (
     <div className="st-panel">
       <div className="st-panel-head">
-        <h3>Tags</h3>
+        <h3>{title}</h3>
       </div>
-      <div className="st-panel-body" id="st-tags">
+      <div className="st-panel-body" id={`st-${typeKey}s`}>
         {(tags || []).map(tg => (
           <div key={tg.id} className="st-li" draggable
-            onDragStart={() => onDragStart(tg.id, 'tag')}
+            onDragStart={() => onDragStart(tg.id, typeKey)}
             onDragEnd={onDragEnd}
             onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLElement).classList.add('drag-over'); }}
             onDragLeave={e => (e.currentTarget as HTMLElement).classList.remove('drag-over')}
-            onDrop={e => { e.preventDefault(); (e.currentTarget as HTMLElement).classList.remove('drag-over'); onDrop('tag', tg.id); }}>
+            onDrop={e => { e.preventDefault(); (e.currentTarget as HTMLElement).classList.remove('drag-over'); onDrop(typeKey, tg.id); }}>
             <span className="st-drag">⋮⋮</span>
             <div style={{ width: 9, height: 9, borderRadius: '50%', background: tg.color || '#888', flexShrink: 0 }} />
             <span className="st-li-name">{tg.label}</span>
@@ -49,7 +51,7 @@ export default function TagsPanel({
           </div>
         ))}
         <div style={{ padding: '8px 12px', display: 'flex', gap: 6 }}>
-          <input type="text" placeholder="New tag + Enter" value={newLabel}
+          <input type="text" placeholder={`New ${title.toLowerCase()} + Enter`} value={newLabel}
             onChange={e => setNewLabel(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
             style={{ flex: 1, fontSize: 12, padding: '5px 9px' }} />

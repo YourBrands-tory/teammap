@@ -10,9 +10,16 @@ export default function ClientForm({ data, onClose }) {
   const [name, setName] = useState(data.name || '');
   const [industry, setIndustry] = useState(data.industry || '');
   const [color, setColor] = useState(data.color || COLORS[Math.floor(Math.random() * COLORS.length)]);
+  const [selectedCats, setSelectedCats] = useState(data.serviceCategoryIds || []);
   const inputRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const toggleCat = (id) => {
+    setSelectedCats(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   const save = async () => {
     const trimmed = name.trim();
@@ -21,6 +28,7 @@ export default function ClientForm({ data, onClose }) {
       ...data,
       name: trimmed,
       industry: industry.trim(),
+      serviceCategoryIds: selectedCats,
       ...(isEdit ? {} : { color, order: S.clients.length }),
     });
     onClose();
@@ -35,6 +43,23 @@ export default function ClientForm({ data, onClose }) {
 
       <label className="fl">Industry / type</label>
       <input type="text" placeholder="e.g. Finance" value={industry} onChange={e => setIndustry(e.target.value)} />
+
+      <label className="fl">Service categories</label>
+      <div className="tag-chip-pick" style={{ marginTop: 0 }}>
+        {(S.serviceCategories || []).map(sc => {
+          const on = selectedCats.includes(sc.id);
+          return (
+            <span key={sc.id} className={`tcp${on ? ' on' : ''}`}
+              style={on ? { background: sc.color || 'var(--accent)', borderColor: sc.color || 'var(--accent)' } : {}}
+              onClick={() => toggleCat(sc.id)}>
+              {sc.label}
+            </span>
+          );
+        })}
+        {(!S.serviceCategories || S.serviceCategories.length === 0) && (
+          <span style={{ fontSize: 11, color: 'var(--t3)' }}>No categories yet</span>
+        )}
+      </div>
 
       {!isEdit && (
         <>

@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect, useMemo, memo } from 'react';
+import { useState, useCallback, useEffect, useMemo, memo, useRef } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { useUIStore } from '../store/useUIStore';
-import { today, fmtD, taskTimeStr } from '../lib/constants';
+import { today, fmtD, taskTimeStr, getDeadlineClass, getDeadlineLabel } from '../lib/constants';
 import { getStatusMaps, getCompleteStatus, getStandUpStatus, getReviewStatus, getPassStatus } from '../utils/statusUtils';
 import { getNotesText } from '../utils/notesUtils';
 import Avatar from '../components/Avatar';
@@ -9,6 +9,7 @@ import TaskModal from '../components/TaskModal';
 import StatusPopup from '../components/StatusPopup';
 import CircProg from '../components/CircProg';
 import TaskSidePanel from '../components/TaskSidePanel';
+import MilestoneModal from '../components/MilestoneModal';
 
 const minsOf = (t) => (t.estH||0)*60 + (t.estM||0);
 const hm = (m) => m ? `${Math.floor(m/60)}h${m%60?' '+m%60+'m':''}` : null;
@@ -40,6 +41,7 @@ export default function TaskDashboard() {
   const setViewState = useUIStore(s => s.setViewState);
   const [dashDate, setDashDate] = useState(uiViewState.dashDate || today());
   const [modal, setModal] = useState(null);
+  const [msModal, setMsModal] = useState(null);
   const [stPop, setStPop] = useState(null);
   const [drawers, setDrawers] = useState(uiViewState.drawers || {});
   const [reviewFilter, setReviewFilter] = useState(uiViewState.reviewFilter || false);
@@ -54,9 +56,26 @@ export default function TaskDashboard() {
   }, [dashDate, drawers, expandedCards, reviewFilter, setViewState]);
 
   const openTask = useCallback((t) => setModal(t), []);
+  const openMs = useCallback((ms) => setMsModal(ms), []);
+  const closeMs = useCallback(() => setMsModal(null), []);
   const openStatus = useCallback((s) => setStPop(s), []);
   const closeModal = useCallback(() => setModal(null), []);
   const closeStatus = useCallback(() => setStPop(null), []);
+  const linkAfterCreateRef = useRef(null);
+
+  const handleCreateTaskForSubstep = useCallback((ssId, taskData, linkCallback) => {
+    linkAfterCreateRef.current = { ssId, linkCallback };
+    setModal(taskData);
+  }, []);
+
+  const handleTaskSave = useCallback((savedTask) => {
+    const pending = linkAfterCreateRef.current;
+    if (pending && savedTask?.id) {
+      pending.linkCallback(savedTask.id);
+      setModal(null);
+    }
+    linkAfterCreateRef.current = null;
+  }, []);
 
   const shift = (days) => {
     const d = new Date(dashDate+'T12:00:00'); d.setDate(d.getDate()+days);
@@ -132,7 +151,7 @@ export default function TaskDashboard() {
               <TeamCol key={m.id} member={m} date={dashDate} S={S}
                 reviewStatus={reviewStatus} reviewFilter={reviewFilter}
                 drawerOpen={!!drawers[m.id]} toggleDrawer={()=>setDrawers(d=>({...d,[m.id]:!d[m.id]}))}
-                onOpenTask={openTask} onStatus={openStatus} />
+                onOpenTask={openTask} onStatus={openStatus} onOpenMs={openMs} />
             ))}
           </div>
         </div>
@@ -195,7 +214,7 @@ export default function TaskDashboard() {
               member={mobileMember} date={dashDate} S={S}
               expandedCards={expandedCards}
               onToggleExpand={(id) => setExpandedCards(c => ({...c, [id]: !c[id]}))}
-              onOpenTask={openTask} onStatus={openStatus}
+              onOpenTask={openTask} onStatus={openStatus} onOpenMs={openMs}
             />
           )}
         </div>
@@ -274,19 +293,23 @@ export default function TaskDashboard() {
         </button>
       </div>
 
-      {modal && <TaskModal task={modal} onClose={closeModal} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
       {stPop && <StatusPopup taskId={stPop.taskId} anchorRect={stPop.rect} onClose={closeStatus} />}
+      {msModal && <MilestoneModal milestone={msModal.id ? msModal : null} onClose={closeMs} onOpenTask={openTask} onCreateTaskForSubstep={handleCreateTaskForSubstep} />}
+      {modal && <TaskModal task={modal} onClose={closeModal} onSave={handleTaskSave} onSaveAsTemplate={(d) => { useUIStore.getState().triggerSaveAsTemplate(d); }} />}
     </div>
   );
 }
 
 /* ── DESKTOP TEAM COL ── */
-const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFilter, drawerOpen, toggleDrawer, onOpenTask, onStatus }) {
+const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFilter, drawerOpen, toggleDrawer, onOpenTask, onStatus, onOpenMs }) {
   const completeStatus = getCompleteStatus(S.task_statuses);
   const passStatus = getPassStatus(S.task_statuses);
   const standUpStatus = getStandUpStatus(S.task_statuses);
   const allTasks = sel.tasksForMD(S, member.id, date);
   const stats = getMemberStats(S, member.id, date, completeStatus, passStatus, reviewStatus);
+
+  const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
+  const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.deadline || ms.deadline >= date));
   const baseVisible = allTasks.filter(t=>t.status!==completeStatus);
   const reviewVisible = reviewFilter ? baseVisible.filter(t=>t.status===reviewStatus) : baseVisible;
   const dailyCap = member.capacity ?? 6;
@@ -333,6 +356,36 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
       </div>
 
       <div className="tcolb">
+        {(() => {
+          const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
+          const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.deadline || ms.deadline >= date));
+          return msForMember.map(ms => {
+            const total = ms.substeps.length;
+            const done = ms.substeps.filter(s => s.done).length;
+            const pct = total ? Math.round(done/total*100) : 0;
+            const dlClass = getDeadlineClass(ms.deadline);
+            const dlLabel = getDeadlineLabel(ms.deadline);
+            const mood = ms.mood ? sel.gmood(S, ms.mood) : null;
+            const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
+            return (
+              <div key={ms.id} className="ms-dash-card" onClick={() => onOpenMs?.(ms)}>
+                <div className="ms-dash-head">
+                  <span className="ms-dash-badge">◆ MILESTONE</span>
+                  {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
+                </div>
+                <div className="ms-dash-title">{ms.title}</div>
+                  <div className="ms-dash-progress">
+                    <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${pct}%`}} /></div>
+                    <span className="ms-dash-pct">{done}/{total} · {pct}%</span>
+                  </div>
+                <div className="ms-dash-meta">
+                  {mood && <span className="ms-dash-chip" style={{background:mood.bg,color:mood.color}}>{mood.icon} {mood.label}</span>}
+                  {client && <span className="ms-dash-chip" style={{background:(client.color||'var(--s2)')+'22',color:client.color||'var(--t2)'}}>{client.name}</span>}
+                </div>
+              </div>
+            );
+          });
+        })()}
         {hiddenTasks.length > 0 && (
           <div className="hidden-drawer" style={{marginBottom:6}}>
             <button
@@ -506,7 +559,7 @@ const TCard = memo(function TCard({ task, member, moods, clients, tags, taskStat
 });
 
 /* ── MOBILE TEAM COL ── */
-const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCards, onToggleExpand, onOpenTask, onStatus }) {
+const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCards, onToggleExpand, onOpenTask, onStatus, onOpenMs }) {
   const completeStatus = getCompleteStatus(S.task_statuses);
   const standUpStatus = getStandUpStatus(S.task_statuses);
   const allTasks = sel.tasksForMD(S, member.id, date);
@@ -540,6 +593,36 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
 
   return (
     <div className="td-mob-col-inner">
+        {(() => {
+          const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
+          const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.deadline || ms.deadline >= date));
+          return msForMember.map(ms => {
+            const total = ms.substeps.length;
+            const done = ms.substeps.filter(s => s.done).length;
+            const pct = total ? Math.round(done/total*100) : 0;
+            const dlClass = getDeadlineClass(ms.deadline);
+            const dlLabel = getDeadlineLabel(ms.deadline);
+            const mood = ms.mood ? sel.gmood(S, ms.mood) : null;
+            const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
+            return (
+              <div key={ms.id} className="ms-dash-card" onClick={() => onOpenMs?.(ms)}>
+                <div className="ms-dash-head">
+                  <span className="ms-dash-badge">◆ MILESTONE</span>
+                  {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
+                </div>
+                <div className="ms-dash-title">{ms.title}</div>
+                  <div className="ms-dash-progress">
+                    <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${pct}%`}} /></div>
+                    <span className="ms-dash-pct">{done}/{total} · {pct}%</span>
+                  </div>
+                <div className="ms-dash-meta">
+                  {mood && <span className="ms-dash-chip" style={{background:mood.bg,color:mood.color}}>{mood.icon} {mood.label}</span>}
+                  {client && <span className="ms-dash-chip" style={{background:(client.color||'var(--s2)')+'22',color:client.color||'var(--t2)'}}>{client.name}</span>}
+                </div>
+              </div>
+            );
+          });
+        })()}
         {hiddenTasks.length > 0 && (
           <div className="hidden-drawer" style={{marginBottom:6}}>
             <button

@@ -23,6 +23,8 @@ export default function Settings() {
   const upsertClient = useStore(s => s.upsertClient);
   const setMoods = useStore(s => s.setMoods);
   const upsertTag = useStore(s => s.upsertTag);
+  const upsertServiceCategory = useStore(s => s.upsertServiceCategory);
+  const delServiceCategoryStore = useStore(s => s.delServiceCategory);
   const setStateKey = useStore(s => s.setStateKey);
   const setNavOrder = useStore(s => s.setNavOrder);
   const setNavLabels = useStore(s => s.setNavLabels);
@@ -31,9 +33,11 @@ export default function Settings() {
   const {
     stDrag, ftDragId, setStDrag, setFtDragId,
     delMember, delClient, toggleMoodVisibility,
-    delTag, delFreqTag,
+    delTag,
+    addServiceCategory, saveServiceCategory, delServiceCategory,
+    delFreqTag,
     addStatus, saveStatus, delStatus, reorderStatuses,
-    reorderMembers, reorderClientsFn, reorderMoods, reorderTags,
+    reorderMembers, reorderClientsFn, reorderMoods, reorderTags, reorderServiceCategories,
     reorderFreqTags, reorderNav, renameNav,
     resetNav, updateSettings, exportJSON,
   } = useSettings();
@@ -42,6 +46,7 @@ export default function Settings() {
   const [clientModal, setClientModal] = useState<any | null>(null);
   const [moodModal, setMoodModal] = useState<{ index: number; mood?: any } | null>(null);
   const [tagModal, setTagModal] = useState<any | null>(null);
+  const [serviceCategoryModal, setServiceCategoryModal] = useState<any | null>(null);
   const [freqModal, setFreqModal] = useState<any | null>(null);
   const [statusModal, setStatusModal] = useState<any | null>(null);
 
@@ -56,8 +61,9 @@ export default function Settings() {
     else if (type === 'client') reorderClientsFn(targetId);
     else if (type === 'mood') reorderMoods(targetId);
     else if (type === 'tag') reorderTags(targetId);
+    else if (type === 'serviceCategory') reorderServiceCategories(targetId);
     else if (type === 'status') reorderStatuses(targetId);
-  }, [reorderMembers, reorderClientsFn, reorderMoods, reorderTags, reorderStatuses]);
+  }, [reorderMembers, reorderClientsFn, reorderMoods, reorderTags, reorderServiceCategories, reorderStatuses]);
 
   const handleNavDrop = useCallback((targetId: string) => {
     const dragId = navDragRef.current;
@@ -129,6 +135,19 @@ export default function Settings() {
           onDelete={delTag}
         />
 
+        <TagsPanel
+          title="Service Categories"
+          typeKey="serviceCategory"
+          tags={S.serviceCategories}
+          stDrag={stDrag}
+          onDragStart={handleStDragStart}
+          onDragEnd={() => {}}
+          onDrop={handleStDrop}
+          onAdd={addServiceCategory}
+          onEdit={(sc) => setServiceCategoryModal(sc)}
+          onDelete={delServiceCategory}
+        />
+
         <FrequencyPanel
           freqTags={S.freqTags || []}
           ftDragId={ftDragId}
@@ -190,11 +209,12 @@ export default function Settings() {
       {clientModal && (
         <ClientModal
           client={clientModal._new ? null : clientModal}
-          onSave={async (id, name, industry, color) => {
+          serviceCategories={S.serviceCategories}
+          onSave={async (id, name, industry, color, serviceCategoryIds) => {
             if (id) {
-              await upsertClient({ id, name, industry });
+              await upsertClient({ id, name, industry, serviceCategoryIds: serviceCategoryIds || [] });
             } else {
-              await upsertClient({ name, industry, color, order: S.clients.length });
+              await upsertClient({ name, industry, color, order: S.clients.length, serviceCategoryIds: serviceCategoryIds || [] });
             }
           }}
           onClose={() => setClientModal(null)}
@@ -232,6 +252,19 @@ export default function Settings() {
             }
           }}
           onClose={() => setTagModal(null)}
+        />
+      )}
+
+      {serviceCategoryModal && (
+        <TagModal
+          tag={serviceCategoryModal}
+          onSave={async (id, label) => {
+            const existing = S.serviceCategories.find((t: any) => t.id === id);
+            if (existing) {
+              await upsertServiceCategory({ id, label, color: existing.color });
+            }
+          }}
+          onClose={() => setServiceCategoryModal(null)}
         />
       )}
 

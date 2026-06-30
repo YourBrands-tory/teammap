@@ -16,6 +16,8 @@ const TaskGen2 = lazy(() => import('./views/TaskGen2'));
 const LineUp = lazy(() => import('./views/LineUp'));
 const Playground = lazy(() => import('./views/Playground'));
 const DelegatedView = lazy(() => import('./views/DelegatedView'));
+const MilestonesView = lazy(() => import('./views/MilestonesView'));
+const SMCalendar = lazy(() => import('./views/SMCalendar'));
 
 const ALL_VIEWS = {
   tkd: TaskDashboard,
@@ -28,6 +30,7 @@ const ALL_VIEWS = {
   lu:  LineUp,
   pg:  Playground,
   dl:  DelegatedView,
+  sc:  SMCalendar,
 };
 
 function LoadingFallback() {

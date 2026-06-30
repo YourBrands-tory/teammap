@@ -19,13 +19,25 @@ export const DMOODS = [
   { id:'followup', label:'Follow Up', icon:'📞', color:'#1d4ed8', bg:'#dbeafe', desc:'Tasks needing follow-up', max:null, hidden:true, cardSize:'narrow' },
 ];
 
-export const NAV_ICONS = { tkd:'📊', tg2:'💡', lu:'📋', lv:'☷', tk:'☰', td:'▣', bl:'◯', pg:'◢', kb:'📌', st:'⚙', dl:'📤' };
+export const NAV_ICONS = { tkd:'📊', tg2:'💡', lu:'📋', lv:'☷', tk:'☰', ms:'◆', sc:'🗓️', td:'▣', bl:'◯', pg:'◢', kb:'📌', st:'⚙', dl:'📤' };
 
-export const DEFAULT_NAV_ORDER = ['tkd','tg2','lu','lv','tk','dl','td','bl','pg','st'];
+export const DEFAULT_NAV_ORDER = ['tkd','tg2','lu','lv','tk','ms','sc','dl','td','bl','pg','st'];
 export const DEFAULT_NAV_LABELS = {
   tkd:'Task Dashboard', tg2:'Task Gen 2.0', lu:'Line Up', lv:'List View',
-  tk:'Tasks & Milestones', dl:'Delegated', td:'Team Dashboard', bl:'Builder',
+  tk:'Tasks & Milestones', ms:'Milestones', sc:'SM Calendar', dl:'Delegated', td:'Team Dashboard', bl:'Builder',
   pg:'Playground', st:'Settings'
+};
+
+// ── SM Calendar pastel mood palette (separate from DMOODS colours) ─────────
+export const MOOD_PASTEL = {
+  top:        { bg:'#E6F1FB', text:'#0C447C' },
+  hero:       { bg:'#EAF3DE', text:'#27500A' },
+  imp:        { bg:'#FAEEDA', text:'#633806' },
+  creative:   { bg:'#FBEAF0', text:'#72243E' },
+  rapid:      { bg:'#E1F5EE', text:'#085041' },
+  share:      { bg:'#EEEDFE', text:'#26215C' },
+  secondhalf: { bg:'#FAECE7', text:'#4A1B0C' },
+  followup:   { bg:'#F1EFE8', text:'#2C2C2A' },
 };
 
 // ── pure helpers (ported) ───────────────────────────────────────────────────
@@ -36,7 +48,38 @@ export const ini = (n) => (n||'').split(' ').map(w=>w[0]).join('').toUpperCase()
 export const fmtTime = (h,m) => { if(!h&&!m) return ''; const p=[]; if(h)p.push(h+'h'); if(m)p.push(m+'m'); return p.join(' '); };
 export const taskTimeStr = (t) => fmtTime(t.estH||0, t.estM||0);
 
+export const DEFAULT_SERVICE_CATEGORIES = [
+  { id:'sc_perf',    label:'Performance', color:'#2d6a4f' },
+  { id:'sc_social',  label:'Social',      color:'#2196c4' },
+  { id:'sc_website', label:'Website',     color:'#7c3aed' },
+  { id:'sc_seo',     label:'SEO',         color:'#d97706' },
+  { id:'sc_other',   label:'Other',       color:'#e76f51' },
+];
+
 export const DEFAULT_TASK_STATUSES = ['Not Started','Stand Up','WIP','Complete','Pass'];
 
 export const STATUS_TEXT_COLORS = ['#a09d97','#e76f51','#2196c4','#2d6a4f','#7c3aed','#d97706','#be185d','#0f7c6c','#1d4ed8','#059669'];
 export const STATUS_BG_COLORS = ['#f2f0ec','#fde8e2','#e3f2fd','#d8f3dc','#ede9fe','#fef3c7','#fce7f3','#d1fae5','#dbeafe','#d1fae5'];
+
+// ── Deadline helpers ────────────────────────────────────────
+export const getDeadlineClass = (deadline) => {
+  if (!deadline) return 'normal';
+  const now = new Date(); now.setHours(0,0,0,0);
+  const d = new Date(deadline+'T00:00:00');
+  const diff = Math.round((d - now) / (1000*60*60*24));
+  if (diff < 0) return 'overdue';
+  if (diff === 0) return 'overdue';
+  if (diff <= 3) return 'soon';
+  if (diff <= 7) return 'ok';
+  return 'normal';
+};
+export const getDeadlineLabel = (deadline) => {
+  if (!deadline) return '';
+  const now = new Date(); now.setHours(0,0,0,0);
+  const d = new Date(deadline+'T00:00:00');
+  const diff = Math.round((d - now) / (1000*60*60*24));
+  if (diff < 0) return `Overdue by ${Math.abs(diff)}d`;
+  if (diff === 0) return 'Due today';
+  if (diff === 1) return 'Due tomorrow';
+  return `Deadline ${d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})}`;
+};

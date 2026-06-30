@@ -33,7 +33,7 @@ export default function CompactTaskCard({ task, mood, moodColor, moodBg, onOpen,
         </span>
       )}
       <div className="lu-mood-chip" style={{ background: moodBg }}>
-        <span style={{ fontSize: 14 }}>{mood?.icon || '?'}</span>
+        <span className="lu-mood-icon">{mood?.icon || '?'}</span>
       </div>
       <div className="lu-info">
         <div className="lu-title">{task.name}</div>

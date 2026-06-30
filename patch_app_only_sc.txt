@@ -1,0 +1,18 @@
+diff --git a/src/App.jsx b/src/App.jsx
+index 5ebf719..d657a00 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -16,6 +16,7 @@ const TaskGen2 = lazy(() => import('./views/TaskGen2'));
+ const LineUp = lazy(() => import('./views/LineUp'));
+ const Playground = lazy(() => import('./views/Playground'));
+ const DelegatedView = lazy(() => import('./views/DelegatedView'));
++const SMCalendar = lazy(() => import('./views/SMCalendar'));
+
+ const ALL_VIEWS = {
+   tkd: TaskDashboard,
+@@ -28,6 +29,7 @@ const ALL_VIEWS = {
+   lu:  LineUp,
+   pg:  Playground,
+   dl:  DelegatedView,
++  sc:  SMCalendar,
+ };

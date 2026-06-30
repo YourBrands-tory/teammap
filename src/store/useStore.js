@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useUIStore } from './useUIStore';
 import {
-  DMOODS, DEFAULT_NAV_ORDER, DEFAULT_NAV_LABELS, DEFAULT_TASK_STATUSES, uid,
+  DMOODS, DEFAULT_NAV_ORDER, DEFAULT_NAV_LABELS, DEFAULT_SERVICE_CATEGORIES, DEFAULT_TASK_STATUSES, uid,
 } from '../lib/constants';
 import { getCompleteStatus, getReviewStatus } from '../utils/statusUtils';
 import { validateTaskCreation } from '../utils/taskLimits';
@@ -52,24 +52,24 @@ const taskToRow = (t) => ({
 });
 const memberFromRow = (r) => ({ id:r.id, name:r.name, role:r.role, color:r.color, capacity:r.capacity ?? 6 });
 const memberToRow   = (m) => ({ id:m.id, name:m.name, role:m.role, color:m.color, capacity:m.capacity ?? 6 });
-const clientFromRow = (r) => ({ id:r.id, name:r.name, industry:r.industry||'', color:r.color, order:r.ord ?? 0 });
-const clientToRow   = (c) => ({ id:c.id, name:c.name, industry:c.industry||'', color:c.color, ord:c.order ?? 0 });
+const clientFromRow = (r) => ({ id:r.id, name:r.name, industry:r.industry||'', color:r.color, order:r.ord ?? 0, serviceCategoryIds:r.service_category_ids||[] });
+const clientToRow   = (c) => ({ id:c.id, name:c.name, industry:c.industry||'', color:c.color, ord:c.order ?? 0, service_category_ids:c.serviceCategoryIds||[] });
 const linkFromRow   = (r) => ({ id:r.id, memberId:r.member_id, clientId:r.client_id, roles:r.roles||[] });
 const linkToRow     = (l) => ({ id:l.id, member_id:l.memberId, client_id:l.clientId, roles:l.roles||[] });
-const msFromRow     = (r) => ({ id:r.id, name:r.name, description:r.description||'', assignedTo:r.assigned_to||[], color:r.color, createdAt:Number(r.created_at)||Date.now() });
-const msToRow       = (m) => ({ id:m.id, name:m.name, description:m.description||'', assigned_to:m.assignedTo||[], color:m.color, created_at:m.createdAt||Date.now() });
+const msFromRow     = (r) => ({ id:r.id, title:r.title||r.name||'', mood:r.mood||r.color||'', assignedTo:r.assigned_to||[], clientId:r.client_id||'', date:r.date||'', deadline:r.deadline||'', substeps:r.substeps||[], displayMode:r.display_mode||'daily', displayDays:r.display_days||[], deleted:!!r.deleted, createdAt:Number(r.created_at)||Date.now(), updatedAt:Number(r.updated_at)||Date.now() });
+const msToRow       = (m) => ({ id:m.id, name:m.title||m.name||'', title:m.title||'', mood:m.mood||'', assigned_to:m.assignedTo||[], client_id:m.clientId||null, date:m.date||'', deadline:m.deadline||null, substeps:m.substeps||[], display_mode:m.displayMode||'daily', display_days:m.displayDays||[], deleted:!!m.deleted, description:m.description||'', color:m.mood||m.color||'', created_at:m.createdAt||Date.now(), updated_at:m.updatedAt||Date.now() });
 const tagFromRow    = (r) => ({ id:r.id, label:r.label, color:r.color });
 const tagToRow      = (t) => ({ id:t.id, label:t.label, color:t.color });
 
 const SESSION_KEY = 'tm-session';
-const STATE_KEYS = ['settings','moods','navOrder','navLabels','freqTags','templates','playground','tg2Views','lineUpOrder','lineUpHidden','task_statuses'];
+const STATE_KEYS = ['settings','moods','navOrder','navLabels','freqTags','templates','playground','tg2Views','lineUpOrder','lineUpHidden','task_statuses','serviceCategories'];
 
 const EMPTY_S = {
   members:[], clients:[], links:[], tasks:[], milestones:[], tags:[],
   moods: JSON.parse(JSON.stringify(DMOODS)),
   settings:{ maxCap:6, weekends:false, spMember:null },
   navOrder:[...DEFAULT_NAV_ORDER], navLabels:{...DEFAULT_NAV_LABELS},
-  freqTags:[], task_statuses:[], templates:[], playground:{ tabs:[{ id:'pg1', name:'Sheet 1', data:{} }] },
+  serviceCategories:[], freqTags:[], task_statuses:[], templates:[], playground:{ tabs:[{ id:'pg1', name:'Sheet 1', data:{} }] },
   tg2Views:[], lineUpOrder:{}, lineUpHidden:{},
 };
 
@@ -211,6 +211,9 @@ export const useStore = create((set, get) => ({
       supabase.from('tasks').select('*'),
       supabase.from('milestones').select('*'),
     ]);
+    const [svcCats] = await Promise.all([
+      supabase.from('service_categories').select('*'),
+    ]);
     const [st] = await Promise.all([
       supabase.from('app_state').select('*'),
     ]);
@@ -223,6 +226,8 @@ export const useStore = create((set, get) => ({
       console.log('[loadAll] sample links:', sample.links);
     }
 
+
+
     const S = JSON.parse(JSON.stringify(EMPTY_S));
     S.members    = (members.data||[]).map(memberFromRow);
     S.clients    = (clients.data||[]).map(clientFromRow);
@@ -230,8 +235,55 @@ export const useStore = create((set, get) => ({
     S.tasks      = (tasks.data||[]).map(taskFromRow);
     S.milestones = (milestones.data||[]).map(msFromRow);
     S.tags       = (tags.data||[]).map(tagFromRow);
+    S.serviceCategories = (svcCats.data||[]).map(tagFromRow);
+
+    // ── Seed service categories if empty ──
+    if (!S.serviceCategories.length) {
+      S.serviceCategories = JSON.parse(JSON.stringify(DEFAULT_SERVICE_CATEGORIES));
+      for (const sc of S.serviceCategories) {
+        supabase.from('service_categories').upsert(sc).then();
+      }
+    }
+
+    // ── Seed "SM Calendar" tag if missing ──
+    if (!S.tags.find(t => t.label === 'SM Calendar')) {
+      const smTag = { id: uid(), label: 'SM Calendar', color: '#7c3aed' };
+      S.tags = [...S.tags, smTag];
+      supabase.from('tags').upsert({ id: smTag.id, label: smTag.label, color: smTag.color }).then();
+    }
+
     let hasAppStateMoods = false;
     (st.data||[]).forEach(r => { if (STATE_KEYS.includes(r.key)) { S[r.key] = r.value; if (r.key === 'moods') hasAppStateMoods = true; } });
+
+    // ── Ensure 'ms' (Milestones) exists in saved navOrder for existing users ──
+    if (S.navOrder && !S.navOrder.includes('ms')) {
+      const tkIdx = S.navOrder.indexOf('tk');
+      if (tkIdx >= 0) {
+        S.navOrder = [...S.navOrder.slice(0, tkIdx + 1), 'ms', ...S.navOrder.slice(tkIdx + 1)];
+      } else {
+        S.navOrder = [...S.navOrder, 'ms'];
+      }
+      supabase.from('app_state').upsert({ key: 'navOrder', value: S.navOrder }).then();
+    }
+    if (S.navLabels && !S.navLabels.ms) {
+      S.navLabels = { ...S.navLabels, ms: 'Milestones' };
+      supabase.from('app_state').upsert({ key: 'navLabels', value: S.navLabels }).then();
+    }
+
+    // ── Ensure 'sc' (SM Calendar) exists in saved navOrder for existing users ──
+    if (S.navOrder && !S.navOrder.includes('sc')) {
+      const msIdx = S.navOrder.indexOf('ms');
+      if (msIdx >= 0) {
+        S.navOrder = [...S.navOrder.slice(0, msIdx + 1), 'sc', ...S.navOrder.slice(msIdx + 1)];
+      } else {
+        S.navOrder = [...S.navOrder, 'sc'];
+      }
+      supabase.from('app_state').upsert({ key: 'navOrder', value: S.navOrder }).then();
+    }
+    if (S.navLabels && !S.navLabels.sc) {
+      S.navLabels = { ...S.navLabels, sc: 'SM Calendar' };
+      supabase.from('app_state').upsert({ key: 'navLabels', value: S.navLabels }).then();
+    }
 
     const subtaskCount = S.tasks.reduce((a, t) => a + (t.subtasks?.length || 0), 0);
     const linkCount = S.tasks.reduce((a, t) => a + (t.links?.length || 0), 0);
@@ -648,15 +700,51 @@ export const useStore = create((set, get) => ({
 
   // ── MILESTONES ────────────────────────────────────────────────────────────
   upsertMilestone: async (m) => {
-    if (!m.id) m={ assignedTo:[], description:'', ...m, id:uid(), createdAt:Date.now() };
-    get()._patchS((S)=>{ const i=S.milestones.findIndex(x=>x.id===m.id);
-      S.milestones = i>=0 ? S.milestones.map(x=>x.id===m.id?m:x) : [...S.milestones,m]; });
-    await supabase.from('milestones').upsert(msToRow(m));
+    const now = Date.now();
+    const existing = get().S.milestones.find(x => x.id === m.id);
+    const isNew = !m.id;
+    if (isNew) {
+      m = { substeps:[], displayMode:'daily', displayDays:[], deleted:false, ...m, id:uid(), createdAt:now, updatedAt:now };
+    } else {
+      m = { ...(existing||{}), ...m, updatedAt:now };
+    }
+    get()._patchS((S)=>{
+      const i=S.milestones.findIndex(x=>x.id===m.id);
+      S.milestones = i>=0 ? S.milestones.map(x=>x.id===m.id?m:x) : [...S.milestones,m];
+    });
+    const row = msToRow(m);
+    console.log('[upsertMilestone] table=milestones op='+(isNew?'insert':'update')+' id='+m.id+' title='+m.title);
+    console.log('[upsertMilestone] payload:', JSON.stringify(row, null, 2));
+    let { error } = await supabase.from('milestones').upsert(row).select();
+    if (error && (error.code === '42703' || /column .+ does not exist/i.test(error.message))) {
+      console.warn('[upsertMilestone] new-schema columns missing, falling back to old schema');
+      const oldRow = { id:m.id, name:m.title||m.name||'', description:m.description||'', assigned_to:m.assignedTo||[], color:m.mood||m.color||'', created_at:m.createdAt||Date.now() };
+      console.log('[upsertMilestone] fallback payload:', JSON.stringify(oldRow, null, 2));
+      const fb = await supabase.from('milestones').upsert(oldRow).select();
+      error = fb.error;
+      if (fb.error) {
+        console.error('[upsertMilestone] fallback error.code:', fb.error.code);
+        console.error('[upsertMilestone] fallback error.message:', fb.error.message);
+        console.error('[upsertMilestone] fallback error.details:', fb.error.details);
+      } else {
+        console.log('[upsertMilestone] saved with old schema (title/substeps not persisted until migration runs)');
+      }
+    } else if (error) {
+      console.error('[upsertMilestone] error.code:', error.code);
+      console.error('[upsertMilestone] error.message:', error.message);
+      console.error('[upsertMilestone] error.details:', error.details);
+      console.error('[upsertMilestone] error.hint:', error.hint);
+    }
     return m;
   },
   delMilestone: async (id) => {
-    get()._patchS((S)=>{ S.milestones=S.milestones.filter(x=>x.id!==id); });
-    await supabase.from('milestones').delete().eq('id', id);
+    const now = Date.now();
+    get()._patchS((S)=>{ S.milestones=S.milestones.map(x=>x.id===id?{...x,deleted:true,updatedAt:now}:x); });
+    const { error } = await supabase.from('milestones').update({ deleted:true, updated_at:now }).eq('id', id);
+    if (error && (error.code === '42703' || /column .+ does not exist/i.test(error.message))) {
+      console.warn('[delMilestone] new-schema columns missing, using hard delete');
+      await supabase.from('milestones').delete().eq('id', id);
+    }
   },
 
   // ── TAGS ──────────────────────────────────────────────────────────────────
@@ -670,6 +758,19 @@ export const useStore = create((set, get) => ({
   delTag: async (id) => {
     get()._patchS((S)=>{ S.tags=S.tags.filter(x=>x.id!==id); });
     await supabase.from('tags').delete().eq('id', id);
+  },
+
+  // ── SERVICE CATEGORIES ───────────────────────────────────────────────────
+  upsertServiceCategory: async (sc) => {
+    if (!sc.id) sc={ ...sc, id:uid() };
+    get()._patchS((S)=>{ const i=S.serviceCategories.findIndex(x=>x.id===sc.id);
+      S.serviceCategories = i>=0 ? S.serviceCategories.map(x=>x.id===sc.id?sc:x) : [...S.serviceCategories,sc]; });
+    await supabase.from('service_categories').upsert(tagToRow(sc));
+    return sc;
+  },
+  delServiceCategory: async (id) => {
+    get()._patchS((S)=>{ S.serviceCategories=S.serviceCategories.filter(x=>x.id!==id); });
+    await supabase.from('service_categories').delete().eq('id', id);
   },
 
   // ── CONFIG SINGLETONS (app_state) ─────────────────────────────────────────
@@ -712,6 +813,7 @@ export const useStore = create((set, get) => ({
       S.moods = S.moods.map(m => ({ ...m, hidden: m.hidden !== undefined ? m.hidden : (m.visible !== undefined ? !m.visible : false) }));
     }
     if (!S.tags) S.tags = [];
+    if (!S.serviceCategories) S.serviceCategories = JSON.parse(JSON.stringify(DEFAULT_SERVICE_CATEGORIES));
     if (!S.settings) S.settings = { maxCap:6, weekends:false, spMember:S.members?.[0]?.id||null };
 
     const chunks = [
@@ -720,6 +822,7 @@ export const useStore = create((set, get) => ({
       supabase.from('links').upsert((S.links||[]).map(linkToRow)),
       supabase.from('milestones').upsert((S.milestones||[]).map(msToRow)),
       supabase.from('tags').upsert((S.tags||[]).map(tagToRow)),
+      supabase.from('service_categories').upsert((S.serviceCategories||[]).map(tagToRow)),
       ...(S.tasks?.length ? [supabase.from('tasks').upsert(S.tasks.map(taskToRow))] : []),
       ...STATE_KEYS.map(k => supabase.from('app_state').upsert({ key:k, value:S[k] })),
     ];

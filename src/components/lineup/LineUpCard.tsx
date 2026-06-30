@@ -95,7 +95,7 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
         </span>
       )}
       <div className="lu-mood-chip" style={{ background: moodBg }}>
-        <span style={{ fontSize: isBig ? 26 : isNarrow ? 14 : 20 }}>{mood?.icon || '?'}</span>
+        <span className="lu-mood-icon">{mood?.icon || '?'}</span>
         {!isNarrow && <span className="lu-mood-name" style={{ color: moodColor }}>{mood?.label || ''}</span>}
       </div>
       <div className="lu-info">
@@ -119,13 +119,10 @@ export default function LineUpCard({ task, S, onOpen, onStatusChange, onHide, on
           </div>
         )}
         {!compact && isBig && getNotesText(task.notes) && (
-          <div style={{
-            fontSize: 12, color: 'var(--t2)', marginTop: 4, lineHeight: 1.5,
-            overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', opacity: 0.7
-          }}>{getNotesText(task.notes)}</div>
+          <div className="lu-notes-preview">{getNotesText(task.notes)}</div>
         )}
         {!compact && !isNarrow && (hasLinks || hasSubtasks) && (
-          <div className="card-icon-row" style={{ marginTop: 4, gap: 4 }}>
+          <div className="card-icon-row lu-card-icon-row">
             {hasLinks && (
               <span className="card-icon-pill link-pill" aria-label={`${task.links!.length} link(s)`}
                 onClick={e => { e.stopPropagation(); setLinkPop(p => !p); }}>

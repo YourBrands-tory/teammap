@@ -169,8 +169,8 @@ export default function MemberLineUp() {
       {(() => {
         const capColor = dailyActiveCount > dailyLimit ? '#e76f51' : dailyActiveCount === dailyLimit ? '#d97706' : 'var(--t2)';
         return (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 16px', fontSize: 12, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-            <span style={{ color: 'var(--t3)' }}>Your daily limit:</span>
+          <div className="lu-daily-limit">
+            <span className="lu-daily-limit-label">Your daily limit:</span>
             <span style={{ fontWeight: 700, color: capColor }}>{dailyActiveCount}/{dailyLimit}</span>
           </div>
         );
@@ -179,9 +179,9 @@ export default function MemberLineUp() {
       <div className="lu-body">
         <div className="lu-main">
           {!activeTasks.length ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 8, color: 'var(--t3)' }}>
-              <div style={{ fontSize: 36 }}>&#128203;</div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--t2)' }}>No tasks for this date</p>
+            <div className="lu-empty-state">
+              <div className="lu-empty-icon">&#128203;</div>
+              <p className="lu-empty-text">No tasks for this date</p>
             </div>
           ) : (
             activeTasks.map(task => (
@@ -217,12 +217,12 @@ export default function MemberLineUp() {
             </div>
             <div className="lu-mobile-drawer-content">
               {!myHiddenTasks.length ? (
-                <div style={{ fontSize: 12, color: 'var(--t3)', padding: '12px 6px', textAlign: 'center' }}>No hidden tasks</div>
+                <div className="lu-hidden-empty">No hidden tasks</div>
               ) : myHiddenTasks.map(t => {
                 const mood = S.moods.find(m => m.id === t.mood);
                 return (
                   <div key={t.id} className="lu-hidden-card">
-                    <span style={{ fontSize: 13 }}>{mood?.icon || '?'}</span>
+                    <span className="lu-hidden-mood-icon">{mood?.icon || '?'}</span>
                     <span className="lu-title" style={{ flex: 1 }}>{t.name}</span>
                     <button className="lu-restore-btn" onClick={() => { restoreTask(t.id); setMobileHiddenOpen(false); }} title="Bring back to line up">&#8630;</button>
                   </div>

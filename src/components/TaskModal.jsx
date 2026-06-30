@@ -169,6 +169,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
         const saved = await upsertTask(payload);
         if (!currentId) {
           taskIdRef.current = saved.id;
+          if (onSave) onSave(saved);
         }
         retryCount.current = 0;
         lastSnapshot.current = snapshot;

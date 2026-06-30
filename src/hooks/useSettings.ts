@@ -13,6 +13,8 @@ export default function useSettings() {
   const setMoods = useStore(s => s.setMoods);
   const upsertTag = useStore(s => s.upsertTag);
   const delTagStore = useStore(s => s.delTag);
+  const upsertServiceCategory = useStore(s => s.upsertServiceCategory);
+  const delServiceCategoryStore = useStore(s => s.delServiceCategory);
   const setStateKey = useStore(s => s.setStateKey);
   const setNavOrder = useStore(s => s.setNavOrder);
   const setNavLabels = useStore(s => s.setNavLabels);
@@ -100,6 +102,25 @@ export default function useSettings() {
     if (!confirm('Remove this tag?')) return;
     await delTagStore(id);
   }, [delTagStore]);
+
+  // Service Categories
+  const addServiceCategory = useCallback(async (label: string) => {
+    if (!label.trim()) return;
+    if (S.serviceCategories.find((t: any) => t.label.toLowerCase() === label.toLowerCase())) return;
+    await upsertServiceCategory({ label: label.trim(), color: COLORS[S.serviceCategories.length % COLORS.length] });
+  }, [S.serviceCategories, upsertServiceCategory]);
+
+  const saveServiceCategory = useCallback(async (id: string, label: string) => {
+    const existing = S.serviceCategories.find((t: any) => t.id === id);
+    if (existing) {
+      await upsertServiceCategory({ id, label: label.trim() || existing.label, color: existing.color });
+    }
+  }, [S.serviceCategories, upsertServiceCategory]);
+
+  const delServiceCategory = useCallback(async (id: string) => {
+    if (!confirm('Remove this service category?')) return;
+    await delServiceCategoryStore(id);
+  }, [delServiceCategoryStore]);
 
   // Frequency tags
   const addFreqTag = useCallback(async (label: string) => {
@@ -214,6 +235,15 @@ export default function useSettings() {
     setStDrag({ id: null, type: null });
   }, [stDrag, S.tags, upsertTag]);
 
+  const reorderServiceCategories = useCallback(async (targetId: string) => {
+    if (!stDrag.id || stDrag.id === targetId || stDrag.type !== 'serviceCategory') return;
+    const arr = reorderArray(S.serviceCategories, stDrag.id, targetId);
+    for (const sc of arr) {
+      await upsertServiceCategory(sc);
+    }
+    setStDrag({ id: null, type: null });
+  }, [stDrag, S.serviceCategories, upsertServiceCategory]);
+
   const reorderFreqTags = useCallback(async (targetId: string) => {
     if (!ftDragId || ftDragId === targetId) return;
     const fl = [...(S.freqTags || [])].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
@@ -252,9 +282,10 @@ export default function useSettings() {
     saveClient, delClient,
     saveMood, toggleMoodVisibility,
     addTag, saveTag, delTag,
+    addServiceCategory, saveServiceCategory, delServiceCategory,
     addFreqTag, saveFreqTag, delFreqTag,
     addStatus, saveStatus, delStatus, reorderStatuses,
-    reorderMembers, reorderClientsFn, reorderMoods, reorderTags, reorderFreqTags, reorderNav, renameNav,
+    reorderMembers, reorderClientsFn, reorderMoods, reorderTags, reorderServiceCategories, reorderFreqTags, reorderNav, renameNav,
     resetNav, updateSettings, exportJSON, importJSON,
   };
 }
