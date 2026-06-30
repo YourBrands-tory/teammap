@@ -329,7 +329,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   const stats = getMemberStats(S, member.id, date, completeStatus, passStatus, reviewStatus);
 
   const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
-  const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.deadline || ms.deadline >= date));
+  const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.date || date >= ms.date) && (!ms.deadline || ms.deadline >= date));
   const baseVisible = allTasks.filter(t=>t.status!==completeStatus);
   const reviewVisible = reviewFilter ? baseVisible.filter(t=>t.status===reviewStatus) : baseVisible;
   const dailyCap = member.capacity ?? 6;
@@ -378,7 +378,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
       <div className="tcolb">
         {(() => {
           const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
-          const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.deadline || ms.deadline >= date));
+          const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.date || date >= ms.date) && (!ms.deadline || ms.deadline >= date));
           return msForMember.map(ms => {
             const total = ms.substeps.length;
             const done = ms.substeps.filter(s => s.done).length;
@@ -615,7 +615,7 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
     <div className="td-mob-col-inner">
         {(() => {
           const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
-          const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.deadline || ms.deadline >= date));
+          const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.date || date >= ms.date) && (!ms.deadline || ms.deadline >= date));
           return msForMember.map(ms => {
             const total = ms.substeps.length;
             const done = ms.substeps.filter(s => s.done).length;
