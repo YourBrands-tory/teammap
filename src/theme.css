@@ -796,6 +796,32 @@ td:hover .pg-cell-actions{display:flex}
 .st-li-name{flex:1;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .st-li-sub{font-size:11px;color:var(--t3);margin-left:4px}
 .st-li-actions{display:flex;gap:4px;flex-shrink:0}
+.st-panel-body-dnd{padding:0}
+
+/* ── SETTINGS MEMBER EXPAND/COLLAPSE ──────────────────────── */
+.st-li-w{border-bottom:1px solid var(--border)}
+.st-li-w:last-child{border-bottom:none}
+.st-li-h{cursor:pointer;user-select:none;border-bottom:none!important}
+.st-li-h:hover{background:var(--s2)}
+.st-li-h.open{border-bottom:none!important}
+.st-arrow{font-size:10px;color:var(--t3);transition:transform .22s ease;margin-left:auto;flex-shrink:0}
+.st-arrow.open{transform:rotate(180deg)}
+.st-li-body{max-height:0;opacity:0;overflow:hidden;transition:max-height .22s ease,opacity .18s ease,padding .2s ease;padding:0 12px}
+.st-li-body.open{max-height:300px;opacity:1;padding:2px 12px 10px}
+.st-li-body-in{display:flex;flex-direction:column;gap:6px}
+.st-li-field{display:flex;align-items:center;gap:8px;font-size:12px}
+.st-li-label{color:var(--t3);min-width:70px;flex-shrink:0;font-size:11px;font-weight:600}
+.st-li-input{flex:1;padding:4px 8px;border:1px solid var(--border);border-radius:var(--r);font-size:12px;background:var(--bg);color:var(--t1);outline:none;transition:border-color .15s}
+.st-li-input:focus{border-color:var(--accent)}
+.st-li-num{max-width:60px}
+.st-li-cpick{display:flex;gap:4px;flex-wrap:wrap}
+.st-li-csw{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:border-color .15s;flex-shrink:0}
+.st-li-csw:hover{border-color:var(--t2)}
+.st-li-csw.sel{border-color:var(--t1)}
+
+/* ── SETTINGS DRAG OVERLAY ─────────────────────────────────── */
+.st-li-overlay{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl2);padding:8px 14px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.15);cursor:grabbing;display:flex;align-items:center;gap:8px;width:260px}
+.st-li-dragging{opacity:0.25!important}
 
 /* ── LINE UP DESKTOP / MOBILE WRAPPERS ───────────────────── */
 .lu-desk-wrap{display:contents}
@@ -1201,6 +1227,11 @@ td:hover .pg-cell-actions{display:flex}
   .st-li-actions .btn{min-height:32px}
   .st-panel-head{padding:10px 14px}
   .st-panel-body{padding:4px 0}
+  .st-panel-body-dnd{padding:0}
+  .st-li-h{min-height:44px}
+  .st-li-body.open{padding:4px 14px 12px}
+  .st-li-input{font-size:14px}
+  .st-li-csw{width:26px;height:26px}
 
   /* Tasks & Milestones */
   .tm-desk-tabs{display:none!important}

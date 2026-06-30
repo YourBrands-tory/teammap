@@ -62,7 +62,7 @@ const tagFromRow    = (r) => ({ id:r.id, label:r.label, color:r.color });
 const tagToRow      = (t) => ({ id:t.id, label:t.label, color:t.color });
 
 const SESSION_KEY = 'tm-session';
-const STATE_KEYS = ['settings','moods','navOrder','navLabels','freqTags','templates','playground','tg2Views','lineUpOrder','lineUpHidden','task_statuses','serviceCategories'];
+const STATE_KEYS = ['settings','moods','navOrder','navLabels','freqTags','templates','playground','tg2Views','lineUpOrder','lineUpHidden','task_statuses','serviceCategories','memberOrder'];
 
 const EMPTY_S = {
   members:[], clients:[], links:[], tasks:[], milestones:[], tags:[],
@@ -70,7 +70,7 @@ const EMPTY_S = {
   settings:{ maxCap:6, weekends:false, spMember:null },
   navOrder:[...DEFAULT_NAV_ORDER], navLabels:{...DEFAULT_NAV_LABELS},
   serviceCategories:[], freqTags:[], task_statuses:[], templates:[], playground:{ tabs:[{ id:'pg1', name:'Sheet 1', data:{} }] },
-  tg2Views:[], lineUpOrder:{}, lineUpHidden:{},
+  tg2Views:[], lineUpOrder:{}, lineUpHidden:{}, memberOrder:[],
 };
 
 export const useStore = create((set, get) => ({
@@ -254,6 +254,12 @@ export const useStore = create((set, get) => ({
 
     let hasAppStateMoods = false;
     (st.data||[]).forEach(r => { if (STATE_KEYS.includes(r.key)) { S[r.key] = r.value; if (r.key === 'moods') hasAppStateMoods = true; } });
+
+    // ── Sort members by saved memberOrder ──
+    if (S.memberOrder && S.memberOrder.length) {
+      const orderIdx = new Map(S.memberOrder.map((id, i) => [id, i]));
+      S.members.sort((a, b) => (orderIdx.get(a.id) ?? Infinity) - (orderIdx.get(b.id) ?? Infinity));
+    }
 
     // ── Ensure 'ms' (Milestones) exists in saved navOrder for existing users ──
     if (S.navOrder && !S.navOrder.includes('ms')) {

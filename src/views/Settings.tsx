@@ -90,13 +90,10 @@ export default function Settings() {
       <div className="st-grid">
         <MembersPanel
           members={S.members}
-          stDrag={stDrag}
-          onDragStart={handleStDragStart}
-          onDragEnd={() => {}}
-          onDrop={handleStDrop}
           onEdit={(m) => setMemberModal(m)}
           onDelete={delMember}
           onAdd={() => setMemberModal({ _new: true })}
+          upsertMember={upsertMember}
         />
 
         <ClientsPanel
