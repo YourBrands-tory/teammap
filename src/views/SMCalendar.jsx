@@ -301,12 +301,25 @@ export default function SMCalendar() {
               <div className="smc-side-empty">No tasks today</div>
             )}
             {todayTasks.map(t => {
+              const p = moodPastel(t.mood);
+              const moodColor = p?.text || 'var(--t3)';
+              const theMood = t.mood ? S.moods.find(x => x.id === t.mood) : null;
               const client = t.clientId ? sel.gc(S, t.clientId) : null;
               const hasTime = t.estH || t.estM;
               const timeLabel = hasTime ? `${t.estH || 0}h${t.estM ? ` ${t.estM}m` : ''}` : 'No fixed time';
+              const hasLinks = t.links?.length > 0;
+              const hasSubtasks = t.subtasks?.length > 0;
+              const subTotal = t.subtasks?.length || 0;
+              const subDone = t.subtasks?.filter(s => s.done).length || 0;
+              const hasNotes = getNotesText(t.notes).length > 0;
+              const CIRC = 2 * Math.PI * 13;
+              const hasIcons = hasLinks || hasSubtasks || hasNotes;
               return (
-                <div key={t.id} className="smc-today-card" onClick={() => openTask(t)}>
-                  <div className="smc-today-time">{timeLabel}</div>
+                <div key={t.id} className="smc-today-card" style={{borderLeft:`3px solid ${moodColor}`}} onClick={() => openTask(t)}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:3}}>
+                    {theMood && <span className="mood-tag" style={{background:p?.bg||'var(--s2)',color:moodColor}}>{theMood.icon} {theMood.label}</span>}
+                    <span className="smc-today-time" style={{marginBottom:0}}>{timeLabel}</span>
+                  </div>
                   <div className="smc-today-name">{t.name}</div>
                   <div className="smc-today-meta">
                     {client && (
@@ -323,6 +336,28 @@ export default function SMCalendar() {
                       ) : null;
                     })}
                   </div>
+                  {hasIcons && (
+                    <div className="task-icons" style={{marginTop:4}}>
+                      {hasSubtasks && (
+                        <span className="circ-wrap" style={{ color: moodColor }}>
+                          <svg viewBox="0 0 30 30" width="18" height="18" style={{ display: 'block' }}>
+                            <circle cx="15" cy="15" r="13" fill="none" stroke="var(--s2)" strokeWidth="3.5" />
+                            <circle cx="15" cy="15" r="13" fill="none" stroke="currentColor" strokeWidth="3.5"
+                              strokeDasharray={CIRC} strokeDashoffset={subTotal > 0 ? CIRC * (1 - subDone / subTotal) : CIRC}
+                              strokeLinecap="round" transform="rotate(-90 15 15)" />
+                          </svg>
+                          <span className="circ-label">{subDone}/{subTotal}</span>
+                        </span>
+                      )}
+                      {hasLinks && (
+                        <span className="icon-wrap" onClick={e => { e.stopPropagation(); window.open(t.links[0].url, '_blank'); }}>
+                          <i className="link-icon">🔗</i>
+                          <span className="link-tooltip">{t.links[0].url}</span>
+                        </span>
+                      )}
+                      {hasNotes && <i className="notes-icon">📝</i>}
+                    </div>
+                  )}
                 </div>
               );
             })}
