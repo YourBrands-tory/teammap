@@ -341,10 +341,6 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
   const limitReached = stats.activeCount >= dailyCap;
   const capColor = stats.activeCount > dailyCap ? '#e76f51' : stats.activeCount === dailyCap ? '#d97706' : 'var(--t3)';
   const setToast = useUIStore(s => s.setToast);
-  const upsertMilestone = useStore(s => s.upsertMilestone);
-  const handleHideMs = useCallback(async (ms) => {
-    await upsertMilestone({ ...ms, displayMode: 'hidden' });
-  }, [upsertMilestone]);
   const handleAddTask = useCallback((moodId) => {
     if (limitReached) {
       setToast(`Task limit reached.\n\n${member.name} already has ${stats.activeCount}/${dailyCap} active tasks for today.\n\nComplete, pass, move, or reassign an existing task before creating another.`);
@@ -395,7 +391,6 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
           const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
           return (
             <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
-              <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
               <div className="ms-dash-head">
                 <span className="ms-dash-badge">◆ MILESTONE</span>
                 {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
@@ -422,7 +417,6 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
           const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
           return (
             <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
-              <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
               <div className="ms-dash-head">
                 <span className="ms-dash-badge">◆ MILESTONE</span>
                 {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
@@ -533,8 +527,7 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
                   const mClient = ms.clientId ? sel.gc(S, ms.clientId) : null;
                   return (
                     <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
-                      <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
-                      <div className="ms-dash-head">
+                              <div className="ms-dash-head">
                         <span className="ms-dash-badge">◆ MILESTONE</span>
                         {mDlLabel && <span className={`ms-dash-deadline ${mDlClass}`}>{mDlLabel}</span>}
                       </div>
@@ -670,10 +663,6 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
     if (!milestonesByMood[ms.mood]) milestonesByMood[ms.mood] = [];
     milestonesByMood[ms.mood].push(ms);
   });
-  const upsertMilestone = useStore(s => s.upsertMilestone);
-  const handleHideMs = useCallback(async (ms) => {
-    await upsertMilestone({ ...ms, displayMode: 'hidden' });
-  }, [upsertMilestone]);
   const visibleMoods = S.moods.filter(m => !m.hidden);
   const hiddenMoods = S.moods.filter(m => m.hidden);
   const hiddenTasks = useMemo(() => {
@@ -696,7 +685,6 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
           const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
           return (
             <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
-              <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
               <div className="ms-dash-head">
                 <span className="ms-dash-badge">◆ MILESTONE</span>
                 {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
@@ -723,7 +711,6 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
           const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
           return (
             <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
-              <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
               <div className="ms-dash-head">
                 <span className="ms-dash-badge">◆ MILESTONE</span>
                 {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
@@ -835,8 +822,7 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
                 const mClient = ms.clientId ? sel.gc(S, ms.clientId) : null;
                 return (
                   <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
-                    <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
-                    <div className="ms-dash-head">
+                          <div className="ms-dash-head">
                       <span className="ms-dash-badge">◆ MILESTONE</span>
                       {mDlLabel && <span className={`ms-dash-deadline ${mDlClass}`}>{mDlLabel}</span>}
                     </div>

@@ -467,9 +467,6 @@ input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--ac
 .ms-dash-card .ms-dash-progress .ms-dash-pct{font-size:9px;font-weight:700;color:var(--t2);white-space:nowrap}
 .ms-dash-card .ms-dash-meta{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .ms-dash-card .ms-dash-meta .ms-dash-chip{font-size:9px;padding:1px 6px;border-radius:10px;font-weight:600;white-space:nowrap}
-.ms-dash-hide-btn{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:none;background:var(--s2);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;color:var(--t3);transition:.15s;z-index:2;font-family:inherit;line-height:1;opacity:0}
-.ms-dash-card:hover .ms-dash-hide-btn{opacity:1}
-.ms-dash-hide-btn:hover{background:var(--wl);color:var(--warn)}
 
 @media(max-width:768px){
   .ms-modal{width:calc(100% - 16px);border-radius:16px}
