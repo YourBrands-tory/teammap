@@ -215,18 +215,20 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   }
 
   const tryCloseModal = useCallback(() => {
+    if (limitError) return;
     const hasName = name.trim().length > 0;
     const hasMood = !!mood;
     const hasAssignee = assigned.length > 0;
     if (hasName && hasMood && hasAssignee) {
-      flushSave().then(() => {
+      flushSave().then(saved => {
+        if (!saved) return;
         clearDraft();
         onClose();
       });
     } else {
       nudgeMissingFields(hasName, hasMood, hasAssignee);
     }
-  }, [name, mood, assigned, flushSave, onClose]);
+  }, [name, mood, assigned, flushSave, onClose, limitError]);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -248,6 +250,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
 
   // Auto-save: debounce on any field change
   useEffect(() => {
+    if (limitError) return;
     const f = { name, mood, assigned };
     if (!f.name.trim() || !f.mood || !f.assigned.length) return;
     if (!taskIdRef.current && !hasEverHadRequiredFields.current) {
@@ -392,7 +395,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
   };
 
   return (
-    <div className="mbg" onMouseDown={(e)=>e.target.classList.contains('mbg')&&tryCloseModal()}>
+    <div className="mbg" onMouseDown={(e)=>e.target===e.currentTarget&&tryCloseModal()}>
       <div className="modal modal-lg" onMouseDown={e=>e.stopPropagation()}>
         <h2 style={{marginBottom:4}}>{isEdit ? 'Edit task' : 'New task'}</h2>
         {fromCellText && (
@@ -643,7 +646,7 @@ export default function TaskModal({ task = {}, onClose, onSave, fromCellText = '
             {saveStatus === 'saving' && <span style={{fontSize:12,color:'var(--t3)',fontWeight:600}}>Saving…</span>}
             {saveStatus === 'saved' && <span style={{fontSize:12,color:'var(--accent)',fontWeight:600}}>Auto-saved</span>}
             {saveStatus === 'error' && <span style={{fontSize:12,color:'var(--warn)',fontWeight:600}}>Couldn't save. Retrying…</span>}
-            <button className="btn" disabled={!isEdit && (!name.trim() || !mood || !assigned.length)} onClick={flushSave}>Save Task</button>
+            <button className="btn" disabled={(!isEdit && (!name.trim() || !mood || !assigned.length)) || !!limitError} onClick={tryCloseModal}>Save Task</button>
             {onSaveAsTemplate && (
               <button className="btn btn-outline" onClick={() => onSaveAsTemplate({
                 name, clientId, mood, assignedTo: [...assigned],

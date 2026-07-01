@@ -74,8 +74,16 @@ export default function SMCalendar() {
         map[t.date].push(t);
       }
     });
+    const moodOrder = S.moods.map(m => m.id);
+    for (const date in map) {
+      map[date].sort((a, b) => {
+        const ai = moodOrder.indexOf(a.mood);
+        const bi = moodOrder.indexOf(b.mood);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      });
+    }
     return map;
-  }, [filteredTasks]);
+  }, [filteredTasks, S.moods]);
 
   const socialCatId = useMemo(() => {
     const cat = (S.serviceCategories || []).find(c => c.label.trim().toLowerCase() === 'social');
@@ -84,7 +92,9 @@ export default function SMCalendar() {
 
   const socialClients = useMemo(() => {
     if (!socialCatId) return [];
-    return S.clients.filter(c => (c.serviceCategoryIds || []).includes(socialCatId));
+    return S.clients
+      .filter(c => (c.serviceCategoryIds || []).includes(socialCatId))
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
   }, [S.clients, socialCatId]);
 
   const todayTasks = useMemo(() => tasksByDate[todayDate] || [], [tasksByDate]);
@@ -138,8 +148,8 @@ export default function SMCalendar() {
               <button className="smc-mm-btn" onClick={nextMonth}>›</button>
             </div>
             <div className="smc-mm-grid">
-              {MINI_DAYS.map(d => (
-                <div key={d} className="smc-mm-dow">{d}</div>
+              {MINI_DAYS.map((d, i) => (
+                <div key={i} className="smc-mm-dow">{d}</div>
               ))}
               {mmDays.map((d, i) => {
                 const ds = dateStr(year, month, d.day);

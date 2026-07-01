@@ -19,9 +19,9 @@ function isTaskHiddenBySubstep(taskId, milestones) {
   for (const ms of milestones) {
     if (ms.deleted) continue;
     for (const ss of (ms.substeps || [])) {
-      if ((ss.linkedTaskIds || []).includes(taskId)) {
-        if (ss.showOnDashboard) return false;
-        return true;
+      const link = (ss.linkedTasks || []).find(lt => lt.taskId === taskId);
+      if (link) {
+        return !link.showOnDashboard;
       }
     }
   }
@@ -83,6 +83,7 @@ export default function TaskDashboard() {
   const linkAfterCreateRef = useRef(null);
 
   const handleCreateTaskForSubstep = useCallback((ssId, taskData, linkCallback) => {
+    sessionStorage.removeItem('tm_task_draft');
     linkAfterCreateRef.current = { ssId, linkCallback };
     setModal(taskData);
   }, []);
@@ -91,7 +92,6 @@ export default function TaskDashboard() {
     const pending = linkAfterCreateRef.current;
     if (pending && savedTask?.id) {
       pending.linkCallback(savedTask.id);
-      setModal(null);
     }
     linkAfterCreateRef.current = null;
   }, []);
@@ -329,12 +329,22 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
 
   const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
   const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.date || date >= ms.date) && (!ms.deadline || ms.deadline >= date));
+  const noMoodMilestones = msForMember.filter(ms => !ms.mood);
+  const milestonesByMood = {};
+  msForMember.filter(ms => ms.mood).forEach(ms => {
+    if (!milestonesByMood[ms.mood]) milestonesByMood[ms.mood] = [];
+    milestonesByMood[ms.mood].push(ms);
+  });
   const baseVisible = allTasks.filter(t=>t.status!==completeStatus);
   const reviewVisible = reviewFilter ? baseVisible.filter(t=>t.status===reviewStatus) : baseVisible;
   const dailyCap = member.capacity ?? 6;
   const limitReached = stats.activeCount >= dailyCap;
   const capColor = stats.activeCount > dailyCap ? '#e76f51' : stats.activeCount === dailyCap ? '#d97706' : 'var(--t3)';
   const setToast = useUIStore(s => s.setToast);
+  const upsertMilestone = useStore(s => s.upsertMilestone);
+  const handleHideMs = useCallback(async (ms) => {
+    await upsertMilestone({ ...ms, displayMode: 'hidden' });
+  }, [upsertMilestone]);
   const handleAddTask = useCallback((moodId) => {
     if (limitReached) {
       setToast(`Task limit reached.\n\n${member.name} already has ${stats.activeCount}/${dailyCap} active tasks for today.\n\nComplete, pass, move, or reassign an existing task before creating another.`);
@@ -375,36 +385,60 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
       </div>
 
       <div className="tcolb">
-        {(() => {
-          const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
-          const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.date || date >= ms.date) && (!ms.deadline || ms.deadline >= date));
-          return msForMember.map(ms => {
-            const total = ms.substeps.length;
-            const done = ms.substeps.filter(s => s.done).length;
-            const pct = total ? Math.round(done/total*100) : 0;
-            const dlClass = getDeadlineClass(ms.deadline);
-            const dlLabel = getDeadlineLabel(ms.deadline);
-            const mood = ms.mood ? sel.gmood(S, ms.mood) : null;
-            const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
-            return (
-              <div key={ms.id} className="ms-dash-card" onClick={() => onOpenMs?.(ms)}>
-                <div className="ms-dash-head">
-                  <span className="ms-dash-badge">◆ MILESTONE</span>
-                  {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
-                </div>
-                <div className="ms-dash-title">{ms.title}</div>
-                  <div className="ms-dash-progress">
-                    <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${pct}%`}} /></div>
-                    <span className="ms-dash-pct">{done}/{total} · {pct}%</span>
-                  </div>
-                <div className="ms-dash-meta">
-                  {mood && <span className="ms-dash-chip" style={{background:mood.bg,color:mood.color}}>{mood.icon} {mood.label}</span>}
-                  {client && <span className="ms-dash-chip" style={{background:(client.color||'var(--s2)')+'22',color:client.color||'var(--t2)'}}>{client.name}</span>}
-                </div>
+        {noMoodMilestones.map(ms => {
+          const total = ms.substeps.length;
+          const done = ms.substeps.filter(s => s.done).length;
+          const pct = total ? Math.round(done/total*100) : 0;
+          const dlClass = getDeadlineClass(ms.deadline);
+          const dlLabel = getDeadlineLabel(ms.deadline);
+          const mood = ms.mood ? sel.gmood(S, ms.mood) : null;
+          const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
+          return (
+            <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
+              <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
+              <div className="ms-dash-head">
+                <span className="ms-dash-badge">◆ MILESTONE</span>
+                {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
               </div>
-            );
-          });
-        })()}
+              <div className="ms-dash-title">{ms.title}</div>
+              <div className="ms-dash-progress">
+                <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${pct}%`}} /></div>
+                <span className="ms-dash-pct">{done}/{total} · {pct}%</span>
+              </div>
+              <div className="ms-dash-meta">
+                {mood && <span className="ms-dash-chip" style={{background:mood.bg,color:mood.color}}>{mood.icon} {mood.label}</span>}
+                {client && <span className="ms-dash-chip" style={{background:(client.color||'var(--s2)')+'22',color:client.color||'var(--t2)'}}>{client.name}</span>}
+              </div>
+            </div>
+          );
+        })}
+        {msForMember.filter(ms => ms.mood && hiddenMoods.some(m => m.id === ms.mood)).map(ms => {
+          const total = ms.substeps.length;
+          const done = ms.substeps.filter(s => s.done).length;
+          const pct = total ? Math.round(done/total*100) : 0;
+          const dlClass = getDeadlineClass(ms.deadline);
+          const dlLabel = getDeadlineLabel(ms.deadline);
+          const m = ms.mood ? sel.gmood(S, ms.mood) : null;
+          const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
+          return (
+            <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
+              <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
+              <div className="ms-dash-head">
+                <span className="ms-dash-badge">◆ MILESTONE</span>
+                {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
+              </div>
+              <div className="ms-dash-title">{ms.title}</div>
+              <div className="ms-dash-progress">
+                <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${pct}%`}} /></div>
+                <span className="ms-dash-pct">{done}/{total} · {pct}%</span>
+              </div>
+              <div className="ms-dash-meta">
+                {m && <span className="ms-dash-chip" style={{background:m.bg,color:m.color}}>{m.icon} {m.label}</span>}
+                {client && <span className="ms-dash-chip" style={{background:(client.color||'var(--s2)')+'22',color:client.color||'var(--t2)'}}>{client.name}</span>}
+              </div>
+            </div>
+          );
+        })}
         {hiddenTasks.length > 0 && (
           <div className="hidden-drawer" style={{marginBottom:6}}>
             <button
@@ -462,7 +496,8 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
         {visibleMoods.map(mood => {
           const mid = mood.id;
           const mt = visibleTasks.filter(t=>t.mood===mid && t.status!==standUpStatus);
-          if ((mid==='top'||mid==='creative') && !mt.length) return null;
+          const moodMilestones = milestonesByMood[mid] || [];
+          if ((mid==='top'||mid==='creative') && !mt.length && !moodMilestones.length) return null;
           const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
           const secClass = isHero?'hero-sec':isImp?'imp-sec':isTop?'top-sec':'other-sec';
           const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
@@ -488,8 +523,35 @@ const TeamCol = memo(function TeamCol({ member, date, S, reviewStatus, reviewFil
                     justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
               </div>
               <div className="msec-tasks">
+                {moodMilestones.map(ms => {
+                  const mTotal = ms.substeps.length;
+                  const mDone = ms.substeps.filter(s => s.done).length;
+                  const mPct = mTotal ? Math.round(mDone/mTotal*100) : 0;
+                  const mDlClass = getDeadlineClass(ms.deadline);
+                  const mDlLabel = getDeadlineLabel(ms.deadline);
+                  const mMood = ms.mood ? sel.gmood(S, ms.mood) : null;
+                  const mClient = ms.clientId ? sel.gc(S, ms.clientId) : null;
+                  return (
+                    <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
+                      <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
+                      <div className="ms-dash-head">
+                        <span className="ms-dash-badge">◆ MILESTONE</span>
+                        {mDlLabel && <span className={`ms-dash-deadline ${mDlClass}`}>{mDlLabel}</span>}
+                      </div>
+                      <div className="ms-dash-title">{ms.title}</div>
+                      <div className="ms-dash-progress">
+                        <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${mPct}%`}} /></div>
+                        <span className="ms-dash-pct">{mDone}/{mTotal} · {mPct}%</span>
+                      </div>
+                      <div className="ms-dash-meta">
+                        {mMood && <span className="ms-dash-chip" style={{background:mMood.bg,color:mMood.color}}>{mMood.icon} {mMood.label}</span>}
+                        {mClient && <span className="ms-dash-chip" style={{background:(mClient.color||'var(--s2)')+'22',color:mClient.color||'var(--t2)'}}>{mClient.name}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
                 {mt.length ? mt.map(t => <TCard key={t.id} task={t} member={member} moods={S.moods} clients={S.clients} tags={S.tags} taskStatuses={S.task_statuses} members={S.members} onOpenTask={onOpenTask} onStatus={onStatus} />)
-                  : <div style={{fontSize:10,color:'var(--t3)',padding:'5px 4px',fontStyle:'italic'}}>No active {mood.label}</div>}
+                  : !moodMilestones.length ? <div style={{fontSize:10,color:'var(--t3)',padding:'5px 4px',fontStyle:'italic'}}>No active {mood.label}</div> : null}
               </div>
             </div>
           );
@@ -600,6 +662,18 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
     onOpenTask({ date, mood: moodId, assignedTo: [member.id] });
   }, [limitReached, dailyActive, dailyCap, member.name, date, onOpenTask, setToast]);
 
+  const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
+  const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.date || date >= ms.date) && (!ms.deadline || ms.deadline >= date));
+  const noMoodMilestones = msForMember.filter(ms => !ms.mood);
+  const milestonesByMood = {};
+  msForMember.filter(ms => ms.mood).forEach(ms => {
+    if (!milestonesByMood[ms.mood]) milestonesByMood[ms.mood] = [];
+    milestonesByMood[ms.mood].push(ms);
+  });
+  const upsertMilestone = useStore(s => s.upsertMilestone);
+  const handleHideMs = useCallback(async (ms) => {
+    await upsertMilestone({ ...ms, displayMode: 'hidden' });
+  }, [upsertMilestone]);
   const visibleMoods = S.moods.filter(m => !m.hidden);
   const hiddenMoods = S.moods.filter(m => m.hidden);
   const hiddenTasks = useMemo(() => {
@@ -612,36 +686,60 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
 
   return (
     <div className="td-mob-col-inner">
-        {(() => {
-          const dayName = new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'short'});
-          const msForMember = (S.milestones||[]).filter(ms => !ms.deleted && ms.assignedTo?.includes(member.id) && ms.displayMode !== 'hidden' && (ms.displayMode === 'daily' || (ms.displayMode === 'specific_days' && ms.displayDays?.includes(dayName))) && (!ms.date || date >= ms.date) && (!ms.deadline || ms.deadline >= date));
-          return msForMember.map(ms => {
-            const total = ms.substeps.length;
-            const done = ms.substeps.filter(s => s.done).length;
-            const pct = total ? Math.round(done/total*100) : 0;
-            const dlClass = getDeadlineClass(ms.deadline);
-            const dlLabel = getDeadlineLabel(ms.deadline);
-            const mood = ms.mood ? sel.gmood(S, ms.mood) : null;
-            const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
-            return (
-              <div key={ms.id} className="ms-dash-card" onClick={() => onOpenMs?.(ms)}>
-                <div className="ms-dash-head">
-                  <span className="ms-dash-badge">◆ MILESTONE</span>
-                  {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
-                </div>
-                <div className="ms-dash-title">{ms.title}</div>
-                  <div className="ms-dash-progress">
-                    <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${pct}%`}} /></div>
-                    <span className="ms-dash-pct">{done}/{total} · {pct}%</span>
-                  </div>
-                <div className="ms-dash-meta">
-                  {mood && <span className="ms-dash-chip" style={{background:mood.bg,color:mood.color}}>{mood.icon} {mood.label}</span>}
-                  {client && <span className="ms-dash-chip" style={{background:(client.color||'var(--s2)')+'22',color:client.color||'var(--t2)'}}>{client.name}</span>}
-                </div>
+        {noMoodMilestones.map(ms => {
+          const total = ms.substeps.length;
+          const done = ms.substeps.filter(s => s.done).length;
+          const pct = total ? Math.round(done/total*100) : 0;
+          const dlClass = getDeadlineClass(ms.deadline);
+          const dlLabel = getDeadlineLabel(ms.deadline);
+          const mood = ms.mood ? sel.gmood(S, ms.mood) : null;
+          const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
+          return (
+            <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
+              <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
+              <div className="ms-dash-head">
+                <span className="ms-dash-badge">◆ MILESTONE</span>
+                {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
               </div>
-            );
-          });
-        })()}
+              <div className="ms-dash-title">{ms.title}</div>
+              <div className="ms-dash-progress">
+                <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${pct}%`}} /></div>
+                <span className="ms-dash-pct">{done}/{total} · {pct}%</span>
+              </div>
+              <div className="ms-dash-meta">
+                {mood && <span className="ms-dash-chip" style={{background:mood.bg,color:mood.color}}>{mood.icon} {mood.label}</span>}
+                {client && <span className="ms-dash-chip" style={{background:(client.color||'var(--s2)')+'22',color:client.color||'var(--t2)'}}>{client.name}</span>}
+              </div>
+            </div>
+          );
+        })}
+        {msForMember.filter(ms => ms.mood && hiddenMoods.some(m => m.id === ms.mood)).map(ms => {
+          const total = ms.substeps.length;
+          const done = ms.substeps.filter(s => s.done).length;
+          const pct = total ? Math.round(done/total*100) : 0;
+          const dlClass = getDeadlineClass(ms.deadline);
+          const dlLabel = getDeadlineLabel(ms.deadline);
+          const m = ms.mood ? sel.gmood(S, ms.mood) : null;
+          const client = ms.clientId ? sel.gc(S, ms.clientId) : null;
+          return (
+            <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
+              <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
+              <div className="ms-dash-head">
+                <span className="ms-dash-badge">◆ MILESTONE</span>
+                {dlLabel && <span className={`ms-dash-deadline ${dlClass}`}>{dlLabel}</span>}
+              </div>
+              <div className="ms-dash-title">{ms.title}</div>
+              <div className="ms-dash-progress">
+                <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${pct}%`}} /></div>
+                <span className="ms-dash-pct">{done}/{total} · {pct}%</span>
+              </div>
+              <div className="ms-dash-meta">
+                {m && <span className="ms-dash-chip" style={{background:m.bg,color:m.color}}>{m.icon} {m.label}</span>}
+                {client && <span className="ms-dash-chip" style={{background:(client.color||'var(--s2)')+'22',color:client.color||'var(--t2)'}}>{client.name}</span>}
+              </div>
+            </div>
+          );
+        })}
         {hiddenTasks.length > 0 && (
           <div className="hidden-drawer" style={{marginBottom:6}}>
             <button
@@ -700,7 +798,8 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
       {visibleMoods.map(mood => {
         const mid = mood.id;
         const mt = visibleTasks.filter(t=>t.mood===mid && t.status!==standUpStatus);
-        if ((mid==='top'||mid==='creative') && !mt.length) return null;
+        const moodMilestones = milestonesByMood[mid] || [];
+        if ((mid==='top'||mid==='creative') && !mt.length && !moodMilestones.length) return null;
         const isHero=mid==='hero', isImp=mid==='imp', isTop=mid==='top';
         const secClass = isHero?'hero-sec':isImp?'imp-sec':isTop?'top-sec':'other-sec';
         const moodMins = allTasks.filter(t=>t.mood===mid).reduce((a,t)=>a+minsOf(t),0);
@@ -726,8 +825,35 @@ const TeamColMobile = memo(function TeamColMobile({ member, date, S, expandedCar
                   justifyContent:'center',flexShrink:0,padding:0,fontFamily:'inherit',marginLeft:hm(moodMins)?2:'auto',opacity:limitReached?0.5:1}}>+</button>
             </div>
             <div className="msec-tasks" style={{maxHeight:isHero?160:isImp?120:80,overflowY:'auto'}}>
+              {moodMilestones.map(ms => {
+                const mTotal = ms.substeps.length;
+                const mDone = ms.substeps.filter(s => s.done).length;
+                const mPct = mTotal ? Math.round(mDone/mTotal*100) : 0;
+                const mDlClass = getDeadlineClass(ms.deadline);
+                const mDlLabel = getDeadlineLabel(ms.deadline);
+                const mMood = ms.mood ? sel.gmood(S, ms.mood) : null;
+                const mClient = ms.clientId ? sel.gc(S, ms.clientId) : null;
+                return (
+                  <div key={ms.id} className="ms-dash-card" style={{position:'relative'}} onClick={() => onOpenMs?.(ms)}>
+                    <button className="ms-dash-hide-btn" onClick={e => { e.stopPropagation(); handleHideMs(ms); }}>👁</button>
+                    <div className="ms-dash-head">
+                      <span className="ms-dash-badge">◆ MILESTONE</span>
+                      {mDlLabel && <span className={`ms-dash-deadline ${mDlClass}`}>{mDlLabel}</span>}
+                    </div>
+                    <div className="ms-dash-title">{ms.title}</div>
+                    <div className="ms-dash-progress">
+                      <div className="ms-dash-bar"><div className="ms-dash-fill" style={{width:`${mPct}%`}} /></div>
+                      <span className="ms-dash-pct">{mDone}/{mTotal} · {mPct}%</span>
+                    </div>
+                    <div className="ms-dash-meta">
+                      {mMood && <span className="ms-dash-chip" style={{background:mMood.bg,color:mMood.color}}>{mMood.icon} {mMood.label}</span>}
+                      {mClient && <span className="ms-dash-chip" style={{background:(mClient.color||'var(--s2)')+'22',color:mClient.color||'var(--t2)'}}>{mClient.name}</span>}
+                    </div>
+                  </div>
+                );
+              })}
               {mt.length ? mt.map(t => <MobileTaskCard key={t.id} task={t} member={member} moods={S.moods} clients={S.clients} tags={S.tags} taskStatuses={S.task_statuses} members={S.members} expanded={expandedCards[t.id]} onToggleExpand={onToggleExpand} onOpenTask={onOpenTask} onStatus={onStatus} />)
-                : <div style={{fontSize:10,color:'var(--t3)',padding:'4px 4px',fontStyle:'italic'}}>No active {mood.label}</div>}
+                : !moodMilestones.length ? <div style={{fontSize:10,color:'var(--t3)',padding:'4px 4px',fontStyle:'italic'}}>No active {mood.label}</div> : null}
             </div>
           </div>
         );

@@ -1,13 +1,29 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useStore, sel } from '../store/useStore';
 import { today, uid, getDeadlineClass, getDeadlineLabel } from '../lib/constants';
 
 const migrateSS = (ss) => {
-  if (ss.linkedTaskId && !ss.linkedTaskIds) {
-    return { ...ss, linkedTaskIds: [ss.linkedTaskId], linkedTaskId: undefined };
+  if (ss.linkedTaskId && !ss.linkedTaskIds && !ss.linkedTasks) {
+    return {
+      ...ss,
+      linkedTasks: [{ taskId: ss.linkedTaskId, showOnDashboard: ss.showOnDashboard || false }],
+      linkedTaskId: undefined,
+      showOnDashboard: undefined
+    };
   }
-  if (!ss.linkedTaskIds) {
-    return { ...ss, linkedTaskIds: [] };
+  if (ss.linkedTaskIds && !ss.linkedTasks) {
+    return {
+      ...ss,
+      linkedTasks: ss.linkedTaskIds.map(taskId => ({
+        taskId,
+        showOnDashboard: ss.showOnDashboard || false
+      })),
+      linkedTaskIds: undefined,
+      showOnDashboard: undefined
+    };
+  }
+  if (!ss.linkedTasks) {
+    return { ...ss, linkedTasks: [] };
   }
   return ss;
 };
@@ -16,6 +32,7 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   const S = useStore(s => s.S);
   const upsertMilestone = useStore(s => s.upsertMilestone);
   const delMilestone = useStore(s => s.delMilestone);
+  const softDeleteTask = useStore(s => s.softDeleteTask);
 
   const isEdit = !!milestone;
   const [m, setM] = useState(() => milestone ? {
@@ -31,14 +48,128 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   const [expandedSS, setExpandedSS] = useState({});
   const [taskSearch, setTaskSearch] = useState(null);
   const [searchQ, setSearchQ] = useState('');
-  const [confirmDel, setConfirmDel] = useState(false);
   const [triedSave, setTriedSave] = useState(false);
+
+  const milestoneIdRef = useRef(milestone?.id || null);
+  const [saveStatus, setSaveStatus] = useState(milestone?.id ? 'idle' : 'idle');
+  const debounceRef = useRef(null);
+  const fieldsRef = useRef({});
+  const lastSnapshot = useRef('');
+  const retryCount = useRef(0);
+  const mountedRef = useRef(true);
+  const hasEverHadRequiredFields = useRef(false);
+  const saveStatusTimer = useRef(null);
+  const saveQueue = useRef(Promise.resolve());
+
+  // Initialize snapshot on first render to prevent auto-save on mount for existing milestones
+  if (milestone?.id && lastSnapshot.current === '') {
+    lastSnapshot.current = JSON.stringify([
+      (milestone.title || '').trim(), milestone.mood || '', [...(milestone.assignedTo || [])].sort(),
+      milestone.clientId || '', milestone.date || '', milestone.deadline || '',
+      JSON.stringify(milestone.substeps || []), milestone.displayMode || 'daily', [...(milestone.displayDays || [])].sort(),
+    ]);
+  }
+
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
+  // Keep a ref with the latest field values (no stale closures in debounce callbacks)
+  useEffect(() => {
+    fieldsRef.current = {
+      title: m.title, mood: m.mood, assignedTo: [...(m.assignedTo || [])],
+      clientId: m.clientId || '', date: m.date, deadline: m.deadline || '',
+      substeps: (m.substeps || []).map(s => ({ ...s })),
+      displayMode: m.displayMode, displayDays: [...(m.displayDays || [])],
+    };
+  });
+
+  const doSave = useCallback(() => {
+    const result = saveQueue.current.catch(() => {}).then(async () => {
+      const f = fieldsRef.current;
+      const currentId = milestoneIdRef.current;
+      if (!f.title?.trim() || !f.clientId || !f.assignedTo?.length) return null;
+
+      const snapshot = JSON.stringify([
+        f.title.trim(), f.mood || '', [...f.assignedTo].sort(),
+        f.clientId || '', f.date || '', f.deadline || '',
+        JSON.stringify(f.substeps), f.displayMode || 'daily', [...f.displayDays].sort(),
+      ]);
+      if (snapshot === lastSnapshot.current && currentId) return null;
+
+      if (mountedRef.current) setSaveStatus('saving');
+
+      const payload = {
+        ...(currentId ? { id: currentId } : {}),
+        title: f.title.trim(), mood: f.mood || '', assignedTo: [...f.assignedTo],
+        clientId: f.clientId || null, date: f.date || '', deadline: f.deadline || null,
+        substeps: f.substeps.map(s => ({ ...s })),
+        displayMode: f.displayMode || 'daily', displayDays: [...f.displayDays],
+      };
+      payload.deleted = false;
+
+      try {
+        const saved = await upsertMilestone(payload);
+        if (!currentId) {
+          milestoneIdRef.current = saved.id;
+        }
+        retryCount.current = 0;
+        lastSnapshot.current = snapshot;
+        if (mountedRef.current) {
+          setSaveStatus('saved');
+          clearTimeout(saveStatusTimer.current);
+          saveStatusTimer.current = setTimeout(() => {
+            if (mountedRef.current) setSaveStatus(prev => prev === 'saved' ? 'idle' : prev);
+          }, 2000);
+        }
+        return saved;
+      } catch (err) {
+        console.error('[Milestone AutoSave] failed:', err);
+        if (mountedRef.current) setSaveStatus('error');
+        if (retryCount.current < 3) {
+          retryCount.current++;
+          setTimeout(() => { if (mountedRef.current) doSave(); }, 3000);
+        }
+        return null;
+      }
+    });
+    saveQueue.current = result;
+    return result;
+  }, [upsertMilestone]);
+
+  const flushSave = useCallback(() => {
+    if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+    return doSave();
+  }, [doSave]);
+
+  const scheduleSave = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSave(), 600);
+  }, [doSave]);
+
+  // Auto-save: debounce on any field change (mirrors TaskModal pattern)
+  useEffect(() => {
+    const f = { title: m.title, mood: m.mood, assignedTo: m.assignedTo };
+    if (!f.title?.trim() || !m.clientId || !f.assignedTo?.length) return;
+    if (!milestoneIdRef.current && !hasEverHadRequiredFields.current) {
+      hasEverHadRequiredFields.current = true;
+      flushSave();
+      return;
+    }
+    scheduleSave();
+  }, [m, scheduleSave, flushSave]);
 
   const subTotal = m.substeps.length;
   const subDone = m.substeps.filter(s => s.done).length;
   const subPct = subTotal ? Math.round(subDone / subTotal * 100) : 0;
 
-  const allTasks = useMemo(() => S.tasks.filter(t => !t.deleted && t.status !== 'Complete'), [S.tasks]);
+  const allTasks = useMemo(() => {
+    const sorted = S.tasks.filter(t => !t.deleted && t.status !== 'Complete');
+    sorted.sort((a, b) => {
+      const aTime = a.updatedAt || a.createdAt || 0;
+      const bTime = b.updatedAt || b.createdAt || 0;
+      return bTime - aTime;
+    });
+    return sorted;
+  }, [S.tasks]);
 
   const searchResults = useMemo(() => {
     if (!searchQ.trim()) return allTasks;
@@ -50,7 +181,12 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
     });
   }, [allTasks, searchQ, S]);
 
-  const close = () => { onClose?.(); };
+  const close = async () => {
+    if (m.title.trim() && m.clientId && m.assignedTo.length) {
+      await flushSave();
+    }
+    onClose?.();
+  };
 
   const updateField = (field, value) => setM(prev => ({ ...prev, [field]: value }));
 
@@ -82,7 +218,7 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   };
 
   const addSubstep = () => {
-    const newSs = { id: uid(), title: '', done: false, linkedTaskIds: [], showOnDashboard: false };
+    const newSs = { id: uid(), title: '', done: false, linkedTasks: [] };
     setM(prev => ({ ...prev, substeps: [...prev.substeps, newSs] }));
     setExpandedSS(prev => ({ ...prev, [newSs.id]: true }));
   };
@@ -94,7 +230,10 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   const linkTaskToSubstep = (ssId, taskId) => {
     setM(prev => ({
       ...prev,
-      substeps: prev.substeps.map(s => s.id === ssId ? { ...s, linkedTaskIds: [...new Set([...(s.linkedTaskIds||[]), taskId])] } : s)
+      substeps: prev.substeps.map(s => s.id === ssId ? {
+        ...s,
+        linkedTasks: [...(s.linkedTasks||[]), { taskId, showOnDashboard: true }]
+      } : s)
     }));
     setTaskSearch(null);
     setSearchQ('');
@@ -103,14 +242,19 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   const unlinkFromSubstep = (ssId, taskId) => {
     setM(prev => ({
       ...prev,
-      substeps: prev.substeps.map(s => s.id === ssId ? { ...s, linkedTaskIds: (s.linkedTaskIds||[]).filter(id => id !== taskId) } : s)
+      substeps: prev.substeps.map(s => s.id === ssId ? { ...s, linkedTasks: (s.linkedTasks||[]).filter(lt => lt.taskId !== taskId) } : s)
     }));
   };
 
-  const toggleSSDashboard = (ssId) => {
+  const toggleTaskDashVisibility = (ssId, taskId) => {
     setM(prev => ({
       ...prev,
-      substeps: prev.substeps.map(s => s.id === ssId ? { ...s, showOnDashboard: !s.showOnDashboard } : s)
+      substeps: prev.substeps.map(s => s.id === ssId ? {
+        ...s,
+        linkedTasks: (s.linkedTasks||[]).map(lt =>
+          lt.taskId === taskId ? { ...lt, showOnDashboard: !lt.showOnDashboard } : lt
+        )
+      } : s)
     }));
   };
 
@@ -124,23 +268,55 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
   };
 
   const save = async () => {
-    if (!m.title.trim()) return;
-    if (!m.mood || !m.assignedTo.length) {
+    if (!m.title.trim() || !m.clientId || !m.assignedTo.length) {
       setTriedSave(true);
       return;
     }
-    await upsertMilestone(m);
+    await flushSave();
     close();
   };
 
-  const handleDelete = async () => {
+  const handleDeleteMilestone = async () => {
+    const substepCount = m.substeps?.length || 0;
+    if (!confirm(`Delete milestone?\n\nThis will permanently delete '${m.title}'${substepCount > 0 ? ` and all ${substepCount} substeps` : ''}.`)) return;
+
+    const allLinkedTaskIds = [...new Set(
+      (m.substeps || []).flatMap(ss => (ss.linkedTasks || []).map(lt => lt.taskId)).filter(Boolean)
+    )];
+
+    if (allLinkedTaskIds.length > 0) {
+      let detail = '';
+      if (allLinkedTaskIds.length <= 5) {
+        detail = '\n\n' + allLinkedTaskIds.map(tid => {
+          const task = S.tasks.find(t => t.id === tid);
+          return `- "${task?.name || tid}"`;
+        }).join('\n');
+      }
+      const deleteTasks = confirm(
+        `Also delete linked tasks?\n\nThis milestone has ${allLinkedTaskIds.length} linked task${allLinkedTaskIds.length > 1 ? 's' : ''} across its substeps. Do you want to permanently delete them too, or keep them as regular tasks?` +
+        detail +
+        `\n\nPress OK to delete tasks too, or Cancel to keep them as regular tasks.`
+      );
+      if (deleteTasks) {
+        for (const tid of allLinkedTaskIds) { await softDeleteTask(tid); }
+      }
+    }
     await delMilestone(m.id);
-    close();
+    onClose?.();
   };
 
   const handleOpenTask = (taskId) => {
     const task = S.tasks.find(t => t.id === taskId);
     if (task && onOpenTask) onOpenTask(task);
+  };
+
+  const handleDeleteTask = (ssId, ltObj) => {
+    if (!confirm('Delete this task? This cannot be undone.')) return;
+    softDeleteTask(ltObj.taskId);
+    setM(prev => ({
+      ...prev,
+      substeps: prev.substeps.map(s => s.id === ssId ? { ...s, linkedTasks: (s.linkedTasks||[]).filter(lt => lt.taskId !== ltObj.taskId) } : s)
+    }));
   };
 
   const handleCreateAndLink = (ssId) => {
@@ -172,7 +348,7 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
       <div className="modal modal-lg ms-modal" style={{display:'flex',flexDirection:'column',overflow:'hidden',padding:26,background:'var(--surface)',borderRadius:24}} onClick={e => e.stopPropagation()}>
 
         <h2 style={{marginBottom:4}}>{isEdit ? 'Edit Milestone' : 'New Milestone'}</h2>
-        <div style={{fontSize:11,color:'var(--warn)',marginBottom:10}}>* Title is required</div>
+        <div style={{fontSize:11,color:'var(--warn)',marginBottom:10}}>* Title, Client, and Assignee are required</div>
 
         {isEdit && (milestone.createdAt || milestone.updatedAt) && (
           <div style={{fontSize:11,color:'var(--t2)',marginBottom:10,lineHeight:1.6}}>
@@ -199,8 +375,8 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
 
           {/* ── SLIDE 0: Essentials ── */}
           <div className={`modal-section${tab===0?' active':''}`}>
-            <label className="fl">Mood *</label>
-            <div className="mood-pick-row" style={triedSave&&!m.mood?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
+            <label className="fl">Mood</label>
+            <div className="mood-pick-row">
               {S.moods.map(mood => {
                 const on = m.mood === mood.id;
                 return (
@@ -212,7 +388,6 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
                 );
               })}
             </div>
-            {triedSave && !m.mood && <div style={{fontSize:11,color:'var(--warn)',marginTop:4}}>Select a mood</div>}
 
             <label className="fl">Assign to *</label>
             <div className="ttag-row horizontal-scroll" style={triedSave&&!m.assignedTo.length?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
@@ -229,13 +404,13 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
             </div>
             {triedSave && !m.assignedTo.length && <div style={{fontSize:11,color:'var(--warn)',marginTop:4}}>Select at least one member</div>}
 
-            <label className="fl">Client / Project</label>
-            <div className="ttag-row horizontal-scroll">
+            <label className="fl">Client / Project *</label>
+            <div className="ttag-row horizontal-scroll" style={triedSave&&!m.clientId?{outline:'2px solid var(--warn)',borderRadius:8,padding:4}:{}}>
               {sel.scl(S).map(c => {
                 const on = m.clientId === c.id;
                 const col = c.color || 'var(--accent)';
                 return (
-                  <div key={c.id} onClick={()=>setClient(c.id)}
+                  <div key={c.id} onClick={()=>{setClient(c.id); setTriedSave(false);}}
                     className={`ms-client-chip${on?' on':''}`}
                     style={on?{borderColor:col,background:col+'18',color:col}:{}}>
                     {c.name}
@@ -243,6 +418,7 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
                 );
               })}
             </div>
+            {triedSave && !m.clientId && <div style={{fontSize:11,color:'var(--warn)',marginTop:4}}>Select a client</div>}
 
             <label className="fl">Date</label>
             <div style={{display:'flex',alignItems:'center',gap:6,marginTop:6,flexWrap:'wrap'}}>
@@ -289,7 +465,7 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
                         {ss.done ? '✓' : ''}
                       </div>
                       <span className={`ms-ss-title${ss.done?' done':''}`}>{ss.title || 'Untitled'}</span>
-                      {ss.linkedTaskIds?.length > 0 && <span className="ms-ss-linked">🔗 {ss.linkedTaskIds.length} task{ss.linkedTaskIds.length > 1 ? 's' : ''}</span>}
+                      {ss.linkedTasks?.length > 0 && <span className="ms-ss-linked">🔗 {ss.linkedTasks.length} task{ss.linkedTasks.length > 1 ? 's' : ''}</span>}
                       <span className="ms-ss-expand">{expandedSS[ss.id] ? '▲' : '▼'}</span>
                     </div>
                     {expandedSS[ss.id] && (
@@ -299,37 +475,37 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
                         <div className="ms-ss-link-section">
                           <label className="ms-ss-link-label">LINKED TASKS</label>
 
-                          {(ss.linkedTaskIds||[]).length > 0 && (
+                          {(ss.linkedTasks||[]).length > 0 && (
                             <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                              {(ss.linkedTaskIds||[]).map(taskId => {
-                                const lt = S.tasks.find(t => t.id === taskId);
+                              {(ss.linkedTasks||[]).map(ltObj => {
+                                const lt = S.tasks.find(t => t.id === ltObj.taskId);
                                 const tm = lt ? sel.gmood(S, lt.mood) : null;
                                 const tc = lt ? sel.gc(S, lt.clientId) : null;
                                 return lt ? (
-                                  <div key={taskId} style={{
-                                    display:'flex',alignItems:'center',gap:8,
-                                    border:'1px solid var(--border)',
+                                  <div key={ltObj.taskId} className="linked-task-card" style={{
                                     borderLeft:`3px solid ${tm?.color||'var(--accent)'}`,
-                                    borderRadius:'var(--r)',padding:'10px 12px',
-                                    background:'var(--surface)',fontSize:12,
                                   }}>
-                                    <span style={{fontSize:16,flexShrink:0}}>{tm?.icon||''}</span>
-                                    <div style={{flex:1,minWidth:0}}>
-                                      <div style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{lt.name}</div>
-                                      <div style={{display:'flex',alignItems:'center',gap:4,marginTop:2,flexWrap:'wrap'}}>
-                                        {tc && <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:(tc.color||'var(--s2)')+'22',color:tc.color||'var(--t2)',fontWeight:600}}>{tc.name}</span>}
-                                        {tm && <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:tm.bg,color:tm.color,fontWeight:600}}>{tm.icon} {tm.label}</span>}
-                                        <span style={{fontSize:9,padding:'1px 5px',borderRadius:4,background:'var(--s2)',fontWeight:600,color:'var(--t2)'}}>{lt.status}</span>
-                                        <span style={{fontSize:9,color:'var(--t3)',whiteSpace:'nowrap'}}>{lt.date||''}</span>
-                                      </div>
+                                    <div className="linked-task-top">
+                                      <span className="linked-task-mood">{tm?.icon||''}</span>
+                                      <span className="linked-task-name">{lt.name}</span>
+                                      <button className="icon-btn edit" title="Open task" onClick={()=>handleOpenTask(lt.id)}>✎</button>
+                                      <button className="icon-btn unlink" title="Unlink" onClick={()=>unlinkFromSubstep(ss.id, ltObj.taskId)}>⊗</button>
+                                      <button className="icon-btn del" title="Delete task" onClick={e=>{e.stopPropagation();handleDeleteTask(ss.id, ltObj);}}>🗑</button>
                                     </div>
-                                    <div style={{display:'flex',gap:4,flexShrink:0}}>
-                                      <button className="ms-ss-lp-action" title="Open task" onClick={()=>handleOpenTask(lt.id)}>✎</button>
-                                      <button className="ms-ss-lp-action" title="Unlink" onClick={()=>unlinkFromSubstep(ss.id, taskId)}>⊗</button>
+                                    <div className="linked-task-meta">
+                                      {tc && <span className="linked-task-client" style={{background:(tc.color||'var(--s2)')+'22',color:tc.color||'var(--t2)'}}>{tc.name}</span>}
+                                      {tm && <span className="linked-task-mood-tag" style={{background:tm.bg,color:tm.color}}>{tm.icon} {tm.label}</span>}
+                                      <span className="linked-task-status">{lt.status}</span>
+                                      <span className="linked-task-date">{lt.date||''}</span>
                                     </div>
+                                    <label className="show-dash-toggle">
+                                      <input type="checkbox" checked={ltObj.showOnDashboard}
+                                        onChange={() => toggleTaskDashVisibility(ss.id, ltObj.taskId)} />
+                                      Show on Task Dashboard
+                                    </label>
                                   </div>
                                 ) : (
-                                  <span key={taskId} style={{color:'var(--warn)',fontSize:12}}>Task not found (id: {taskId})</span>
+                                  <span key={ltObj.taskId} style={{color:'var(--warn)',fontSize:12}}>Task not found (id: {ltObj.taskId})</span>
                                 );
                               })}
                             </div>
@@ -340,13 +516,6 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
                             <button onClick={()=>handleCreateAndLink(ss.id)}>+ Create new task</button>
                           </div>
                         </div>
-
-                        {(ss.linkedTaskIds||[]).length > 0 && (
-                          <div className="ms-ss-ck-row">
-                            <input type="checkbox" checked={ss.showOnDashboard} onChange={()=>toggleSSDashboard(ss.id)} />
-                            <span>Show on Task Dashboard</span>
-                          </div>
-                        )}
 
                         <button className="ms-ss-remove" onClick={()=>removeSubstep(ss.id)}>🗑 Remove substep</button>
                       </div>
@@ -438,15 +607,7 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
 
             {isEdit && (
               <div className="ms-del-section">
-                {confirmDel ? (
-                  <div className="ms-del-confirm">
-                    <span>Delete this milestone?</span>
-                    <button className="btn btn-sm btn-d" onClick={handleDelete}>Yes, delete</button>
-                    <button className="btn btn-sm btn-g" onClick={()=>setConfirmDel(false)}>Cancel</button>
-                  </div>
-                ) : (
-                  <button className="ms-del-btn" onClick={()=>setConfirmDel(true)}>🗑 Delete milestone</button>
-                )}
+                <button className="ms-del-btn" onClick={handleDeleteMilestone}>🗑 Delete milestone</button>
               </div>
             )}
           </div>
@@ -455,10 +616,13 @@ export default function MilestoneModal({ milestone, onClose, onOpenTask, onCreat
 
         <div className="modal-footer" style={{flexShrink:0,marginTop:0}}>
           <div className="modal-footer-left">
-            {isEdit && <button className="btn btn-d" onClick={()=>setConfirmDel(true)}>🗑 Delete</button>}
+            {isEdit && <button className="btn btn-d" onClick={handleDeleteMilestone}>🗑 Delete</button>}
             <button className="modal-close-text" onClick={close}>Close</button>
           </div>
           <div className="modal-footer-right">
+            {saveStatus === 'saving' && <span style={{fontSize:12,color:'var(--t3)',fontWeight:600,marginRight:8}}>Saving…</span>}
+            {saveStatus === 'saved' && <span style={{fontSize:12,color:'var(--accent)',fontWeight:600,marginRight:8}}>Auto-saved</span>}
+            {saveStatus === 'error' && <span style={{fontSize:12,color:'var(--warn)',fontWeight:600,marginRight:8}}>Couldn't save. Retrying…</span>}
             <button className="btn btn-p" onClick={save} disabled={!m.title.trim()}
               style={{opacity:m.title.trim()?1:.5}}>Save milestone</button>
           </div>
